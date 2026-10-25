@@ -19,7 +19,13 @@ import {
   formatNumber,
   formatPeriod,
 } from '@vertex-hub/messages';
-import { documentHtml, escapeHtml, type TemplateAssets, textLines } from './document.js';
+import {
+  clientLogoTile,
+  documentHtml,
+  escapeHtml,
+  type TemplateAssets,
+  textLines,
+} from './document.js';
 
 /*
  * The retainer contract and annex PDFs (spec F05C K6, K10), in the shell of `document.ts` and the
@@ -91,6 +97,8 @@ table.party thead th { background: #004139; color: #FFFFFF; font-weight: 700; te
   padding: 6px 8px; font-size: 10pt; }
 table.party td { padding: 4px 8px; border-top: 1px solid #E7EFED; font-size: 9pt; vertical-align: top; }
 table.party td.label { width: 38%; color: #616866; }
+.party-head { display: flex; align-items: center; gap: 8px; }
+p.preamble.with-logo { display: flex; align-items: center; gap: 8px; }
 .blank { display: inline-block; min-width: 40mm; border-bottom: 1px dotted #616866; height: 1.1em; }
 .slogan { text-align: center; color: #004139; font-weight: 700; margin: 14px 0 6px; }
 .preamble { margin: 0 0 14px; }
@@ -129,10 +137,14 @@ function partyTable(
   caption: string,
   header: string | undefined,
   rows: readonly (readonly [string, string | undefined])[],
+  logo: string | null = null,
 ): string {
+  const head = logo
+    ? `<span class="party-head">${clientLogoTile(logo)}<span>${value(header)}</span></span>`
+    : value(header);
   return `<table class="party">
   <caption>${caption}</caption>
-  <thead><tr><th colspan="2">${value(header)}</th></tr></thead>
+  <thead><tr><th colspan="2">${head}</th></tr></thead>
   <tbody>${rows.map(([label, text]) => `<tr><td class="label">${label}</td><td>${value(text)}</td></tr>`).join('')}</tbody>
 </table>`;
 }
@@ -247,7 +259,7 @@ export function contractHtml(snapshot: ContractSnapshot, assets: TemplateAssets)
 <div class="title"><h1 class="contract-title">${T.title}</h1></div>
 <div class="parties">
   ${partyTable(T.firstParty, agency.legalName, agencyRows)}
-  ${partyTable(T.secondParty, client.signatoryName, clientRows)}
+  ${partyTable(T.secondParty, client.signatoryName, clientRows, assets.clientLogo)}
 </div>
 ${snapshot.slogan.trim() ? `<p class="slogan">${escapeHtml(snapshot.slogan)}</p>` : ''}
 <p class="preamble">${T.preamble}</p>
@@ -280,7 +292,7 @@ export function annexHtml(snapshot: AnnexSnapshot, assets: TemplateAssets): stri
   </dl>
 </div>
 <div class="title"><h1 class="contract-title">${escapeHtml(title)}</h1></div>
-<p class="preamble">${textLines(fill(T.annex.parties, { agency: agency.tradeName || agency.legalName, client: client.tradeName }))}</p>
+<p class="preamble${assets.clientLogo ? ' with-logo' : ''}">${clientLogoTile(assets.clientLogo)}<span>${textLines(fill(T.annex.parties, { agency: agency.tradeName || agency.legalName, client: client.tradeName }))}</span></p>
 <p class="preamble">${T.annex.intro}</p>
 <article>${annexAmendmentLines(amendment)
     .map((line) => `<p>${sentence(line)}</p>`)

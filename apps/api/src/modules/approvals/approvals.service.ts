@@ -35,8 +35,8 @@ import { ENV, type Env } from '../../core/config/env.js';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
-import { ClientDirectory, ClientEmails, type ClientSummary } from '../clients/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
+import { ClientDirectory, ClientEmails, type ClientSummary, clientRef } from '../clients/index.js';
 import { PostApprovals, PostReviewHooks } from '../content/index.js';
 import { FileVersions, type SentVersion } from '../files/index.js';
 import { ClientReviewHooks, type PendingApproval, TaskApprovals } from '../tasks/index.js';
@@ -827,7 +827,7 @@ export class ApprovalsService implements OnModuleInit {
         own.find((entry) => entry.status === status)?.value ?? 0;
       return {
         id: row.id,
-        client: { id: row.clientId, name: clients.get(row.clientId)?.name ?? '' },
+        client: clientRef(clients, row.clientId),
         contact: contacts.get(row.contactId) ?? { id: row.contactId, name: '', archived: true },
         state: approvalRequestState(row, now),
         items: {
@@ -839,7 +839,7 @@ export class ApprovalsService implements OnModuleInit {
         issuedAt: row.linkIssuedAt.toISOString(),
         expiresAt: row.expiresAt.toISOString(),
         remindedAt: row.remindedAt?.toISOString() ?? null,
-        createdBy: { id: row.createdById, name: people.get(row.createdById)?.name ?? '' },
+        createdBy: personRef(people, row.createdById),
         createdAt: row.createdAt.toISOString(),
       };
     });

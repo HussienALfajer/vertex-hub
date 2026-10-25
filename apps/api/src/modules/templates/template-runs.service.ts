@@ -36,7 +36,12 @@ import { and, count, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
+import {
+  type CurrentUserInfo,
+  lockAccessChanges,
+  personRef,
+  UserDirectory,
+} from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { HolidayCalendar } from '../hr/index.js';
 import { type Notice, NotificationCenter } from '../notifications/index.js';
@@ -356,7 +361,7 @@ export class TemplateRunsService implements OnModuleInit {
       target,
       assignees: [...assigned].map(([department, userId]) => ({
         department,
-        user: userId ? { id: userId, name: people.get(userId)?.name ?? '' } : null,
+        user: userId ? personRef(people, userId) : null,
       })),
       isMember: (userId, department) => pairs.has(`${userId}:${department}`),
       revisionLimit,
@@ -664,7 +669,7 @@ export class TemplateRunsService implements OnModuleInit {
           archived: !!template?.archivedAt,
         },
         trigger: row.trigger,
-        project: project ? { id: project.id, name: project.name } : null,
+        project: project ? { id: project.id, name: project.name, imageId: project.imageId } : null,
         cycle: cycle
           ? {
               id: cycle.id,
@@ -678,7 +683,9 @@ export class TemplateRunsService implements OnModuleInit {
         startDate: row.startDate,
         taskCount: row.taskCount,
         milestonesCreated: row.milestonesCreated,
-        createdBy: creator ? { id: creator.id, name: creator.name } : null,
+        createdBy: creator
+          ? { id: creator.id, name: creator.name, imageId: creator.imageId }
+          : null,
         createdAt: row.createdAt.toISOString(),
         ...(withTasks && {
           tasks: runTasks

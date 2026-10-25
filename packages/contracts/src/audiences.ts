@@ -54,7 +54,7 @@ export const audienceMemberSchema = z
   .object({
     id: z.uuid(),
     name: z.string(),
-    image: z.string().nullable(),
+    imageId: z.uuid().nullable(),
     /** The primary department; null for an account without one. */
     department: departmentCodeSchema.nullable(),
   })

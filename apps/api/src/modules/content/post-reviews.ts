@@ -15,7 +15,7 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { UserDirectory } from '../auth/index.js';
+import { personRef, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
 import type { LinkedTask } from '../tasks/index.js';
@@ -256,7 +256,7 @@ export class PostReviews {
       ]),
       this.clients.contactSummaries(responses.map((response) => response.contactId)),
     ]);
-    const person = (userId: string) => ({ id: userId, name: people.get(userId)?.name ?? '' });
+    const person = (userId: string) => personRef(people, userId);
     // In the order of the snapshot: the display order of the media (rule 5).
     const versionsOf = (ids: string[]): ReviewVersion[] =>
       ids.flatMap((id) => versions.get(id) ?? []);

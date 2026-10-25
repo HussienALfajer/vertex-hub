@@ -10,6 +10,7 @@ import {
   type CampaignPdfReadyJob,
   campaignPdfReadyJobSchema,
   type QuotePdfRender,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import { adWalletEntries, type Database, type Transaction } from '@vertex-hub/db';
 import { eq } from 'drizzle-orm';
@@ -18,7 +19,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { JobQueue, payloadHash } from '../../core/jobs/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
-import { GeneratedFiles } from '../files/index.js';
+import { GeneratedFiles, ImagesService } from '../files/index.js';
 import { QuoteDirectory } from '../quotes/index.js';
 import { covers } from './campaign-access.js';
 
@@ -52,6 +53,7 @@ export class AdReceiptsService implements OnModuleInit {
     private readonly quotes: QuoteDirectory,
     private readonly files: GeneratedFiles,
     private readonly jobs: JobQueue,
+    private readonly images: ImagesService,
   ) {}
 
   onModuleInit(): void {
@@ -94,7 +96,7 @@ export class AdReceiptsService implements OnModuleInit {
   /** Queues the receipt of a deposit just recorded, once committed. */
   async queue(entry: EntryRow): Promise<void> {
     const job = receiptJob(entry);
-    if (job) await this.send(job);
+    if (job) await this.send(job, entry.clientId);
   }
 
   /** Rule 18: a voided deposit's receipt document is archived, as the void's actor. */
@@ -109,7 +111,7 @@ export class AdReceiptsService implements OnModuleInit {
    * refund has no receipt, and a void deposit's receipt is archived: both `INVALID_TRANSITION`.
    */
   async render(actor: CurrentUserInfo, entryId: string): Promise<QuotePdfRender> {
-    const { state, job } = await this.db.transaction(async (tx) => {
+    const { state, job, clientId } = await this.db.transaction(async (tx) => {
       const [entry] = await tx
         .select()
         .from(adWalletEntries)
@@ -123,14 +125,16 @@ export class AdReceiptsService implements OnModuleInit {
       const pending = receiptJob(entry);
       // A deposit recorded before receipts were rendered has none.
       if (!pending) throw new NotFoundException();
-      if (entry.receiptPdfStatus === 'ready') return { state: 'ready' as const, job: null };
+      if (entry.receiptPdfStatus === 'ready') {
+        return { state: 'ready' as const, job: null, clientId: entry.clientId };
+      }
       await tx
         .update(adWalletEntries)
         .set({ receiptPdfStatus: 'pending' })
         .where(eq(adWalletEntries.id, entryId));
-      return { state: 'pending' as const, job: pending };
+      return { state: 'pending' as const, job: pending, clientId: entry.clientId };
     });
-    if (job) await this.send(job);
+    if (job) await this.send(job, clientId);
     return { state };
   }
 
@@ -211,8 +215,13 @@ export class AdReceiptsService implements OnModuleInit {
     return client;
   }
 
-  private async send(job: CampaignPdfJob): Promise<void> {
-    await this.jobs.send(CAMPAIGNS_PDF_JOB.queue, job, {
+  /** F01C rule 14: with the client's current logo. */
+  private async send(job: UnqueuedPdfJob<CampaignPdfJob>, clientId: string): Promise<void> {
+    const queued: CampaignPdfJob = {
+      ...job,
+      clientLogoKey: await this.images.clientLogoKey(clientId),
+    };
+    await this.jobs.send(CAMPAIGNS_PDF_JOB.queue, queued, {
       retryLimit: CAMPAIGNS_PDF_JOB.retryLimit,
     });
   }
@@ -227,7 +236,7 @@ export class AdReceiptsService implements OnModuleInit {
 }
 
 /** The render of a deposit's receipt: its frozen snapshot; null when it has none. */
-function receiptJob(entry: EntryRow): CampaignPdfJob | null {
+function receiptJob(entry: EntryRow): UnqueuedPdfJob<CampaignPdfJob> | null {
   if (!entry.receiptSnapshot) return null;
   const snapshot = adDepositReceiptSnapshotSchema.parse(entry.receiptSnapshot);
   return { kind: KIND, id: entry.id, hash: receiptHash(snapshot), snapshot };

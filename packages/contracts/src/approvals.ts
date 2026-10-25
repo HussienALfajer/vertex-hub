@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { calendarDateSchema, timeOfDaySchema } from './dates.js';
 import { emailSummarySchema } from './email-basics.js';
 import { filePreviewStatusSchema, fileTypeSchema, fileVersionKindSchema } from './files.js';
+import { clientRefSchema, personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
 import { postPlatformSchema, postTypeSchema } from './post-values.js';
 import { optionalText } from './text.js';
@@ -151,13 +152,13 @@ export type PublicApproveAllInput = z.input<typeof publicApproveAllSchema>;
 
 // Responses
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
+const namedSchema = z.object({ id: z.uuid(), name: z.string() });
 
 export const approvalRequestSchema = z
   .object({
     id: z.uuid(),
-    client: personSchema,
-    contact: personSchema.extend({ archived: z.boolean() }),
+    client: clientRefSchema,
+    contact: namedSchema.extend({ archived: z.boolean() }),
     state: approvalRequestStateSchema,
     items: z.object({
       total: z.number().int().min(1),

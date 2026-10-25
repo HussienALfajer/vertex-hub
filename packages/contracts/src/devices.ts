@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { departmentCodeSchema } from './departments.js';
+import { personSchema } from './images.js';
 import { devicePushSchema } from './push.js';
 
 /*
@@ -163,7 +164,7 @@ const devicePlaceSchema = z.object({
 /** Rule 15: another user signed in on the device of a session. */
 export const sharedDeviceUserSchema = z
   .object({
-    user: z.object({ id: z.uuid(), name: z.string(), image: z.string().nullable() }),
+    user: personSchema,
     department: z.object({ code: departmentCodeSchema, name: z.string() }).nullable(),
     match: deviceMatchSchema,
     lastActiveAt: z.iso.datetime(),

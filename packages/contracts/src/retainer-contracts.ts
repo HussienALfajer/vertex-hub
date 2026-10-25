@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { calendarDateSchema } from './dates.js';
+import { personSchema } from './images.js';
 import { currencySchema, minorAmountSchema } from './money.js';
 import { quotePdfStateSchema } from './quotes.js';
 import {
@@ -175,7 +176,7 @@ export const contractSettingsSchema = settingsFieldsSchema
     nextNumber: z.string(),
     articles: z.array(contractArticleSchema),
     updatedAt: z.iso.datetime(),
-    updatedBy: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    updatedBy: personSchema.nullable(),
     canEdit: z.boolean(),
   })
   .meta({ id: 'ContractSettings' });
@@ -414,7 +415,7 @@ export const contractAnnexSchema = z
     pdf: contractPdfSchema,
     signed: signedCopySchema,
     voided: voidedSchema,
-    issuedBy: contractPersonSchema.nullable(),
+    issuedBy: personSchema.nullable(),
     createdAt: z.iso.datetime(),
   })
   .meta({ id: 'ContractAnnex' });
@@ -448,7 +449,7 @@ export const retainerContractSchema = z
     signed: signedCopySchema,
     voided: voidedSchema,
     issuedAt: z.iso.datetime().nullable(),
-    issuedBy: contractPersonSchema.nullable(),
+    issuedBy: personSchema.nullable(),
     /** K9: the term was edited or cancelled, or applied amendments of its cycles have no annex. */
     changedSinceIssue: z.boolean(),
     /** Oldest first, void ones included. */

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { calendarDateSchema } from './dates.js';
+import { personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
 import { currencySchema, minorAmountSchema } from './money.js';
 import { optionalText } from './text.js';
@@ -66,7 +67,7 @@ export const extraWorkSchema = z
     description: z.string().nullable(),
     requestedOn: calendarDateSchema,
     contact: z.object({ id: z.uuid(), name: z.string(), archived: z.boolean() }).nullable(),
-    loggedBy: z.object({ id: z.uuid(), name: z.string() }),
+    loggedBy: personSchema,
     billingStatus: extraWorkBillingSchema,
     billingNote: z.string().nullable(),
     createdAt: z.iso.datetime(),

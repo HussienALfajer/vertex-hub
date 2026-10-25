@@ -103,12 +103,23 @@ const renderedFileSchema = z
   })
   .nullable();
 
+/**
+ * F01C rule 14: the storage key of the client's current logo under `FILES_ROOT`, printed beside
+ * the client's name; null without one. Read when the job is queued, so a render keeps the logo it
+ * was queued with. Outside the hash: the logo does not make another document.
+ */
+const clientLogoKeySchema = z.string().min(1).nullable().default(null);
+
+/** A client-facing PDF job before it is queued: the API adds `clientLogoKey` when it sends it. */
+export type UnqueuedPdfJob<Job> = Job extends unknown ? Omit<Job, 'clientLogoKey'> : never;
+
 export const quotePdfJobSchema = z.object({
   quoteId: z.uuid(),
   /** A draft preview, printed with a "draft" watermark. */
   draft: z.boolean(),
   /** SHA-256 of the payload, hex. */
   hash: renderHashSchema,
+  clientLogoKey: clientLogoKeySchema,
   snapshot: quoteSnapshotSchema,
 });
 
@@ -149,24 +160,28 @@ export const invoicePdfJobSchema = z.discriminatedUnion('kind', [
     kind: z.literal('invoice'),
     id: z.uuid(),
     hash: renderHashSchema,
+    clientLogoKey: clientLogoKeySchema,
     snapshot: invoiceSnapshotSchema,
   }),
   z.object({
     kind: z.literal('invoice_draft'),
     id: z.uuid(),
     hash: renderHashSchema,
+    clientLogoKey: clientLogoKeySchema,
     snapshot: invoiceDraftSnapshotSchema,
   }),
   z.object({
     kind: z.literal('receipt'),
     id: z.uuid(),
     hash: renderHashSchema,
+    clientLogoKey: clientLogoKeySchema,
     snapshot: receiptSnapshotSchema,
   }),
   z.object({
     kind: z.literal('statement'),
     id: z.uuid(),
     hash: renderHashSchema,
+    clientLogoKey: clientLogoKeySchema,
     snapshot: statementSnapshotSchema,
   }),
 ]);
@@ -210,6 +225,7 @@ export const campaignPdfJobSchema = z.object({
   kind: z.literal('ad_deposit_receipt'),
   id: z.uuid(),
   hash: renderHashSchema,
+  clientLogoKey: clientLogoKeySchema,
   snapshot: adDepositReceiptSnapshotSchema,
 });
 
@@ -245,12 +261,14 @@ export const reportPdfJobSchema = z.discriminatedUnion('kind', [
     kind: z.literal('client_report'),
     id: z.uuid(),
     hash: renderHashSchema,
+    clientLogoKey: clientLogoKeySchema,
     snapshot: clientReportSnapshotSchema,
   }),
   z.object({
     kind: z.literal('cycle_report'),
     id: z.uuid(),
     hash: renderHashSchema,
+    clientLogoKey: clientLogoKeySchema,
     snapshot: cycleReportSnapshotSchema,
   }),
 ]);
@@ -291,18 +309,21 @@ export const contractPdfJobSchema = z.discriminatedUnion('kind', [
     kind: z.literal('contract'),
     id: z.uuid(),
     hash: renderHashSchema,
+    clientLogoKey: clientLogoKeySchema,
     snapshot: contractSnapshotSchema,
   }),
   z.object({
     kind: z.literal('contract_draft'),
     id: z.uuid(),
     hash: renderHashSchema,
+    clientLogoKey: clientLogoKeySchema,
     snapshot: contractSnapshotSchema,
   }),
   z.object({
     kind: z.literal('annex'),
     id: z.uuid(),
     hash: renderHashSchema,
+    clientLogoKey: clientLogoKeySchema,
     snapshot: annexSnapshotSchema,
   }),
 ]);

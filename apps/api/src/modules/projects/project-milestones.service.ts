@@ -16,7 +16,7 @@ import { and, asc, count, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { EngagementNotices } from './engagement-notices.js';
@@ -90,7 +90,6 @@ export class ProjectMilestonesService {
     ]);
     const today = businessDate();
     return rows.map((row) => {
-      const doneBy = row.doneById ? people.get(row.doneById) : undefined;
       return {
         id: row.id,
         projectId: row.projectId,
@@ -100,7 +99,7 @@ export class ProjectMilestonesService {
         status: row.status,
         overdue: row.status === 'pending' && row.dueDate !== null && row.dueDate < today,
         doneAt: row.doneAt?.toISOString() ?? null,
-        doneBy: row.doneById ? { id: row.doneById, name: doneBy?.name ?? '' } : null,
+        doneBy: row.doneById ? personRef(people, row.doneById) : null,
         tasks: counts.get(row.id) ?? NO_TASKS,
         ...(withMoney && { money: { installmentMinor: row.installmentMinor } }),
       };

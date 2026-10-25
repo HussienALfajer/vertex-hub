@@ -13,6 +13,7 @@ import {
 } from './dates.js';
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { calendarLeaveSchema } from './hr.js';
+import { clientRefSchema, personSchema } from './images.js';
 import { invoiceStatusSchema } from './invoices.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, queryListSchema } from './lists.js';
 import { taskLinkProblem, taskStatusSchema, taskTitleSchema } from './tasks.js';
@@ -438,9 +439,8 @@ export type ConflictQueryInput = z.input<typeof conflictQuerySchema>;
 
 // Responses
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
-
 const archivablePersonSchema = personSchema.extend({ archived: z.boolean() });
+const archivableClientSchema = clientRefSchema.extend({ archived: z.boolean() });
 
 /** `leave`: an approved leave (F17 rules B16 and B17), never booked here. */
 export const CALENDAR_ITEM_KINDS = ['shoot', 'meeting', 'leave'] as const;
@@ -481,7 +481,7 @@ export const shootSchema = z
     type: shootTypeSchema,
     status: shootStatusSchema,
     /** Null for an internal shoot; `archived` is the client's state (edge case 9). */
-    client: archivablePersonSchema.nullable(),
+    client: archivableClientSchema.nullable(),
     startsAt: z.iso.datetime(),
     endsAt: z.iso.datetime(),
     location: z.string(),
@@ -602,7 +602,7 @@ export const meetingSchema = z
     id: z.uuid(),
     title: z.string(),
     status: meetingStatusSchema,
-    client: archivablePersonSchema.nullable(),
+    client: archivableClientSchema.nullable(),
     startsAt: z.iso.datetime(),
     endsAt: z.iso.datetime(),
     location: z.string().nullable(),
@@ -689,7 +689,7 @@ export const keyDateSchema = z
     /** What the chip opens: the project (also for a milestone), the retainer or the invoice. */
     targetId: z.uuid(),
     /** Null for a `holiday`, whose `targetId` is the holiday's id and opens nothing. */
-    client: archivablePersonSchema.nullable(),
+    client: archivableClientSchema.nullable(),
     /** The invoice's status for `invoice_due` (never an amount); null for the other kinds. */
     invoiceStatus: invoiceStatusSchema.nullable(),
   })

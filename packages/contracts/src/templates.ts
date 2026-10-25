@@ -9,6 +9,7 @@ import {
   workDaysBetween,
 } from './dates.js';
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
+import { clientRefSchema, type PersonRef, personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, sortOrderSchema } from './lists.js';
 import { type DeliverableKind, deliverableKindSchema } from './retainers.js';
 import {
@@ -217,7 +218,7 @@ export type UpdateTemplateInput = z.input<typeof updateTemplateSchema>;
 
 // Responses
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
+const namedSchema = z.object({ id: z.uuid(), name: z.string() });
 
 export const templateStageSchema = z
   .object({ id: z.uuid(), name: z.string(), position: z.number().int().min(1) })
@@ -275,7 +276,7 @@ export const templateDetailSchema = z
       z.object({ type: z.literal('invalid_assignee'), department: departmentCodeSchema }),
     ),
     /** Monthly templates: the non-archived retainers linked to it. */
-    linkedRetainers: z.array(personSchema.extend({ client: personSchema })),
+    linkedRetainers: z.array(namedSchema.extend({ client: clientRefSchema })),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
     archivedAt: z.iso.datetime().nullable(),
@@ -467,7 +468,7 @@ export interface PlanInput {
   template: { stages: { id: string; name: string; position: number }[]; steps: TemplateStep[] };
   target: PlanTarget;
   /** The assignee per department; a department left out goes to its queue. */
-  assignees: { department: DepartmentCode; user: { id: string; name: string } | null }[];
+  assignees: { department: DepartmentCode; user: PersonRef | null }[];
   /** Whether the user is a non-archived member of the department at run time (rule 10). */
   isMember: (userId: string, department: DepartmentCode) => boolean;
   /** Replaces every step's revision limit (F04 A4: project runs from an accepted quote). */
@@ -690,9 +691,9 @@ export const templateRunTaskSchema = z
 export const templateRunSchema = z
   .object({
     id: z.uuid(),
-    template: personSchema.extend({ archived: z.boolean() }),
+    template: namedSchema.extend({ archived: z.boolean() }),
     trigger: templateRunTriggerSchema,
-    project: personSchema.nullable(),
+    project: namedSchema.nullable(),
     cycle: z
       .object({
         id: z.uuid(),
@@ -700,7 +701,7 @@ export const templateRunSchema = z
         number: z.number().int().min(1),
         periodStart: calendarDateSchema,
         periodEnd: calendarDateSchema,
-        retainer: personSchema,
+        retainer: namedSchema,
       })
       .nullable(),
     /** `missing_tasks` runs: the line they filled. */
@@ -762,7 +763,7 @@ export const retainerTemplateLineSchema = z
 
 export const retainerTemplateSchema = z
   .object({
-    template: personSchema.extend({ archived: z.boolean() }).nullable(),
+    template: namedSchema.extend({ archived: z.boolean() }).nullable(),
     /** The open current cycle, or null. */
     cycle: z
       .object({

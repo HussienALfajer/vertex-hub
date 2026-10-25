@@ -8,6 +8,7 @@ import {
   calendarMonthSchema,
   instantSchema,
 } from './dates.js';
+import { personSchema } from './images.js';
 
 /*
  * HR attendance (spec F17 part C, ADR 0039): attendance passkeys, entrance screens (kiosks) and
@@ -432,6 +433,11 @@ export const attendanceGreetingSchema = z
     firstEventAt: instantSchema.nullable(),
     /** `out` only: the time worked today. */
     workedMinutes: z.number().int().min(0).nullable(),
+    /**
+     * F01C rule 15: the `md` photo as a `data:image/webp;base64` URL (the uploaded square while
+     * pending), so the entrance screen shows it without a session; null shows the initial.
+     */
+    photo: z.string().startsWith('data:image/').nullable(),
   })
   .meta({ id: 'AttendanceGreeting' });
 
@@ -441,17 +447,15 @@ export type AttendanceGreeting = z.infer<typeof attendanceGreetingSchema>;
  * Rules C3 and C9: the attendance passkey, a WebAuthn credential that never signs anyone in.
  */
 
-const personRefSchema = z.object({ id: z.uuid(), name: z.string() });
-
 export const attendancePasskeySchema = z
   .object({
     id: z.uuid(),
-    user: personRefSchema,
+    user: personSchema,
     /** The registering browser, e.g. "Safari · iPhone". */
     deviceLabel: z.string(),
     status: passkeyStatusSchema,
     /** Who approved the replacement, or revoked it. */
-    decidedBy: personRefSchema.nullable(),
+    decidedBy: personSchema.nullable(),
     decidedAt: instantSchema.nullable(),
     createdAt: instantSchema,
   })

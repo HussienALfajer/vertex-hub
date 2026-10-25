@@ -36,8 +36,8 @@ import { and, desc, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
+import { ClientDirectory, type ClientSummary, clientRef } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
 import { DocumentNumbers } from '../invoices/index.js';
 import { AdReceiptsService } from './ad-receipts.service.js';
@@ -141,11 +141,8 @@ export class AdWalletsService {
       if (query.low && !low) return [];
       return [
         {
-          client: { id, name: client.name },
-          accountManager: {
-            id: client.accountManagerId,
-            name: managers.get(client.accountManagerId)?.name ?? '',
-          },
+          client: clientRef(clients, id),
+          accountManager: personRef(managers, client.accountManagerId),
           depositedMinor: total.depositedMinor,
           refundedMinor: total.refundedMinor,
           spentMinor: total.spentMinor,
@@ -422,7 +419,7 @@ export class AdWalletsService {
       entries.flatMap((entry) => entry.proofFileItemId ?? []),
       executor,
     );
-    const person = (id: string) => ({ id, name: people.get(id)?.name ?? '' });
+    const person = (id: string) => personRef(people, id);
     const live = entries.filter((entry) => !entry.voidedAt);
     const sumOf = (kind: EntryRow['kind']) =>
       live.filter((entry) => entry.kind === kind).reduce((sum, entry) => sum + entry.usdMinor, 0);
@@ -473,7 +470,12 @@ export class AdWalletsService {
     const ledger = walletLedger(items, query);
     const canFund = covers(actor, 'campaigns.fund', client);
     return {
-      client: { id: client.id, name: client.name, archived: client.archived },
+      client: {
+        id: client.id,
+        name: client.name,
+        imageId: client.imageId,
+        archived: client.archived,
+      },
       depositedMinor: sumOf('deposit'),
       refundedMinor: sumOf('refund'),
       spentMinor,

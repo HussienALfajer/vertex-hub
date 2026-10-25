@@ -249,7 +249,7 @@ describe('templates', () => {
       expect(created.assignees).toEqual([
         {
           department: 'design',
-          user: { id: cast.employee.id, name: cast.employee.name, archived: false },
+          user: { id: cast.employee.id, name: cast.employee.name, imageId: null, archived: false },
           valid: true,
         },
       ]);
@@ -587,7 +587,11 @@ describe('templates', () => {
       .values({ retainerId: retainer.id, templateId: monthly.id, linkedById: cast.gm.id });
 
     expect((await detail(monthly.id, cast.employee.cookie)).linkedRetainers).toEqual([
-      { id: retainer.id, name: retainer.name, client: { id: clientId, name: tradeName } },
+      {
+        id: retainer.id,
+        name: retainer.name,
+        client: { id: clientId, name: tradeName, imageId: null },
+      },
     ]);
     const response = await client.get(
       `/api/templates?search=${encodeURIComponent(monthly.name)}`,

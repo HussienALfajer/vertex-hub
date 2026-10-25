@@ -9,6 +9,7 @@ import {
   quotePdfStorageKey,
 } from '@vertex-hub/contracts';
 import { ENV, type Env } from '../core/config/env.js';
+import { readClientLogo } from '../pdf/client-logo.js';
 import { storeOnce } from '../pdf/pdf-objects.js';
 import { PdfRenderer } from '../pdf/pdf-renderer.js';
 import { PgBossService } from './pg-boss.service.js';
@@ -54,8 +55,12 @@ export class QuotesPdfJob implements OnApplicationBootstrap {
   /** Writes the PDF once per payload hash; a rerun finds it and reports the same file. */
   async render(data: unknown): Promise<QuotePdfReadyJob> {
     const job = quotePdfJobSchema.parse(data);
-    const file = await storeOnce(this.root, quotePdfStorageKey(job), () =>
-      this.renderer.quote(job.snapshot, { draft: job.draft }),
+    const file = await storeOnce(this.root, quotePdfStorageKey(job), async () =>
+      this.renderer.quote(
+        job.snapshot,
+        { draft: job.draft },
+        await readClientLogo(this.root, job.clientLogoKey, this.logger),
+      ),
     );
     return { quoteId: job.quoteId, draft: job.draft, hash: job.hash, file };
   }

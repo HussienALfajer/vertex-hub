@@ -152,7 +152,9 @@ export class SalaryChangesService {
         amountMinor: row.amountMinor,
         currency: row.currency,
         reason: row.reason,
-        createdBy: creator ? { id: creator.id, name: creator.name } : null,
+        createdBy: creator
+          ? { id: creator.id, name: creator.name, imageId: creator.imageId }
+          : null,
         createdAt: row.createdAt.toISOString(),
         archivedAt: row.archivedAt?.toISOString() ?? null,
         archiveReason: row.archiveReason,

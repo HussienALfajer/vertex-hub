@@ -50,7 +50,12 @@ import {
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
+import {
+  type CurrentUserInfo,
+  lockAccessChanges,
+  personRef,
+  UserDirectory,
+} from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
 import { LeaveDirectory } from '../hr/index.js';
@@ -283,7 +288,7 @@ export class TasksService {
         ...revisions.flatMap((r) => (r.extraWorkItemId ? [r.extraWorkItemId] : [])),
       ]),
     ]);
-    const person = (userId: string) => ({ id: userId, name: people.get(userId)?.name ?? '' });
+    const person = (userId: string) => personRef(people, userId);
     const requestExtra = task.extraWorkItemId ? extraWork.get(task.extraWorkItemId) : undefined;
     return {
       ...item,
@@ -786,6 +791,7 @@ export class TasksService {
           [task.assigneeId, assigneeId].filter((userId): userId is string => !!userId),
           tx,
         );
+        // The audit names the people; their photos are not part of the change.
         const who = (userId: string | null) =>
           userId ? { id: userId, name: people.get(userId)?.name ?? '' } : null;
         await audit('task.assigned', {
@@ -1036,6 +1042,7 @@ export class TasksService {
             ? {
                 id: assignee.id,
                 name: assignee.name,
+                imageId: assignee.imageId,
                 archived: assignee.archived,
                 inDepartment: !!memberships.get(assignee.id)?.has(row.department),
               }
@@ -1047,10 +1054,12 @@ export class TasksService {
         dueTime,
         overdue: isTaskOverdue({ status: row.status, dueDate: row.dueDate, dueTime }, now),
         blocked: blocked.has(row.id),
-        client: client ? { id: client.id, name: client.name } : null,
-        project: project ? { id: project.id, name: project.name } : null,
+        client: client ? { id: client.id, name: client.name, imageId: client.imageId } : null,
+        project: project ? { id: project.id, name: project.name, imageId: project.imageId } : null,
         milestone: milestone ? { id: milestone.id, name: milestone.name } : null,
-        retainer: cycle ? { id: cycle.retainerId, name: cycle.retainerName } : null,
+        retainer: cycle
+          ? { id: cycle.retainerId, name: cycle.retainerName, imageId: cycle.imageId }
+          : null,
         cycle: cycle
           ? { id: cycle.id, periodStart: cycle.periodStart, periodEnd: cycle.periodEnd }
           : null,

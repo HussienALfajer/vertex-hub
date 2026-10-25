@@ -9,6 +9,7 @@ import type { AttendanceGreeting } from '@vertex-hub/contracts';
 import { type Listener, listen, type Transaction } from '@vertex-hub/db';
 import { sql } from 'drizzle-orm';
 import { ENV, type Env } from '../../core/config/env.js';
+import { ImagesService } from '../files/index.js';
 
 /** The `pg_notify` channel from a punch's transaction to the screens' streams. */
 const KIOSK_CHANNEL = 'attendance_kiosk';
@@ -30,11 +31,22 @@ export class KioskStream implements BeforeApplicationShutdown, OnApplicationShut
   private readonly subscribers = new Map<string, Set<KioskSubscriber>>();
   private listener: Promise<Listener> | null = null;
 
-  constructor(@Inject(ENV) private readonly env: Env) {}
+  constructor(
+    @Inject(ENV) private readonly env: Env,
+    private readonly images: ImagesService,
+  ) {}
 
-  /** Sent when the punch's transaction commits. */
-  async publish(tx: Transaction, kioskId: string, greeting: AttendanceGreeting): Promise<void> {
-    const payload = JSON.stringify({ kioskId, greeting });
+  /**
+   * Sent when the punch's transaction commits. The photo (F01C rule 15) is too large for a
+   * notification's 8000 bytes: the image id goes instead and the stream's process reads it.
+   */
+  async publish(
+    tx: Transaction,
+    kioskId: string,
+    greeting: AttendanceGreeting,
+    imageId: string | null,
+  ): Promise<void> {
+    const payload = JSON.stringify({ kioskId, greeting: { ...greeting, photo: null }, imageId });
     await tx.execute(sql`select pg_notify(${KIOSK_CHANNEL}, ${payload})`);
   }
 
@@ -44,7 +56,7 @@ export class KioskStream implements BeforeApplicationShutdown, OnApplicationShut
       const attempt = listen(
         this.env.DATABASE_URL,
         KIOSK_CHANNEL,
-        (payload) => this.deliver(payload),
+        (payload) => void this.deliver(payload),
         (error) => {
           this.logger.warn(`Kiosk listener lost: ${error.message}`);
           if (this.listener === attempt) this.listener = null;
@@ -79,13 +91,18 @@ export class KioskStream implements BeforeApplicationShutdown, OnApplicationShut
     await listener?.then((connected) => connected.close()).catch(() => {});
   }
 
-  private deliver(payload: string): void {
+  private async deliver(payload: string): Promise<void> {
     try {
-      const { kioskId, greeting } = JSON.parse(payload) as {
+      const { kioskId, greeting, imageId } = JSON.parse(payload) as {
         kioskId: string;
         greeting: AttendanceGreeting;
+        imageId: string | null;
       };
-      for (const subscriber of this.subscribers.get(kioskId) ?? []) subscriber.greet(greeting);
+      if (!this.subscribers.has(kioskId)) return;
+      const photo = await this.images.photoDataUrl(imageId);
+      for (const subscriber of this.subscribers.get(kioskId) ?? []) {
+        subscriber.greet({ ...greeting, photo });
+      }
     } catch (error) {
       this.logger.error(error, 'Kiosk greeting failed');
     }

@@ -107,7 +107,7 @@ export class NotificationPolicies {
         defaults: { push, email },
         push: row?.push ?? push,
         email: row?.email ?? email,
-        updatedBy: editor ? { id: editor.id, name: editor.name } : null,
+        updatedBy: editor ? { id: editor.id, name: editor.name, imageId: editor.imageId } : null,
         updatedAt: row?.updatedAt.toISOString() ?? null,
       };
     });

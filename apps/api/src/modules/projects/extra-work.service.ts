@@ -17,7 +17,7 @@ import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { EngagementNotices } from './engagement-notices.js';
@@ -296,7 +296,7 @@ export class ExtraWorkService {
         description: row.description,
         requestedOn: row.requestedOn,
         contact: contact ?? null,
-        loggedBy: { id: row.loggedById, name: people.get(row.loggedById)?.name ?? '' },
+        loggedBy: personRef(people, row.loggedById),
         billingStatus: row.billingStatus,
         billingNote: row.billingNote,
         createdAt: row.createdAt.toISOString(),

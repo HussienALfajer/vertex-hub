@@ -27,7 +27,12 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
+import {
+  type CurrentUserInfo,
+  lockAccessChanges,
+  personRef,
+  UserDirectory,
+} from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
 import { type ConversionResult, LeadPipeline } from '../leads/index.js';
@@ -159,14 +164,12 @@ export class QuoteAcceptService {
       );
       const amounts = totalsOf(quote, children).installmentAmountsMinor;
       const mapping = defaultInstallmentMilestones(children.installments.length, milestones.length);
-      const manager = projectManagerId
-        ? (await this.users.summaries([projectManagerId])).get(projectManagerId)
-        : undefined;
+      const managers = projectManagerId
+        ? await this.users.summaries([projectManagerId])
+        : new Map();
       project = {
         name: quote.title,
-        projectManager: projectManagerId
-          ? { id: projectManagerId, name: manager?.name ?? '' }
-          : null,
+        projectManager: projectManagerId ? personRef(managers, projectManagerId) : null,
         departments: derived.oneOff.departments,
         startDate,
         dueDate,

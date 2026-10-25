@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BRAND_FILE_KINDS } from './clients.js';
 import { calendarMonthSchema } from './dates.js';
+import { personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
 import { httpUrlSchema, optionalText } from './text.js';
 
@@ -313,8 +314,6 @@ export const setFinalSchema = z.object({ final: z.boolean() }).meta({ id: 'SetFi
 export type SetFinal = z.infer<typeof setFinalSchema>;
 
 // Responses
-
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
 
 export const fileUploadSchema = z
   .object({

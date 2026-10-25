@@ -11,6 +11,7 @@ import {
   workDaysBefore,
 } from './dates.js';
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
+import { clientRefSchema, personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, queryListSchema } from './lists.js';
 import {
   POST_PLATFORMS,
@@ -418,7 +419,7 @@ export type ReturnPostTask = z.infer<typeof returnPostTaskSchema>;
 
 // Responses
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
+const namedSchema = z.object({ id: z.uuid(), name: z.string() });
 
 const archivablePersonSchema = personSchema.extend({ archived: z.boolean() });
 
@@ -426,7 +427,7 @@ const archivablePersonSchema = personSchema.extend({ archived: z.boolean() });
 export const postSchema = z
   .object({
     id: z.uuid(),
-    client: personSchema,
+    client: clientRefSchema,
     title: z.string(),
     type: postTypeSchema,
     platforms: z.array(postPlatformSchema),
@@ -475,7 +476,7 @@ export const postClientResponseSchema = z
     id: z.uuid(),
     decision: clientDecisionSchema,
     channel: responseChannelSchema,
-    contact: archivablePersonSchema,
+    contact: namedSchema.extend({ archived: z.boolean() }),
     note: z.string().nullable(),
     /** The versions answered: the snapshot's. */
     versions: z.array(reviewVersionSchema),
@@ -552,7 +553,7 @@ export type PostPermissions = z.infer<typeof postPermissionsSchema>;
 
 export const postDetailSchema = postSchema
   .extend({
-    client: personSchema.extend({ healthcare: z.boolean() }),
+    client: clientRefSchema.extend({ healthcare: z.boolean() }),
     /** `inScope` is false after the person lost edit scope on the client (rule 28). */
     responsible: archivablePersonSchema.extend({ inScope: z.boolean() }),
     caption: z.string().nullable(),
@@ -568,7 +569,7 @@ export const postDetailSchema = postSchema
         id: z.uuid(),
         kind: deliverableKindSchema,
         label: z.string().nullable(),
-        retainer: personSchema,
+        retainer: namedSchema,
       })
       .nullable(),
     /** Of the media versions, the caption and the hashtags (rule 11). */

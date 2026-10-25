@@ -12,7 +12,12 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
+import {
+  type CurrentUserInfo,
+  lockAccessChanges,
+  personRef,
+  UserDirectory,
+} from '../auth/index.js';
 import { ClientDirectory, ClientFactory } from '../clients/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { actorOf } from './lead-access.js';
@@ -80,11 +85,11 @@ export class LeadConversionService {
       ...duplicates.map((client) => client.accountManagerId),
       ...(existing ? [existing.accountManagerId] : []),
     ]);
-    const person = (userId: string) => ({ id: userId, name: people.get(userId)?.name ?? '' });
+    const person = (userId: string) => personRef(people, userId);
     const accountManagers = managerIds
       .flatMap((userId) => {
         const user = people.get(userId);
-        return user && !user.archived ? [{ id: userId, name: user.name }] : [];
+        return user && !user.archived ? [personRef(people, userId)] : [];
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'ar') || a.id.localeCompare(b.id));
     const describe = (client: (typeof duplicates)[number]) => ({

@@ -41,7 +41,7 @@ export function adDepositReceiptHtml(
 <dl class="meta">
   ${metaItem(LABELS.receiptNumber, snapshot.displayNumber, { num: true })}
   ${metaItem(LABELS.receivedOn, snapshot.receivedOn, { num: true })}
-  ${metaItem(LABELS.receivedFrom, snapshot.billingName)}
+  ${metaItem(LABELS.receivedFrom, snapshot.billingName, { logo: assets.clientLogo })}
   ${metaItem(LABELS.method, METHODS[snapshot.method])}
   ${reference}
 </dl>

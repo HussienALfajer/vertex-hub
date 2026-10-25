@@ -8,6 +8,7 @@ import {
 } from '@vertex-hub/contracts';
 import { formatRetainerCycle } from '@vertex-hub/messages';
 import {
+  clientLogoTile,
   documentHtml,
   escapeHtml,
   formatMoney,
@@ -300,7 +301,7 @@ function reportDocument(
   const preliminary = snapshot.preliminary ? `<p class="badge">${page.preliminary}</p>` : '';
   const empty = snapshot.empty ? `<p class="empty">${page.noActivity}</p>` : '';
   const body = `<div class="title"><h1>${page.title} <span class="version">${escapeHtml(page.subtitle)}</span></h1></div>
-<p class="client">${escapeHtml(page.name)}</p>
+<p class="client">${clientLogoTile(assets.clientLogo)}<span>${escapeHtml(page.name)}</span></p>
 ${preliminary}${empty}
 ${page.parts.join('\n')}`;
   return documentHtml({
@@ -309,7 +310,8 @@ ${page.parts.join('\n')}`;
     body,
     assets,
     styles: `
-p.client { margin: 0 0 12px; font-size: 12pt; font-weight: 500; }
+p.client { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 12pt;
+  font-weight: 500; }
 p.badge { display: inline-block; margin: 0 0 12px; padding: 2px 10px; border: 1px solid #B9A87A;
   border-radius: 999px; font-size: 8.5pt; color: #616866; }
 p.empty { color: #616866; }

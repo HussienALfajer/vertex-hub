@@ -1,7 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import type {
   AudienceMember,
   DepartmentCode,
+  PersonRef,
   Role,
   UserAccess,
   UserDepartment,
@@ -30,6 +31,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
+import { AuditActorPhotos } from '../audit/index.js';
 import { resolveAccess } from './resolve-access.js';
 import { hasPassword } from './user-status.js';
 
@@ -59,8 +61,16 @@ export interface PeopleSources {
 export interface UserSummary {
   id: string;
   name: string;
+  /** The current photo (F01C). */
+  imageId: string | null;
   archived: boolean;
 }
+
+/** A user as a contract's `personSchema` shows them; a missing one keeps its id with no name. */
+export const personRef = (people: ReadonlyMap<string, UserSummary>, id: string): PersonRef => {
+  const person = people.get(id);
+  return { id, name: person?.name ?? '', imageId: person?.imageId ?? null };
+};
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
 
@@ -81,19 +91,37 @@ export interface ProfileFilter {
 
 /** Users as other modules may see them: names, status and roles, never the tables. */
 @Injectable()
-export class UserDirectory {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+export class UserDirectory implements OnModuleInit {
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly auditPhotos: AuditActorPhotos,
+  ) {}
+
+  onModuleInit(): void {
+    this.auditPhotos.register(async (ids) => {
+      const people = await this.summaries([...ids]);
+      return new Map([...people].map(([id, person]) => [id, person.imageId]));
+    });
+  }
 
   /** Names of the given users, archived ones included. */
   async summaries(ids: string[], executor: Database | Transaction = this.db) {
     const unique = [...new Set(ids)];
     if (unique.length === 0) return new Map<string, UserSummary>();
     const rows = await executor
-      .select({ id: users.id, name: users.name, archivedAt: users.archivedAt })
+      .select({
+        id: users.id,
+        name: users.name,
+        imageId: users.imageId,
+        archivedAt: users.archivedAt,
+      })
       .from(users)
       .where(inArray(users.id, unique));
     return new Map<string, UserSummary>(
-      rows.map((row) => [row.id, { id: row.id, name: row.name, archived: !!row.archivedAt }]),
+      rows.map((row) => [
+        row.id,
+        { id: row.id, name: row.name, imageId: row.imageId, archived: !!row.archivedAt },
+      ]),
     );
   }
 
@@ -121,6 +149,7 @@ export class UserDirectory {
       .select({
         id: users.id,
         name: users.name,
+        imageId: users.imageId,
         title: users.title,
         archivedAt: users.archivedAt,
       })
@@ -149,6 +178,7 @@ export class UserDirectory {
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
+      imageId: row.imageId,
       title: row.title,
       archived: !!row.archivedAt,
       departments: memberships
@@ -221,7 +251,7 @@ export class UserDirectory {
     executor: Database | Transaction = this.db,
   ): Promise<UserSummary | null> {
     const [row] = await executor
-      .select({ id: users.id, name: users.name })
+      .select({ id: users.id, name: users.name, imageId: users.imageId })
       .from(users)
       .where(and(eq(users.id, userId), isNull(users.archivedAt)));
     return row ? { ...row, archived: false } : null;
@@ -241,7 +271,7 @@ export class UserDirectory {
     executor: Database | Transaction = this.db,
   ): Promise<UserSummary | null> {
     const [row] = await executor
-      .select({ id: users.id, name: users.name })
+      .select({ id: users.id, name: users.name, imageId: users.imageId })
       .from(users)
       .innerJoin(userRoles, eq(userRoles.userId, users.id))
       .where(
@@ -268,7 +298,7 @@ export class UserDirectory {
     executor: Database | Transaction = this.db,
   ): Promise<UserSummary | null> {
     const [row] = await executor
-      .select({ id: users.id, name: users.name })
+      .select({ id: users.id, name: users.name, imageId: users.imageId })
       .from(users)
       .innerJoin(departmentMembers, eq(departmentMembers.userId, users.id))
       .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
@@ -286,7 +316,7 @@ export class UserDirectory {
   ): Promise<(UserSummary & { departments: DepartmentCode[] })[]> {
     if (codes.length === 0) return [];
     const rows = await executor
-      .select({ id: users.id, name: users.name, code: departments.code })
+      .select({ id: users.id, name: users.name, imageId: users.imageId, code: departments.code })
       .from(users)
       .innerJoin(departmentMembers, eq(departmentMembers.userId, users.id))
       .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
@@ -297,6 +327,7 @@ export class UserDirectory {
       const member = members.get(row.id) ?? {
         id: row.id,
         name: row.name,
+        imageId: row.imageId,
         archived: false,
         departments: [],
       };
@@ -442,7 +473,7 @@ export class UserDirectory {
   ): Promise<AudienceMember[]> {
     if (ids.length === 0) return [];
     const rows = await executor
-      .select({ id: users.id, name: users.name, image: users.image })
+      .select({ id: users.id, name: users.name, imageId: users.imageId })
       .from(users)
       .where(inArray(users.id, [...new Set(ids)]))
       .orderBy(asc(users.name), asc(users.id));

@@ -59,7 +59,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         streamed: [
           notificationFor(manager, 5950, {
             type: 'task_mentioned',
-            actor: { id: seedIds.layan, name: 'ليان الأحمد' },
+            actor: { id: seedIds.layan, name: 'ليان الأحمد', imageId: null },
             subject: { type: 'task', id: seedIds.autumnMenu },
             data: {
               task: {
@@ -512,6 +512,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
               tasksDueToday: 2,
               firstEventAt: '2026-10-21T10:00:00.000Z',
               workedMinutes: null,
+              photo: null,
             },
           },
         });

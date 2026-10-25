@@ -9,6 +9,7 @@ import {
 import {
   businessDate,
   type CalendarDate,
+  type ClientRef,
   type CreateLead,
   daysInStage,
   followUpDateInRange,
@@ -35,6 +36,7 @@ import {
   manualLeadMoveRefusal,
   type NotificationResolution,
   OPEN_LEAD_STAGES,
+  type PersonRef,
   type UpdateLead,
 } from '@vertex-hub/contracts';
 import { type Database, leadInterests, leadNotes, leads, type Transaction } from '@vertex-hub/db';
@@ -59,8 +61,10 @@ import { changedFields, recordAudit } from '../audit/index.js';
 import {
   type CurrentUserInfo,
   lockAccessChanges,
+  personRef,
   ResponsibilityRegistry,
   UserDirectory,
+  type UserSummary,
 } from '../auth/index.js';
 import { CatalogDirectory } from '../catalog/index.js';
 import { ClientDirectory } from '../clients/index.js';
@@ -344,7 +348,7 @@ export class LeadsService implements OnModuleInit {
       ...leadRows.map((row) => row.ownerId),
       ...clientRows.map((client) => client.accountManagerId),
     ]);
-    const person = (id: string) => ({ id, name: people.get(id)?.name ?? '' });
+    const person = (id: string) => personRef(people, id);
     return {
       leads: leadRows.map((row) => ({
         id: row.id,
@@ -383,7 +387,14 @@ export class LeadsService implements OnModuleInit {
       .flatMap((id) => {
         const user = people.get(id);
         return user && !user.archived
-          ? [{ id, name: user.name, departments: [...(memberships.get(id) ?? [])].sort() }]
+          ? [
+              {
+                id,
+                name: user.name,
+                imageId: user.imageId,
+                departments: [...(memberships.get(id) ?? [])].sort(),
+              },
+            ]
           : [];
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'ar') || a.id.localeCompare(b.id));
@@ -503,7 +514,7 @@ export class LeadsService implements OnModuleInit {
     const client = row.clientId ? await this.clients.summary(row.clientId, executor) : null;
     const ownerAccess = await this.users.access(row.ownerId, executor);
     const quoteCounts = await this.quoteChecks.quoteCounts(executor, [row.id]);
-    const person = (id: string) => ({ id, name: people.get(id)?.name ?? '' });
+    const person = (id: string) => personRef(people, id);
     const detailInterests = interests.get(row.id) ?? [];
     const permissions = await this.permissionsOf(actor, row, executor);
     return {
@@ -619,9 +630,9 @@ export class LeadsService implements OnModuleInit {
 
   private summary(
     row: LeadRow,
-    owner: { name: string; archived: boolean } | undefined,
+    owner: UserSummary | undefined,
     interests: string[],
-    client: { id: string; name: string } | null,
+    client: ClientRef | null,
     quoteCount: number,
   ): Lead {
     const today = businessDate();
@@ -635,7 +646,12 @@ export class LeadsService implements OnModuleInit {
       stage: row.stage,
       stageChangedAt: row.stageChangedAt.toISOString(),
       daysInStage: daysInStage(businessDate(row.stageChangedAt), today),
-      owner: { id: row.ownerId, name: owner?.name ?? '', archived: owner?.archived ?? false },
+      owner: {
+        id: row.ownerId,
+        name: owner?.name ?? '',
+        imageId: owner?.imageId ?? null,
+        archived: owner?.archived ?? false,
+      },
       nextFollowUpOn: followUp,
       followUpOverdue: followUp !== null && followUp < today,
       followUpDueToday: followUp === today,
@@ -643,7 +659,7 @@ export class LeadsService implements OnModuleInit {
       budgetCurrency: row.budgetCurrency,
       interests,
       quoteCount,
-      client: client && { id: client.id, name: client.name },
+      client: client && { id: client.id, name: client.name, imageId: client.imageId },
       closedAt: row.closedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -802,7 +818,7 @@ export function noteOf(
   actor: CurrentUserInfo,
   lead: LeadRow,
   note: LeadNoteRow,
-  author: { id: string; name: string },
+  author: PersonRef,
 ) {
   const writable =
     coversLead(actor, 'leads.manage', lead) && !lead.archivedAt && isOpenLeadStage(lead.stage);

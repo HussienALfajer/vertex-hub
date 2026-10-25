@@ -9,6 +9,7 @@ import {
   reportPdfStorageKey,
 } from '@vertex-hub/contracts';
 import { ENV, type Env } from '../core/config/env.js';
+import { readClientLogo } from '../pdf/client-logo.js';
 import { storeOnce } from '../pdf/pdf-objects.js';
 import { PdfRenderer } from '../pdf/pdf-renderer.js';
 import { PgBossService } from './pg-boss.service.js';
@@ -62,11 +63,12 @@ export class ReportsPdfJob implements OnApplicationBootstrap {
   /** Writes the PDF once per payload hash; a rerun finds it and reports the same file. */
   async render(data: unknown): Promise<ReportPdfReadyJob> {
     const job = reportPdfJobSchema.parse(data);
-    const file = await storeOnce(this.root, reportPdfStorageKey(job), () =>
-      job.kind === 'cycle_report'
-        ? this.renderer.cycleReport(job.snapshot)
-        : this.renderer.clientReport(job.snapshot),
-    );
+    const file = await storeOnce(this.root, reportPdfStorageKey(job), async () => {
+      const logo = await readClientLogo(this.root, job.clientLogoKey, this.logger);
+      return job.kind === 'cycle_report'
+        ? this.renderer.cycleReport(job.snapshot, logo)
+        : this.renderer.clientReport(job.snapshot, logo);
+    });
     return { kind: job.kind, id: job.id, hash: job.hash, file };
   }
 

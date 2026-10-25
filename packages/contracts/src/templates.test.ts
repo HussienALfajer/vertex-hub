@@ -293,8 +293,8 @@ const step = (fields: Partial<TemplateStep> & Pick<TemplateStep, 'id' | 'title'>
     ...fields,
   }) satisfies TemplateStep;
 
-const designer = { id: uuid(101), name: 'Designer' };
-const marketer = { id: uuid(102), name: 'Marketer' };
+const designer = { id: uuid(101), name: 'Designer', imageId: null };
+const marketer = { id: uuid(102), name: 'Marketer', imageId: null };
 const members = new Set([`${designer.id}:design`]);
 const isMember = (userId: string, department: string) => members.has(`${userId}:${department}`);
 

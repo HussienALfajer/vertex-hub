@@ -4,10 +4,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
 import {
+  attendanceGreetingSchema,
+  auditPageSchema,
+  clientDetailResponseSchema,
   fileItemSchema,
   fileUploadSchema,
   imageSchema,
   meResponseSchema,
+  notificationPageSchema,
+  projectDetailSchema,
+  projectPageSchema,
+  retainerDetailSchema,
   userPageSchema,
 } from '@vertex-hub/contracts';
 import {
@@ -25,6 +32,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FileContentService } from '../src/modules/files/file-content.service.js';
+import { ImagesService } from '../src/modules/files/index.js';
 import { expectError, seedClientCast } from './client-cast.js';
 import { api, clientIp, ORIGIN, seedUser } from './helpers.js';
 import { startApp } from './start-app.js';
@@ -594,6 +602,103 @@ describe('images (F01C)', () => {
         409,
         'RETAINER_ARCHIVED',
       );
+    });
+  });
+
+  describe('references (rule 3) and beyond the screens (rules 14, 15)', () => {
+    it("shows a project and a retainer with the client's logo until they get their own", async () => {
+      const owned = await cast.createClient();
+      const project = await cast.createProject(owned.id);
+      const retainer = await cast.createRetainer(owned.id);
+      const logo = await setOk(`/api/clients/${owned.id}`, cast.gm.cookie);
+      const clientRow = clientDetailResponseSchema.parse(
+        await (await client.get(`/api/clients/${owned.id}`, cast.gm.cookie)).json(),
+      );
+      expect(clientRow.imageId).toBe(logo.id);
+
+      const projectOf = async () =>
+        projectDetailSchema.parse(
+          await (await client.get(`/api/projects/${project.id}`, cast.gm.cookie)).json(),
+        );
+      const fallback = await projectOf();
+      expect(fallback).toMatchObject({ imageId: logo.id, ownImageId: null });
+      expect(fallback.client.imageId).toBe(logo.id);
+      const own = await setOk(`/api/projects/${project.id}`, cast.gm.cookie);
+      expect(await projectOf()).toMatchObject({ imageId: own.id, ownImageId: own.id });
+      const list = projectPageSchema.parse(
+        await (await client.get(`/api/projects?clientId=${owned.id}`, cast.gm.cookie)).json(),
+      );
+      expect(list.items.find((item) => item.id === project.id)?.imageId).toBe(own.id);
+      expect((await remove(`/api/projects/${project.id}`, cast.gm.cookie)).status).toBe(204);
+      expect(await projectOf()).toMatchObject({ imageId: logo.id, ownImageId: null });
+
+      const retainerOf = async () =>
+        retainerDetailSchema.parse(
+          await (await client.get(`/api/retainers/${retainer.id}`, cast.gm.cookie)).json(),
+        );
+      expect(await retainerOf()).toMatchObject({ imageId: logo.id, ownImageId: null });
+      // A change of the client's logo shows at once on what has no image of its own.
+      const next = await setOk(`/api/clients/${owned.id}`, cast.gm.cookie);
+      expect((await retainerOf()).imageId).toBe(next.id);
+      expect((await remove(`/api/clients/${owned.id}`, cast.gm.cookie)).status).toBe(204);
+      expect((await retainerOf()).imageId).toBeNull();
+    });
+
+    it("shows people with their photo, the audit's actors included", async () => {
+      const owned = await cast.createClient();
+      const photo = await setOk(`/api/users/${cast.am.id}`, cast.am.cookie);
+      const detail = clientDetailResponseSchema.parse(
+        await (await client.get(`/api/clients/${owned.id}`, cast.gm.cookie)).json(),
+      );
+      expect(detail.accountManager).toMatchObject({ id: cast.am.id, imageId: photo.id });
+      const logo = await setOk(`/api/clients/${owned.id}`, cast.am.cookie);
+      const audit = auditPageSchema.parse(
+        await (
+          await client.get(
+            `/api/audit?entityId=${owned.id}&action=client.image_set`,
+            cast.gm.cookie,
+          )
+        ).json(),
+      );
+      expect(audit.items[0]).toMatchObject({
+        actorId: cast.am.id,
+        actorImageId: photo.id,
+        after: { imageId: logo.id, source: 'upload' },
+      });
+      expect((await remove(`/api/users/${cast.am.id}`, cast.am.cookie)).status).toBe(204);
+    });
+
+    it("shows a notification's actor with their photo", async () => {
+      const owned = await cast.createClient();
+      const photo = await setOk(`/api/users/${cast.gm.id}`, cast.gm.cookie);
+      await setOk(`/api/clients/${owned.id}`, cast.gm.cookie);
+      const page = notificationPageSchema.parse(
+        await (await client.get('/api/me/notifications?pageSize=100', cast.am.cookie)).json(),
+      );
+      const notice = page.items.find(
+        (item) => item.type === 'client_logo_changed' && item.subject.id === owned.id,
+      );
+      expect(notice?.actor).toEqual({ id: cast.gm.id, name: cast.gm.name, imageId: photo.id });
+      expect((await remove(`/api/users/${cast.gm.id}`, cast.gm.cookie)).status).toBe(204);
+    });
+
+    it('gives the greeting the photo as a data URL while pending or ready, never once removed', async () => {
+      const store = app.get(ImagesService);
+      const photo = await setOk(`/api/users/${cast.employee.id}`, cast.employee.cookie);
+      const pending = await store.photoDataUrl(photo.id);
+      expect(pending).toBe(`data:image/png;base64,${square.toString('base64')}`);
+      expect(attendanceGreetingSchema.shape.photo.parse(pending)).toBe(pending);
+      const content = app.get(FileContentService);
+      while ((await content.renderPendingImages()).left) {
+        // Renders every batch, so this test's image is among them.
+      }
+      const ready = await store.photoDataUrl(photo.id);
+      expect(ready?.startsWith('data:image/webp;base64,')).toBe(true);
+      expect(await store.photoDataUrl(null)).toBeNull();
+      expect((await remove(`/api/users/${cast.employee.id}`, cast.employee.cookie)).status).toBe(
+        204,
+      );
+      expect(await store.photoDataUrl(photo.id)).toBeNull();
     });
   });
 });

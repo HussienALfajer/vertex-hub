@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { personSchema } from './images.js';
 
 /**
  * The ten departments (ADR 0014). Codes are stable and never change; the display name and the
@@ -41,7 +42,7 @@ export const departmentResponseSchema = z
     id: z.uuid(),
     code: departmentCodeSchema,
     name: z.string(),
-    manager: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    manager: personSchema.nullable(),
     /** Members who are not archived. */
     memberCount: z.number().int().min(0),
   })
@@ -62,6 +63,8 @@ export const departmentDetailResponseSchema = departmentResponseSchema
       z.object({
         id: z.uuid(),
         name: z.string(),
+        /** The current photo (F01C); null shows the initial. */
+        imageId: z.uuid().nullable(),
         title: z.string().nullable(),
         isPrimary: z.boolean(),
         /** For callers with `users.manage` only; only `active` members can be made manager. */

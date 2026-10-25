@@ -73,10 +73,11 @@ import { changedFields, recordAudit } from '../audit/index.js';
 import {
   type CurrentUserInfo,
   lockAccessChanges,
+  personRef,
   UserDirectory,
   type UserSummary,
 } from '../auth/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ClientDirectory, type ClientSummary, clientRef } from '../clients/index.js';
 import { ImagesService } from '../files/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { changedDepartments } from './engagement-departments.js';
@@ -115,6 +116,7 @@ const summaryColumns = {
   startDate: retainers.startDate,
   cyclesFrom: retainers.cyclesFrom,
   renewalDate: retainers.renewalDate,
+  imageId: retainers.imageId,
 };
 
 type SummaryRow = {
@@ -126,6 +128,7 @@ type SummaryRow = {
   startDate: CalendarDate;
   cyclesFrom: CalendarDate | null;
   renewalDate: string | null;
+  imageId: string | null;
 };
 
 const lineColumns = {
@@ -279,6 +282,7 @@ export class RetainersService {
         pending,
         today: businessDate(),
       }),
+      ownImageId: row.imageId,
       startDate: row.startDate,
       endedOn: row.endedOn,
       deliverables: lines,
@@ -425,7 +429,11 @@ export class RetainersService {
       action: 'retainer.created',
       entityType: 'retainer',
       entityId: created.id,
-      after: { ...values, client: { id: client.id, name: client.name }, deliverables: lines },
+      after: {
+        ...values,
+        client: { id: client.id, name: client.name },
+        deliverables: lines,
+      },
     });
     return created.id;
   }
@@ -1033,8 +1041,10 @@ function toRetainer(
   return {
     id: row.id,
     name: row.name,
-    client: { id: row.clientId, name: client?.name ?? '' },
-    accountManager: { id: managerId, name: context.people.get(managerId)?.name ?? '' },
+    client: clientRef(context.clients, row.clientId),
+    // F01C rule 3: its own image, else the client's logo.
+    imageId: row.imageId ?? client?.imageId ?? null,
+    accountManager: personRef(context.people, managerId),
     departments: row.departments,
     status: row.status,
     renewalDate: row.renewalDate,

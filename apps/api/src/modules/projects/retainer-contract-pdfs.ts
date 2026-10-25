@@ -16,6 +16,7 @@ import {
   contractPdfReadyJobSchema,
   contractSnapshotSchema,
   type QuotePdfRender,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import {
   type Database,
@@ -24,13 +25,13 @@ import {
   retainers,
   type Transaction,
 } from '@vertex-hub/db';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
-import { GeneratedFiles } from '../files/index.js';
+import { GeneratedFiles, ImagesService } from '../files/index.js';
 import {
   type AnnexRow,
   annexOf,
@@ -64,6 +65,7 @@ export class ContractPdfs implements OnModuleInit {
     private readonly content: ContractContent,
     private readonly files: GeneratedFiles,
     private readonly jobs: JobQueue,
+    private readonly images: ImagesService,
   ) {}
 
   onModuleInit(): void {
@@ -99,7 +101,12 @@ export class ContractPdfs implements OnModuleInit {
           .update(retainerContracts)
           .set({ draftPdfStatus: 'pending', draftPdfRequestedHash: hash, updatedAt: row.updatedAt })
           .where(eq(retainerContracts.id, row.id));
-        const job: ContractPdfJob = { kind: 'contract_draft', id: row.id, hash, snapshot };
+        const job: UnqueuedPdfJob<ContractPdfJob> = {
+          kind: 'contract_draft',
+          id: row.id,
+          hash,
+          snapshot,
+        };
         return { state: 'pending' as const, job };
       }
       if (row.pdfStatus === 'ready') return { state: 'ready' as const, job: null };
@@ -380,8 +387,26 @@ export class ContractPdfs implements OnModuleInit {
     return retainer.clientId;
   }
 
-  private async queue(job: ContractPdfJob): Promise<void> {
-    await this.jobs.send(CONTRACTS_PDF_JOB.queue, job, {
+  /** F01C rule 14: with the client's current logo. */
+  private async queue(job: UnqueuedPdfJob<ContractPdfJob>): Promise<void> {
+    const [row] = await this.db
+      .select({ clientId: retainers.clientId })
+      .from(retainerContracts)
+      .innerJoin(retainers, eq(retainers.id, retainerContracts.retainerId))
+      .where(
+        job.kind === 'annex'
+          ? inArray(
+              retainerContracts.id,
+              this.db
+                .select({ id: retainerContractAnnexes.contractId })
+                .from(retainerContractAnnexes)
+                .where(eq(retainerContractAnnexes.id, job.id)),
+            )
+          : eq(retainerContracts.id, job.id),
+      );
+    const clientLogoKey = await this.images.clientLogoKey(row?.clientId ?? null);
+    const queued: ContractPdfJob = { ...job, clientLogoKey };
+    await this.jobs.send(CONTRACTS_PDF_JOB.queue, queued, {
       retryLimit: CONTRACTS_PDF_JOB.retryLimit,
     });
   }
@@ -396,13 +421,13 @@ export class ContractPdfs implements OnModuleInit {
 }
 
 /** The render of an issued contract: its frozen snapshot. */
-function contractJob(row: ContractRow): ContractPdfJob {
+function contractJob(row: ContractRow): UnqueuedPdfJob<ContractPdfJob> {
   const snapshot = contractSnapshotSchema.parse(row.snapshot);
   return { kind: 'contract', id: row.id, hash: contractPdfHash('contract', snapshot), snapshot };
 }
 
 /** The render of an annex: its frozen snapshot. */
-function annexJob(annex: AnnexRow): ContractPdfJob {
+function annexJob(annex: AnnexRow): UnqueuedPdfJob<ContractPdfJob> {
   const snapshot = annexSnapshotSchema.parse(annex.snapshot);
   return { kind: 'annex', id: annex.id, hash: contractPdfHash('annex', snapshot), snapshot };
 }

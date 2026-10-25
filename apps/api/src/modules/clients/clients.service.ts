@@ -82,6 +82,7 @@ const hasApprovalContact = sql<boolean>`exists (
 const summaryColumns = {
   id: clients.id,
   tradeName: clients.tradeName,
+  imageId: clients.imageId,
   sector: clients.sector,
   status: clients.status,
   isHealthcare: clients.isHealthcare,
@@ -92,6 +93,7 @@ const summaryColumns = {
 type SummaryRow = {
   id: string;
   tradeName: string;
+  imageId: string | null;
   sector: string | null;
   status: ClientStatus;
   isHealthcare: boolean;
@@ -340,7 +342,9 @@ export class ClientsService implements OnModuleInit {
         );
         managerChange = {
           before: { accountManager: { id: current.accountManagerId, name: previous?.name ?? '' } },
-          after: { accountManager: { id: manager.id, name: manager.name } },
+          after: {
+            accountManager: { id: manager.id, name: manager.name, imageId: manager.imageId },
+          },
         };
       }
       if (!basics && !statusChange && !healthcare && !managerChange) return;
@@ -557,12 +561,14 @@ function toClient(row: SummaryRow, managers: Map<string, UserSummary>): ClientRe
   return {
     id: row.id,
     tradeName: row.tradeName,
+    imageId: row.imageId,
     sector: row.sector,
     status: row.status,
     isHealthcare: row.isHealthcare,
     accountManager: {
       id: row.accountManagerId,
       name: manager?.name ?? '',
+      imageId: manager?.imageId ?? null,
       archived: manager?.archived ?? false,
     },
     hasApprovalContact: row.hasApprovalContact,

@@ -5,7 +5,7 @@ import { and, count, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory, type UserSummary } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory, type UserSummary } from '../auth/index.js';
 import {
   actorOf,
   assertNotArchived,
@@ -253,7 +253,7 @@ function toNote(
     occurredAt: row.occurredAt.toISOString(),
     channel: row.channel,
     summary: row.summary,
-    author: { id: row.authorId, name: authors.get(row.authorId)?.name ?? '' },
+    author: personRef(authors, row.authorId),
     contact:
       row.contactId && row.contactName !== null
         ? { id: row.contactId, name: row.contactName, archived: !!row.contactArchivedAt }

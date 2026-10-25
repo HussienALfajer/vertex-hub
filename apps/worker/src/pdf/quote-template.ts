@@ -162,7 +162,7 @@ export function quoteHtml(
   ${metaItem(LABELS.number, snapshot.displayNumber, { num: true })}
   ${metaItem(LABELS.date, snapshot.sentOn, { num: true })}
   ${metaItem(LABELS.validUntil, snapshot.validUntil, { num: true })}
-  ${metaItem(LABELS.client, snapshot.client)}
+  ${metaItem(LABELS.client, snapshot.client, { logo: assets.clientLogo })}
   ${addressee}
 </dl>
 ${oneOffSection(snapshot)}

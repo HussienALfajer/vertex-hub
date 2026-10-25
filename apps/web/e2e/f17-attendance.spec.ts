@@ -277,6 +277,7 @@ test('the entrance screen says when it is offline, and greets after a punch', as
         tasksDueToday: 2,
         firstEventAt: '2026-10-21T10:00:00.000Z',
         workedMinutes: null,
+        photo: null,
       },
     },
   });

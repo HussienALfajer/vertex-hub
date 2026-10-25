@@ -61,7 +61,7 @@ import {
   UserDirectory,
   type UserSummary,
 } from '../auth/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ClientDirectory, type ClientSummary, clientRef } from '../clients/index.js';
 import { ImagesService } from '../files/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { changedDepartments } from './engagement-departments.js';
@@ -97,6 +97,7 @@ const summaryColumns = {
   status: projects.status,
   startDate: projects.startDate,
   dueDate: projects.dueDate,
+  imageId: projects.imageId,
 };
 
 type SummaryRow = {
@@ -108,6 +109,7 @@ type SummaryRow = {
   status: ProjectStatus;
   startDate: string;
   dueDate: string;
+  imageId: string | null;
 };
 
 const isOpen = (status: ProjectStatus) =>
@@ -255,6 +257,7 @@ export class ProjectsService implements OnModuleInit {
         progress: progressOf(tasks),
         today: businessDate(),
       }),
+      ownImageId: row.imageId,
       description: row.description,
       milestones,
       tasks,
@@ -402,7 +405,9 @@ export class ProjectsService implements OnModuleInit {
         );
         managerChange = {
           before: { projectManager: { id: current.projectManagerId, name: previous?.name ?? '' } },
-          after: { projectManager: { id: manager.id, name: manager.name } },
+          after: {
+            projectManager: { id: manager.id, name: manager.name },
+          },
         };
       }
       if (!basics && !money && !managerChange) return;
@@ -524,7 +529,9 @@ export class ProjectsService implements OnModuleInit {
           entityType: 'project',
           entityId: id,
           before: { projectManager: { id: project.projectManagerId, name: previous?.name ?? '' } },
-          after: { projectManager: { id: manager.id, name: manager.name } },
+          after: {
+            projectManager: { id: manager.id, name: manager.name },
+          },
         });
         await this.notices.managerAssigned(
           tx,
@@ -749,10 +756,13 @@ function toProject(
   return {
     id: row.id,
     name: row.name,
-    client: { id: row.clientId, name: context.clients.get(row.clientId)?.name ?? '' },
+    client: clientRef(context.clients, row.clientId),
+    // F01C rule 3: its own image, else the client's logo.
+    imageId: row.imageId ?? context.clients.get(row.clientId)?.imageId ?? null,
     projectManager: {
       id: row.projectManagerId,
       name: manager?.name ?? '',
+      imageId: manager?.imageId ?? null,
       archived: manager?.archived ?? false,
     },
     departments: row.departments,

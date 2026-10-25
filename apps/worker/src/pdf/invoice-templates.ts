@@ -71,8 +71,8 @@ export const METHODS: Record<PaymentMethod, string> = {
 };
 
 /** The client block of every document: billing name, then the billing address. */
-function billTo(label: string, name: string, address: string | null): string {
-  return metaItem(label, address?.trim() ? `${name}\n${address}` : name);
+function billTo(label: string, name: string, address: string | null, logo: string | null): string {
+  return metaItem(label, address?.trim() ? `${name}\n${address}` : name, { logo });
 }
 
 function footer(text: string): string {
@@ -101,7 +101,7 @@ export function invoiceHtml(
   ${number ? metaItem(LABELS.number, number, { num: true }) : ''}
   ${metaItem(LABELS.issuedOn, snapshot.issuedOn, { num: true })}
   ${metaItem(LABELS.dueOn, snapshot.dueOn, { num: true })}
-  ${billTo(LABELS.billTo, snapshot.billingName, snapshot.billingAddress)}
+  ${billTo(LABELS.billTo, snapshot.billingName, snapshot.billingAddress, assets.clientLogo)}
 </dl>
 <section>
   <table class="lines">
@@ -139,7 +139,7 @@ export function receiptHtml(snapshot: ReceiptSnapshot, assets: TemplateAssets): 
 <dl class="meta">
   ${metaItem(LABELS.receiptNumber, snapshot.displayNumber, { num: true })}
   ${metaItem(LABELS.paidOn, snapshot.paidOn, { num: true })}
-  ${billTo(LABELS.receivedFrom, snapshot.billingName, snapshot.billingAddress)}
+  ${billTo(LABELS.receivedFrom, snapshot.billingName, snapshot.billingAddress, assets.clientLogo)}
   ${metaItem(LABELS.method, METHODS[snapshot.method])}
   ${reference}
   ${metaItem(LABELS.forInvoice, snapshot.invoiceNumber, { num: true })}
@@ -186,7 +186,7 @@ export function statementHtml(snapshot: StatementSnapshot, assets: TemplateAsset
     : `<tr><td colspan="5" class="empty">${LABELS.noRows}</td></tr>`;
   const body = `<div class="title"><h1>${LABELS.statement}</h1></div>
 <dl class="meta">
-  ${billTo(LABELS.client, snapshot.billingName, snapshot.billingAddress)}
+  ${billTo(LABELS.client, snapshot.billingName, snapshot.billingAddress, assets.clientLogo)}
   ${metaItem(LABELS.currency, currency, { num: true })}
   ${metaItem(LABELS.period, `${snapshot.from} → ${snapshot.to}`, { num: true })}
 </dl>

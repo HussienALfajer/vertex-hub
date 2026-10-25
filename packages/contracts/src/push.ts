@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { calendarDateSchema } from './dates.js';
+import { personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
 import { type NotificationPriority, notificationSchema } from './notifications.js';
 
@@ -121,7 +122,7 @@ export type DevicePush = z.infer<typeof devicePushSchema>;
 export const pushDeliverySchema = z
   .object({
     id: z.uuid(),
-    user: z.object({ id: z.uuid(), name: z.string() }),
+    user: personSchema,
     device: z.string(),
     kind: pushDeliveryKindSchema,
     /** Null for the test and the morning push, and once the notification was purged. */

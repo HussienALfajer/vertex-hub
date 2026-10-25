@@ -165,7 +165,9 @@ describe('announcement polls (F16 rule D11)', () => {
     expect(changed.options.map((option) => option.votes)).toEqual([0, 1, 0]);
     expect(changed.voters).toBe(1);
     const authorView = (await read(author, sent.id)).poll as AnnouncementPoll;
-    expect(authorView.options[1]?.voters).toEqual([{ id: designer.id, name: expect.any(String) }]);
+    expect(authorView.options[1]?.voters).toEqual([
+      { id: designer.id, name: expect.any(String), imageId: null },
+    ]);
   });
 
   it('takes several options in a multiple-choice poll', async () => {

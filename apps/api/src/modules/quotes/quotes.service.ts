@@ -48,7 +48,7 @@ import {
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory, type UserSummary } from '../auth/index.js';
 import {
   CatalogDirectory,
   type CatalogPackageEntry,
@@ -607,7 +607,7 @@ export class QuotesService {
     );
     const person = (userId: string | null) => {
       const user = userId ? people.get(userId) : undefined;
-      return user ? { id: user.id, name: user.name } : null;
+      return user ? { id: user.id, name: user.name, imageId: user.imageId } : null;
     };
     const decidedBy = person(row.discountDecidedById);
     const respondedBy = person(row.respondedById);
@@ -670,7 +670,7 @@ export class QuotesService {
               rejectionReason: row.rejectionReason,
             }
           : null,
-      createdBy: person(row.createdById) ?? { id: row.createdById, name: '' },
+      createdBy: person(row.createdById) ?? { id: row.createdById, name: '', imageId: null },
       createdAt: row.createdAt.toISOString(),
       lines: children.lines.map((line, index) => ({
         id: line.id,
@@ -755,11 +755,10 @@ export class QuotesService {
     row: QuoteRow,
     client: Recipient,
     children: QuoteChildren,
-    people: Map<string, { id: string; name: string }>,
+    people: Map<string, UserSummary>,
     today: string,
   ): Quote {
     const totals = totalsOf(row, children);
-    const manager = people.get(client.accountManagerId);
     return {
       id: row.id,
       displayNumber: quoteDisplayNumber(row),
@@ -767,9 +766,12 @@ export class QuotesService {
       number: row.number,
       version: row.version,
       title: row.title,
-      client: client.kind === 'client' ? { id: client.id, name: client.name } : null,
+      client:
+        client.kind === 'client'
+          ? { id: client.id, name: client.name, imageId: client.imageId }
+          : null,
       recipient: { kind: client.kind, id: client.id, name: client.name },
-      accountManager: { id: client.accountManagerId, name: manager?.name ?? '' },
+      accountManager: personRef(people, client.accountManagerId),
       currency: row.currency,
       status: row.status,
       discountApproval: row.discountApproval,

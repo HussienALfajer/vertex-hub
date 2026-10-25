@@ -69,6 +69,7 @@ export async function loadAssets(): Promise<TemplateAssets> {
   return {
     fontFaces: faces.join('\n'),
     logo: `data:image/svg+xml;base64,${logo.toString('base64')}`,
+    clientLogo: null,
   };
 }
 
@@ -80,51 +81,61 @@ export async function loadAssets(): Promise<TemplateAssets> {
 export class PdfRenderer {
   private assets: Promise<TemplateAssets> | undefined;
 
-  quote(snapshot: QuoteSnapshot, options: { draft: boolean }): Promise<Buffer> {
-    return this.render((assets) => quoteHtml(snapshot, options, assets));
+  quote(
+    snapshot: QuoteSnapshot,
+    options: { draft: boolean },
+    clientLogo: string | null,
+  ): Promise<Buffer> {
+    return this.render(clientLogo, (assets) => quoteHtml(snapshot, options, assets));
   }
 
   /** An issued invoice, or a draft preview when it has no number. */
-  invoice(snapshot: InvoiceSnapshot | InvoiceDraftSnapshot): Promise<Buffer> {
-    return this.render((assets) => invoiceHtml(snapshot, assets));
+  invoice(
+    snapshot: InvoiceSnapshot | InvoiceDraftSnapshot,
+    clientLogo: string | null,
+  ): Promise<Buffer> {
+    return this.render(clientLogo, (assets) => invoiceHtml(snapshot, assets));
   }
 
-  receipt(snapshot: ReceiptSnapshot): Promise<Buffer> {
-    return this.render((assets) => receiptHtml(snapshot, assets));
+  receipt(snapshot: ReceiptSnapshot, clientLogo: string | null): Promise<Buffer> {
+    return this.render(clientLogo, (assets) => receiptHtml(snapshot, assets));
   }
 
-  statement(snapshot: StatementSnapshot): Promise<Buffer> {
-    return this.render((assets) => statementHtml(snapshot, assets));
+  statement(snapshot: StatementSnapshot, clientLogo: string | null): Promise<Buffer> {
+    return this.render(clientLogo, (assets) => statementHtml(snapshot, assets));
   }
 
   /** An ad budget deposit (F12 rule 19). */
-  adDepositReceipt(snapshot: AdDepositReceiptSnapshot): Promise<Buffer> {
-    return this.render((assets) => adDepositReceiptHtml(snapshot, assets));
+  adDepositReceipt(snapshot: AdDepositReceiptSnapshot, clientLogo: string | null): Promise<Buffer> {
+    return this.render(clientLogo, (assets) => adDepositReceiptHtml(snapshot, assets));
   }
 
   /** The monthly client report (F15 rule 20). */
-  clientReport(snapshot: ClientReportSnapshot): Promise<Buffer> {
-    return this.render((assets) => clientReportHtml(snapshot, assets));
+  clientReport(snapshot: ClientReportSnapshot, clientLogo: string | null): Promise<Buffer> {
+    return this.render(clientLogo, (assets) => clientReportHtml(snapshot, assets));
   }
 
   /** The retainer cycle report (F05C R1, R3). */
-  cycleReport(snapshot: CycleReportSnapshot): Promise<Buffer> {
-    return this.render((assets) => cycleReportHtml(snapshot, assets));
+  cycleReport(snapshot: CycleReportSnapshot, clientLogo: string | null): Promise<Buffer> {
+    return this.render(clientLogo, (assets) => cycleReportHtml(snapshot, assets));
   }
 
   /** A retainer contract, or a draft preview when it has no number (F05C K6). */
-  contract(snapshot: ContractSnapshot): Promise<Buffer> {
-    return this.render((assets) => contractHtml(snapshot, assets));
+  contract(snapshot: ContractSnapshot, clientLogo: string | null): Promise<Buffer> {
+    return this.render(clientLogo, (assets) => contractHtml(snapshot, assets));
   }
 
   /** An annex of a retainer contract (F05C K10). */
-  annex(snapshot: AnnexSnapshot): Promise<Buffer> {
-    return this.render((assets) => annexHtml(snapshot, assets));
+  annex(snapshot: AnnexSnapshot, clientLogo: string | null): Promise<Buffer> {
+    return this.render(clientLogo, (assets) => annexHtml(snapshot, assets));
   }
 
-  private async render(html: (assets: TemplateAssets) => string): Promise<Buffer> {
+  private async render(
+    clientLogo: string | null,
+    html: (assets: TemplateAssets) => string,
+  ): Promise<Buffer> {
     this.assets ??= loadAssets();
-    const page = html(await this.assets);
+    const page = html({ ...(await this.assets), clientLogo });
     const browser = await chromium.launch();
     try {
       const tab = await browser.newPage();

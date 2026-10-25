@@ -357,7 +357,7 @@ function PersonChip({
   const { t } = useTranslation();
   return (
     <li className="flex items-center gap-2 rounded-full border border-border bg-surface py-0.5 ps-0.5 pe-1 text-sm">
-      <Avatar name={user.name} src={user.image ?? undefined} size="sm" className="size-6" />
+      <Avatar name={user.name} size="sm" className="size-6" />
       <span className="flex flex-col leading-tight">
         <span>{user.name}</span>
         {department && <span className="text-xs text-muted-foreground">{department}</span>}

@@ -145,7 +145,12 @@ describe('tasks linked to posts (F08 rules 5–10, 12, 16, 18, 19)', () => {
           id: task.id,
           title: task.title,
           department: 'design',
-          assignee: { id: cast.designer.id, name: cast.designer.name, archived: false },
+          assignee: {
+            id: cast.designer.id,
+            name: cast.designer.name,
+            imageId: null,
+            archived: false,
+          },
           status: 'in_progress',
           cycleLine: null,
         },

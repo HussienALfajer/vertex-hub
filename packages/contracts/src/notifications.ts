@@ -18,6 +18,7 @@ import {
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { clientEmailKindSchema, SECURITY_CHANGES } from './email-basics.js';
 import { balanceLeaveTypeSchema, hrRequestKindSchema, leaveTypeSchema } from './hr.js';
+import { personSchema } from './images.js';
 import type { InvoiceOrigin } from './invoices.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema } from './lists.js';
 import { currencySchema, minorAmountSchema, signedMinorAmountSchema } from './money.js';
@@ -1712,10 +1713,18 @@ export function snoozeUntil(option: SnoozeOption, now: Date): Date {
 
 /* Responses. */
 
+/**
+ * F01C: the default only covers notifications rendered before F01C into queued email jobs, which
+ * the worker still sends after the deploy; the API always sets the photo.
+ */
+const notificationPersonSchema = personSchema.extend({
+  imageId: z.uuid().nullable().default(null),
+});
+
 const notificationBaseSchema = z.object({
   id: z.uuid(),
   /** Null for the daily job and automatic runs. */
-  actor: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+  actor: notificationPersonSchema.nullable(),
   subject: z.object({ type: notificationSubjectTypeSchema, id: z.uuid() }),
   /** Merged `task_commented`, `task_file_added` and `approval_responded` notifications count their items (rule 5); otherwise 1. */
   count: z.number().int().min(1),
@@ -1733,7 +1742,7 @@ const notificationBaseSchema = z.object({
   resolution: z
     .object({
       outcome: notificationResolutionSchema,
-      by: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+      by: notificationPersonSchema.nullable(),
       at: z.iso.datetime(),
     })
     .nullable()
@@ -1876,7 +1885,7 @@ export const notificationPolicySchema = z
     defaults: z.object({ push: channelModeSchema, email: channelModeSchema }),
     push: channelModeSchema,
     email: channelModeSchema,
-    updatedBy: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    updatedBy: personSchema.nullable(),
     updatedAt: z.iso.datetime().nullable(),
   })
   .meta({ id: 'NotificationPolicy' });

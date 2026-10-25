@@ -49,7 +49,7 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { CatalogDirectory } from '../catalog/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
@@ -471,7 +471,7 @@ export class InvoicesService {
     );
     const person = (userId: string | null) => {
       const user = userId ? people.get(userId) : undefined;
-      return user ? { id: user.id, name: user.name } : null;
+      return user ? { id: user.id, name: user.name, imageId: user.imageId } : null;
     };
     const paymentRows = await executor
       .select()
@@ -486,10 +486,7 @@ export class InvoicesService {
       paymentRows.flatMap((payment) => [payment.recordedById, payment.voidedById ?? []]).flat(),
       executor,
     );
-    const recorder = (userId: string) => ({
-      id: userId,
-      name: recorders.get(userId)?.name ?? '',
-    });
+    const recorder = (userId: string) => personRef(recorders, userId);
     const rate = row.sypPerUsd;
     const manages = canManage(actor, client);
     const takesPayments = covers(actor, 'payments.manage', client);
@@ -637,11 +634,8 @@ export class InvoicesService {
         {
           id: row.id,
           displayNumber: displayNumber(row),
-          client: { id: client.id, name: client.name },
-          accountManager: {
-            id: client.accountManagerId,
-            name: people.get(client.accountManagerId)?.name ?? '',
-          },
+          client: { id: client.id, name: client.name, imageId: client.imageId },
+          accountManager: personRef(people, client.accountManagerId),
           engagement: engagement
             ? { type: engagement.type, id: engagement.id, name: engagement.name }
             : null,

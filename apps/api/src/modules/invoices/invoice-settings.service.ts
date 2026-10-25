@@ -99,7 +99,7 @@ export class InvoiceSettingsService {
     );
     const person = (id: string | null) => {
       const user = id ? users.get(id) : undefined;
-      return user ? { id: user.id, name: user.name } : null;
+      return user ? { id: user.id, name: user.name, imageId: user.imageId } : null;
     };
     return {
       ...auditFields(row),

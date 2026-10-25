@@ -19,7 +19,7 @@ import { and, asc, eq, max, ne } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { GeneratedFiles } from '../files/index.js';
 import { type AnnexRow, annexOf, contractOf, contractRetainer } from './contract-access.js';
@@ -327,11 +327,10 @@ export class RetainerContractAnnexesService {
       .from(retainerAmendments)
       .where(eq(retainerAmendments.id, annex.amendmentId));
     const people = await this.users.summaries([annex.issuedById]);
-    const issuer = people.get(annex.issuedById);
     return presentAnnex(
       annex,
       amendment?.number ?? 0,
-      issuer ? { id: issuer.id, name: issuer.name } : null,
+      people.has(annex.issuedById) ? personRef(people, annex.issuedById) : null,
     );
   }
 }

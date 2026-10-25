@@ -159,6 +159,28 @@ const approvalFactsSchema = clientEmailDataSchema.extend({
   expiresAt: z.iso.datetime(),
 });
 
+/*
+ * Named with their types, so the declaration of `EMAIL_DATA_SCHEMAS` refers to them instead of
+ * spelling out the notification shape twice (TypeScript's limit on an inferred type's length).
+ */
+export const notificationBatchDataSchema = z.object({
+  notifications: shortListSchema(notificationSchema, NOTIFICATION_EMAIL.batchItems),
+  departments: departmentNamesSchema,
+});
+
+export const digestDataSchema = z.object({
+  date: calendarDateSchema,
+  overdue: shortListSchema(digestTaskSchema, NOTIFICATION_EMAIL.digestTasks),
+  dueToday: shortListSchema(digestTaskSchema, NOTIFICATION_EMAIL.digestTasks),
+  notifications: shortListSchema(notificationSchema, NOTIFICATION_EMAIL.digestNotifications),
+  unreadCount: z.number().int().min(0),
+  departments: departmentNamesSchema,
+});
+
+export type NotificationBatchDataSchema = typeof notificationBatchDataSchema;
+
+export type DigestDataSchema = typeof digestDataSchema;
+
 /**
  * The template data of each kind, validated when the email is queued and again by the worker.
  * A kind gets its schema with the change that first sends it.
@@ -167,19 +189,9 @@ export const EMAIL_DATA_SCHEMAS = {
   /** Rule 26: an administrator checks the configuration. */
   test: z.object({ requestedBy: z.string().min(1) }),
   /** Rules 6–9: the recipient's notifications, newest first. */
-  notification_batch: z.object({
-    notifications: shortListSchema(notificationSchema, NOTIFICATION_EMAIL.batchItems),
-    departments: departmentNamesSchema,
-  }),
+  notification_batch: notificationBatchDataSchema as NotificationBatchDataSchema,
   /** Rule 10: the morning digest of one work day. */
-  digest: z.object({
-    date: calendarDateSchema,
-    overdue: shortListSchema(digestTaskSchema, NOTIFICATION_EMAIL.digestTasks),
-    dueToday: shortListSchema(digestTaskSchema, NOTIFICATION_EMAIL.digestTasks),
-    notifications: shortListSchema(notificationSchema, NOTIFICATION_EMAIL.digestNotifications),
-    unreadCount: z.number().int().min(0),
-    departments: departmentNamesSchema,
-  }),
+  digest: digestDataSchema as DigestDataSchema,
   /** Rule 13: a user created, restored, or sent a new activation link. */
   account_activation: accountLinkSchema.extend({ restored: z.boolean() }),
   /** Rule 13: a reset link from a user manager, or asked for by the user (`requested`). */

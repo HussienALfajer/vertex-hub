@@ -48,8 +48,13 @@ import {
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
-import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import {
+  type CurrentUserInfo,
+  lockAccessChanges,
+  personRef,
+  UserDirectory,
+} from '../auth/index.js';
+import { ClientDirectory, type ClientSummary, clientRef } from '../clients/index.js';
 import { RecordFollowers } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { countedTwice, PostTasks } from '../tasks/index.js';
@@ -235,11 +240,16 @@ export class ContentService {
         content.tasks.flatMap((task) => (task.cycleLineId ? [task.cycleLineId] : [])),
       ),
     ]);
-    const person = (userId: string) => ({ id: userId, name: people.get(userId)?.name ?? '' });
+    const person = (userId: string) => personRef(people, userId);
     const pendingApproval = pending.get(id) ?? null;
     return {
       ...item,
-      client: { id: post.client.id, name: post.client.name, healthcare: post.client.isHealthcare },
+      client: {
+        id: post.client.id,
+        name: post.client.name,
+        imageId: post.client.imageId,
+        healthcare: post.client.isHealthcare,
+      },
       responsible: {
         ...item.responsible,
         inScope:
@@ -626,7 +636,7 @@ export class ContentService {
     ]);
     return rows.map((row) => ({
       id: row.id,
-      client: { id: row.clientId, name: clients.get(row.clientId)?.name ?? '' },
+      client: clientRef(clients, row.clientId),
       title: row.title,
       type: row.type,
       platforms: row.platforms,
@@ -637,6 +647,7 @@ export class ContentService {
       responsible: people.get(row.responsibleId) ?? {
         id: row.responsibleId,
         name: '',
+        imageId: null,
         archived: true,
       },
       thumbnailVersionId:

@@ -19,7 +19,7 @@ import { and, asc, count, desc, eq } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { UserDirectory } from '../auth/index.js';
+import { personRef, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
 import type { Notice } from '../notifications/index.js';
@@ -281,7 +281,7 @@ export class TaskReviews {
       ]),
       this.clients.contactSummaries(responses.map((response) => response.contactId)),
     ]);
-    const person = (userId: string) => ({ id: userId, name: people.get(userId)?.name ?? '' });
+    const person = (userId: string) => personRef(people, userId);
     const versionsOf = (ids: string[]): ReviewVersion[] =>
       ids
         .flatMap((id) => versions.get(id) ?? [])

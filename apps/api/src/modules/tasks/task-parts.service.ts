@@ -4,6 +4,7 @@ import {
   type AuditEntityType,
   type CreateTaskChecklistItem,
   type CreateTaskLink,
+  type PersonRef,
   TASK_LIMITS,
   type TaskChecklist,
   type TaskChecklistItem,
@@ -16,7 +17,7 @@ import { and, asc, count, eq, gt, isNull, max, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { actorOf, assertTaskWritable, readableTask, taskRights } from './task-access.js';
@@ -172,7 +173,7 @@ export class TaskPartsService {
       });
       return created;
     });
-    return this.presentLink(row, actor.name);
+    return this.presentLink(row, personRef(await this.users.summaries([actor.id]), actor.id));
   }
 
   async archiveLink(actor: CurrentUserInfo, taskId: string, linkId: string) {
@@ -234,9 +235,7 @@ export class TaskPartsService {
       position: row.position,
       done: !!row.doneAt,
       doneAt: row.doneAt?.toISOString() ?? null,
-      doneBy: row.doneById
-        ? { id: row.doneById, name: people.get(row.doneById)?.name ?? '' }
-        : null,
+      doneBy: row.doneById ? personRef(people, row.doneById) : null,
     }));
   }
 
@@ -246,12 +245,12 @@ export class TaskPartsService {
     return item;
   }
 
-  private presentLink(row: LinkRow, addedByName: string): TaskLink {
+  private presentLink(row: LinkRow, addedBy: PersonRef): TaskLink {
     return {
       id: row.id,
       url: row.url,
       label: row.label,
-      addedBy: { id: row.addedById, name: addedByName },
+      addedBy,
       createdAt: row.createdAt.toISOString(),
     };
   }

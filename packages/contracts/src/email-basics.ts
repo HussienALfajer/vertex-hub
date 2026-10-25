@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { personSchema } from './images.js';
 
 export const EMAIL_AUDIENCES = ['staff', 'client'] as const;
 
@@ -67,8 +68,6 @@ export const emailAddressSchema = z
 
 export type EmailAddress = z.infer<typeof emailAddressSchema>;
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
-
 export const emailSummarySchema = z
   .object({
     id: z.uuid(),
@@ -77,7 +76,8 @@ export const emailSummarySchema = z
     to: z.array(emailAddressSchema),
     cc: z.array(emailAddressSchema),
     subject: z.string(),
-    sender: personSchema.nullable(),
+    /** Emails show no photos (F01C), so the sender carries none. */
+    sender: personSchema.omit({ imageId: true }).nullable(),
     createdAt: z.iso.datetime(),
     sentAt: z.iso.datetime().nullable(),
     /** The SMTP error of the last attempt. */

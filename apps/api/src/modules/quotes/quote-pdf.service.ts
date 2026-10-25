@@ -8,6 +8,7 @@ import {
   type QuotePdfRender,
   quotePdfReadyJobSchema,
   quoteSnapshotSchema,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import { type Database, quotes, type Transaction } from '@vertex-hub/db';
 import { and, eq, isNull, ne } from 'drizzle-orm';
@@ -16,7 +17,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
-import { GeneratedFiles } from '../files/index.js';
+import { GeneratedFiles, ImagesService } from '../files/index.js';
 import { assertCanManage, canRead, type Recipient, snapshotParty } from './quote-access.js';
 import { QuoteRecipients } from './quote-recipients.js';
 import {
@@ -48,6 +49,7 @@ export class QuotePdfService implements OnModuleInit {
     private readonly recipients: QuoteRecipients,
     private readonly files: GeneratedFiles,
     private readonly jobs: JobQueue,
+    private readonly images: ImagesService,
   ) {}
 
   onModuleInit(): void {
@@ -250,7 +252,7 @@ export class QuotePdfService implements OnModuleInit {
     actor: CurrentUserInfo,
     quote: QuoteRow,
     client: Recipient,
-  ): Promise<{ state: QuotePdfRender['state']; job: QuotePdfJob | null }> {
+  ): Promise<{ state: QuotePdfRender['state']; job: UnqueuedPdfJob<QuotePdfJob> | null }> {
     assertCanManage(actor, client);
     if (quote.archivedAt) {
       throw new CodedException(409, 'INVALID_TRANSITION', 'A discarded draft is not previewed');
@@ -283,8 +285,17 @@ export class QuotePdfService implements OnModuleInit {
     return { state: 'pending', job: { quoteId: quote.id, draft: true, hash, snapshot } };
   }
 
-  private async queue(job: QuotePdfJob): Promise<void> {
-    await this.jobs.send(QUOTES_PDF_JOB.queue, job, { retryLimit: QUOTES_PDF_JOB.retryLimit });
+  /** F01C rule 14: with the client's current logo; a lead's quote has none. */
+  private async queue(job: UnqueuedPdfJob<QuotePdfJob>): Promise<void> {
+    const [quote] = await this.db
+      .select({ clientId: quotes.clientId })
+      .from(quotes)
+      .where(eq(quotes.id, job.quoteId));
+    const clientLogoKey = await this.images.clientLogoKey(quote?.clientId ?? null);
+    const queued: QuotePdfJob = { ...job, clientLogoKey };
+    await this.jobs.send(QUOTES_PDF_JOB.queue, queued, {
+      retryLimit: QUOTES_PDF_JOB.retryLimit,
+    });
   }
 
   private async removeObject(key: string): Promise<void> {
@@ -297,7 +308,7 @@ export class QuotePdfService implements OnModuleInit {
 }
 
 /** The render of a sent version: its frozen snapshot. */
-function sentJob(quote: QuoteRow): QuotePdfJob {
+function sentJob(quote: QuoteRow): UnqueuedPdfJob<QuotePdfJob> {
   const snapshot = quoteSnapshotSchema.parse(quote.snapshot);
   return { quoteId: quote.id, draft: false, hash: renderHash(snapshot, false), snapshot };
 }

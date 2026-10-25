@@ -20,6 +20,7 @@ import {
   receiptDisplayNumber,
   receiptSnapshotSchema,
   type StatementSnapshot,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import {
   type Database,
@@ -35,7 +36,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
-import { FilePurges, GeneratedFiles } from '../files/index.js';
+import { FilePurges, GeneratedFiles, ImagesService } from '../files/index.js';
 import { QuoteDirectory } from '../quotes/index.js';
 import { canManage, covers } from './invoice-access.js';
 import { InvoiceBillingService } from './invoice-billing.service.js';
@@ -70,6 +71,7 @@ export class InvoicePdfService implements OnModuleInit {
     private readonly files: GeneratedFiles,
     private readonly purges: FilePurges,
     private readonly jobs: JobQueue,
+    private readonly images: ImagesService,
   ) {}
 
   onModuleInit(): void {
@@ -317,7 +319,7 @@ export class InvoicePdfService implements OnModuleInit {
     actor: CurrentUserInfo,
     invoice: InvoiceRow,
     client: ClientSummary,
-  ): Promise<{ state: QuotePdfRender['state']; job: InvoicePdfJob | null }> {
+  ): Promise<{ state: QuotePdfRender['state']; job: UnqueuedPdfJob<InvoicePdfJob> | null }> {
     if (!canManage(actor, client)) throw new ForbiddenException();
     if (invoice.archivedAt) {
       throw new CodedException(409, 'INVALID_TRANSITION', 'A discarded draft is not previewed');
@@ -540,12 +542,38 @@ export class InvoicePdfService implements OnModuleInit {
     query: ClientStatementQuery,
   ) {
     const statement = await this.billing.statement(actor, clientId, query);
-    const snapshot = { ...statement, companyDetails: await this.quotes.companyDetails() };
+    const snapshot: StatementSnapshot = {
+      ...statement,
+      // F01C: names only, so the hash is the same as before images (the logo is not hashed).
+      client: { id: statement.client.id, name: statement.client.name },
+      companyDetails: await this.quotes.companyDetails(),
+    };
     return { snapshot, hash: invoicePdfHash('statement', snapshot) };
   }
 
-  private async queue(job: InvoicePdfJob): Promise<void> {
-    await this.jobs.send(INVOICES_PDF_JOB.queue, job, { retryLimit: INVOICES_PDF_JOB.retryLimit });
+  /** F01C rule 14: with the client's current logo. */
+  private async queue(job: UnqueuedPdfJob<InvoicePdfJob>): Promise<void> {
+    const clientLogoKey = await this.images.clientLogoKey(await this.clientOf(job));
+    const queued: InvoicePdfJob = { ...job, clientLogoKey };
+    await this.jobs.send(INVOICES_PDF_JOB.queue, queued, {
+      retryLimit: INVOICES_PDF_JOB.retryLimit,
+    });
+  }
+
+  private async clientOf(job: UnqueuedPdfJob<InvoicePdfJob>): Promise<string | null> {
+    if (job.kind === 'statement') return job.snapshot.client.id;
+    const [row] =
+      job.kind === 'receipt'
+        ? await this.db
+            .select({ clientId: invoices.clientId })
+            .from(payments)
+            .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
+            .where(eq(payments.id, job.id))
+        : await this.db
+            .select({ clientId: invoices.clientId })
+            .from(invoices)
+            .where(eq(invoices.id, job.id));
+    return row?.clientId ?? null;
   }
 
   private async removeObject(key: string): Promise<void> {
@@ -558,13 +586,13 @@ export class InvoicePdfService implements OnModuleInit {
 }
 
 /** The render of an issued invoice: its frozen snapshot. */
-function issuedJob(invoice: InvoiceRow): InvoicePdfJob {
+function issuedJob(invoice: InvoiceRow): UnqueuedPdfJob<InvoicePdfJob> {
   const snapshot = invoiceSnapshotSchema.parse(invoice.snapshot);
   return { kind: 'invoice', id: invoice.id, hash: invoicePdfHash('invoice', snapshot), snapshot };
 }
 
 /** The render of a payment's receipt: its frozen snapshot. */
-function receiptJob(payment: PaymentRow): InvoicePdfJob {
+function receiptJob(payment: PaymentRow): UnqueuedPdfJob<InvoicePdfJob> {
   const snapshot = receiptSnapshotSchema.parse(payment.receiptSnapshot);
   return { kind: 'receipt', id: payment.id, hash: invoicePdfHash('receipt', snapshot), snapshot };
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuditController } from './audit.controller.js';
 import { AuditService } from './audit.service.js';
+import { AuditActorPhotos } from './audit-actor-photos.js';
 
 /**
  * The audit log (ADR 0013): every module writes its entries with `recordAudit` inside the
@@ -9,7 +10,7 @@ import { AuditService } from './audit.service.js';
  */
 @Module({
   controllers: [AuditController],
-  providers: [AuditService],
-  exports: [AuditService],
+  providers: [AuditService, AuditActorPhotos],
+  exports: [AuditService, AuditActorPhotos],
 })
 export class AuditModule {}

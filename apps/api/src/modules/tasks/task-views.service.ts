@@ -120,7 +120,7 @@ export class TaskViewsService {
       people: people.map((person) => {
         const row = byPerson.get(person.id);
         return {
-          user: { id: person.id, name: person.name },
+          user: { id: person.id, name: person.name, imageId: person.imageId },
           departments: person.departments,
           overdue: row?.overdue ?? 0,
           dueThisWeek: row?.dueThisWeek ?? 0,

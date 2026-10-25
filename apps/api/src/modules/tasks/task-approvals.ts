@@ -18,7 +18,7 @@ import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
@@ -420,9 +420,7 @@ export class TaskApprovals {
           versions: (snapshots.get(response.reviewId)?.versionIds ?? [])
             .flatMap((id) => versions.get(id) ?? [])
             .sort((a, b) => a.name.localeCompare(b.name, 'ar') || a.number - b.number),
-          recordedBy: response.recordedById
-            ? { id: response.recordedById, name: people.get(response.recordedById)?.name ?? '' }
-            : null,
+          recordedBy: response.recordedById ? personRef(people, response.recordedById) : null,
           createdAt: response.createdAt.toISOString(),
         }),
       ),

@@ -21,6 +21,7 @@ export {
   type Mailbox,
   type PeopleSources,
   type ProfileFilter,
+  personRef,
   type Signature,
   UserDirectory,
   type UserProfile,

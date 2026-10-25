@@ -44,8 +44,8 @@ import { and, asc, count, desc, eq, inArray, isNull, lte, max, ne, sql } from 'd
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
-import { ClientDirectory } from '../clients/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
+import { ClientDirectory, clientRef } from '../clients/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { ChargeInvoices } from './charge-invoices.js';
 import { actorOf, assertCanEditMoney, coversClient, seesMoney } from './project-access.js';
@@ -238,7 +238,7 @@ export class RetainerAmendmentsService {
             name: row.retainer.name,
             currency: row.retainer.currency,
           },
-          client: { id: row.clientId, name: clients.get(row.clientId)?.name ?? '' },
+          client: clientRef(clients, row.clientId),
         };
       }),
       total: total?.value ?? 0,
@@ -1499,7 +1499,7 @@ export class RetainerAmendmentsService {
       rows.flatMap((row) => [row.createdById, row.decidedById].filter((id) => id !== null)),
       executor,
     );
-    const person = (id: string) => ({ id, name: people.get(id)?.name ?? '' });
+    const person = (id: string) => personRef(people, id);
     return rows.map((row) => ({
       id: row.id,
       retainerId: row.retainerId,

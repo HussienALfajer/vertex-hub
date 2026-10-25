@@ -14,6 +14,7 @@ import {
 } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import { extraWorkBillingSchema } from './extra-work.js';
+import { clientRefSchema, engagementRefSchema, personSchema } from './images.js';
 import {
   pageQuerySchema,
   pageSchema,
@@ -553,9 +554,10 @@ export type RevisionDecisionInput = z.infer<typeof revisionDecisionInputSchema>;
 
 // Responses
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
+const namedSchema = z.object({ id: z.uuid(), name: z.string() });
 
 const archivablePersonSchema = personSchema.extend({ archived: z.boolean() });
+const archivableContactSchema = namedSchema.extend({ archived: z.boolean() });
 
 export const taskSchema = z
   .object({
@@ -573,10 +575,10 @@ export const taskSchema = z
     dueTime: timeOfDaySchema.nullable(),
     overdue: z.boolean(),
     blocked: z.boolean(),
-    client: personSchema.nullable(),
-    project: personSchema.nullable(),
-    milestone: personSchema.nullable(),
-    retainer: personSchema.nullable(),
+    client: clientRefSchema.nullable(),
+    project: engagementRefSchema.nullable(),
+    milestone: namedSchema.nullable(),
+    retainer: engagementRefSchema.nullable(),
     cycle: z
       .object({ id: z.uuid(), periodStart: calendarDateSchema, periodEnd: calendarDateSchema })
       .nullable(),
@@ -646,7 +648,7 @@ export const taskRevisionSchema = z
     /** Client revisions only: 1, 2, 3… */
     number: z.number().int().min(1).nullable(),
     note: z.string(),
-    contact: archivablePersonSchema.nullable(),
+    contact: archivableContactSchema.nullable(),
     overLimit: z.boolean(),
     decision: revisionDecisionSchema.nullable(),
     decisionNote: z.string().nullable(),
@@ -698,7 +700,7 @@ export const taskClientResponseSchema = z
     id: z.uuid(),
     decision: clientDecisionSchema,
     channel: responseChannelSchema,
-    contact: archivablePersonSchema,
+    contact: archivableContactSchema,
     note: z.string().nullable(),
     /** The versions answered: the snapshot's. */
     versions: z.array(reviewVersionSchema),
@@ -746,7 +748,7 @@ export const taskDetailSchema = taskSchema
     needsClientApproval: z.boolean(),
     clientRequest: z
       .object({
-        contact: archivablePersonSchema.nullable(),
+        contact: archivableContactSchema.nullable(),
         requestedOn: calendarDateSchema,
         scope: requestScopeSchema,
         extraWork: z

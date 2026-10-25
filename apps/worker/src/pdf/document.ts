@@ -16,6 +16,13 @@ export interface TemplateAssets {
   logo: string;
   /** `@font-face` rules with embedded fonts. */
   fontFaces: string;
+  /** F01C rule 14: the client's logo of this render, a data URL; null prints the name alone. */
+  clientLogo: string | null;
+}
+
+/** The client's logo in a 12 mm square tile, beside the client's name; nothing without one. */
+export function clientLogoTile(logo: string | null): string {
+  return logo ? `<img class="client-logo" src="${logo}" alt="">` : '';
 }
 
 const ESCAPES: Record<string, string> = {
@@ -86,8 +93,15 @@ const isolateNumbers = (line: string) =>
  * A `dl.meta` entry; `num` for dates and numbers, which read left to right. Other values (a billing
  * address with a phone, a payment reference of digits) print line by line as `textLines` does.
  */
-export function metaItem(label: string, value: string, options: { num?: boolean } = {}): string {
+export function metaItem(
+  label: string,
+  value: string,
+  options: { num?: boolean; logo?: string | null } = {},
+): string {
   const shown = options.num ? escapeHtml(value) : textLines(value);
+  if (options.logo) {
+    return `<div><dt>${label}</dt><dd class="with-logo">${clientLogoTile(options.logo)}<span>${shown}</span></dd></div>`;
+  }
   return `<div><dt>${label}</dt><dd${options.num ? ' class="num"' : ''}>${shown}</dd></div>`;
 }
 
@@ -113,6 +127,10 @@ dl.meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px; m
   padding: 10px 14px; border: 1px solid #D4DBD9; border-radius: 8px; }
 dl.meta dt { font-size: 8pt; color: #616866; }
 dl.meta dd { margin: 0; font-weight: 500; white-space: pre-line; }
+dl.meta dd.with-logo { display: flex; align-items: center; gap: 8px; white-space: normal; }
+/* F01C: a transparent logo reads on its white tile. */
+img.client-logo { flex: none; width: 12mm; height: 12mm; object-fit: contain; background: #FFFFFF;
+  border: 1px solid #D4DBD9; border-radius: 2mm; }
 section { margin-bottom: 18px; break-inside: auto; }
 h2 { margin: 0 0 8px; font-size: 12pt; font-weight: 700; color: #004139; }
 h3 { margin: 12px 0 6px; font-size: 10pt; font-weight: 700; color: #004139; }
