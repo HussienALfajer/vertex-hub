@@ -12,10 +12,13 @@ import { FileVersions } from './file-versions.js';
 import { FilesController } from './files.controller.js';
 import { FilesService } from './files.service.js';
 import { GeneratedFiles } from './generated-files.js';
+import { ImagesController } from './images.controller.js';
+import { ImagesService } from './images.service.js';
 import { LocalFileStorage } from './local-file-storage.js';
 
 /**
- * Files and versions (F10, ADR 0019). Owns `file_items`, `file_versions` and `file_uploads`;
+ * Files and versions (F10, ADR 0019) and profile images (F01C, ADR 0040). Owns `file_items`,
+ * `file_versions`, `file_uploads` and `images` (stored for `auth` through its `UserImages`);
  * reads users through `auth`'s `UserDirectory` and notifies through `notifications`. Never
  * imports `tasks`, `clients` or `projects`: they register their owner policies in the exported
  * `FileOwnerRegistry`, and `tasks` calls the exported `FileVersions` in its transactions;
@@ -25,7 +28,7 @@ import { LocalFileStorage } from './local-file-storage.js';
  */
 @Module({
   imports: [AuthModule, NotificationsModule],
-  controllers: [FileContentController, FilesController],
+  controllers: [FileContentController, FilesController, ImagesController],
   providers: [
     { provide: FileStorage, useClass: LocalFileStorage },
     FileOwnerRegistry,
@@ -36,7 +39,8 @@ import { LocalFileStorage } from './local-file-storage.js';
     FileUploadsService,
     FileContentService,
     GeneratedFiles,
+    ImagesService,
   ],
-  exports: [FileOwnerRegistry, FilePurges, FileVersions, GeneratedFiles],
+  exports: [FileOwnerRegistry, FilePurges, FileVersions, GeneratedFiles, ImagesService],
 })
 export class FilesModule {}

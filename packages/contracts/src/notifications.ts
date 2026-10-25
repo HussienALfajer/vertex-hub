@@ -175,6 +175,11 @@ export const NOTIFICATION_TYPES = [
   'action_reminder',
   'action_escalated',
   'action_escalated_top',
+  // F01C.
+  'profile_changed',
+  'client_logo_changed',
+  'project_image_changed',
+  'retainer_image_changed',
   // F16: the followers' status notices come last, after every other notice of the change.
   'task_progressed',
   'post_progressed',
@@ -421,6 +426,11 @@ const CATALOG: Record<
   action_reminder: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated: { category: 'reminders', subject: 'task', mutable: false },
   action_escalated_top: { category: 'reminders', subject: 'task', mutable: false },
+  /** F01C rules 18–19: the recipient's own account; opens My account. */
+  profile_changed: { category: 'account', subject: 'user', mutable: true },
+  client_logo_changed: { category: 'clients_projects', subject: 'client', mutable: true },
+  project_image_changed: { category: 'clients_projects', subject: 'project', mutable: true },
+  retainer_image_changed: { category: 'clients_projects', subject: 'retainer', mutable: true },
 };
 
 /*
@@ -612,6 +622,10 @@ const CHANNELS: Record<NotificationType, Channels> = {
   action_reminder: important(),
   action_escalated: important('on'),
   action_escalated_top: critical(),
+  profile_changed: informational,
+  client_logo_changed: informational,
+  project_image_changed: informational,
+  retainer_image_changed: informational,
 };
 
 /*
@@ -676,11 +690,19 @@ interface Engine {
   opened: boolean;
   /** Rule B9: merges into the recipient's unread, unresolved row of the same type and subject. */
   merges: boolean;
+  /** F01C: merges only into a row created on the same business day ("merges per … and day"). */
+  mergesDaily: boolean;
   /** Rule B11: the steps sent while the original stays unresolved; empty when it never escalates. */
   escalation: readonly EscalationStep[];
 }
 
-const info: Engine = { box: 'info', opened: false, merges: false, escalation: [] };
+const info: Engine = {
+  box: 'info',
+  opened: false,
+  merges: false,
+  mergesDaily: false,
+  escalation: [],
+};
 const action = (rest: Partial<Omit<Engine, 'box'>> = {}): Engine => ({
   ...info,
   box: 'action',
@@ -689,6 +711,7 @@ const action = (rest: Partial<Omit<Engine, 'box'>> = {}): Engine => ({
 const opened = action({ opened: true });
 const chain = action({ escalation: CHAIN });
 const merged: Engine = { ...info, merges: true };
+const mergedDaily: Engine = { ...merged, mergesDaily: true };
 
 /** Spec F16, "Notification types": box, "opened", "merges" and "escalates" of each type. */
 const ENGINE: Record<NotificationType, Engine> = {
@@ -852,6 +875,10 @@ const ENGINE: Record<NotificationType, Engine> = {
   action_reminder: action(),
   action_escalated: action(),
   action_escalated_top: action(),
+  profile_changed: mergedDaily,
+  client_logo_changed: mergedDaily,
+  project_image_changed: mergedDaily,
+  retainer_image_changed: mergedDaily,
 };
 
 /**
@@ -897,6 +924,13 @@ export function firstMatchPerRecipient<
 }
 
 /* Display snapshots, one schema per type. */
+
+/** F01C rules 18–19: the parts of a profile another person can change, in display order. */
+export const PROFILE_CHANGES = ['photo', 'name', 'title', 'phone', 'skills'] as const;
+
+export const profileChangeSchema = z.enum(PROFILE_CHANGES).meta({ id: 'ProfileChange' });
+
+export type ProfileChange = z.infer<typeof profileChangeSchema>;
 
 export const NOTIFICATION_EXCERPT_MAX = 140;
 
@@ -1424,6 +1458,20 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   action_escalated: escalationData,
   /** Step 3: the General Managers and Internal Operations managers (or the step's role). */
   action_escalated_top: escalationData,
+  /** F01C rules 18–19: what another person changed on the recipient's profile today. */
+  profile_changed: z.object({ changes: z.array(profileChangeSchema).min(1) }),
+  /** F01C rule 18: the latest change of the day; `removed` when the image was removed. */
+  client_logo_changed: z.object({ client: nameSchema, removed: z.boolean() }),
+  project_image_changed: z.object({
+    project: nameSchema,
+    client: nameSchema,
+    removed: z.boolean(),
+  }),
+  retainer_image_changed: z.object({
+    retainer: nameSchema,
+    client: nameSchema,
+    removed: z.boolean(),
+  }),
 } satisfies Record<NotificationType, z.ZodType>;
 
 export type NotificationData<Type extends NotificationType> = z.infer<
@@ -1465,6 +1513,23 @@ export function resolutionTypeOf(content: NotificationContent): NotificationType
   return isEscalationType(content.type)
     ? (content.data as EscalationData).originalType
     : content.type;
+}
+
+/**
+ * Rule B9: the snapshot a merged row keeps: the new one, except `profile_changed`, which names
+ * every part changed since the row was created, in display order (F01C rule 19).
+ */
+export function mergedNotificationData(
+  content: NotificationContent,
+  previous: unknown,
+): NotificationContent['data'] {
+  if (content.type !== 'profile_changed') return content.data;
+  const before = NOTIFICATION_DATA_SCHEMAS.profile_changed.safeParse(previous);
+  const changes = new Set([
+    ...(before.success ? before.data.changes : []),
+    ...content.data.changes,
+  ]);
+  return { changes: PROFILE_CHANGES.filter((change) => changes.has(change)) };
 }
 
 export type EscalationData = NotificationData<'action_reminder'>;

@@ -1,13 +1,10 @@
 import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import type {
-  CreateUser,
-  UpdateOwnProfile,
-  UpdateUser,
-  UserListQuery,
-} from '@vertex-hub/contracts';
+import type { CreateUser, UpdateOwnProfile, UpdateUser } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
+import type { paths } from '../../lib/api/schema.gen';
 
-export type UserListFilters = Partial<UserListQuery>;
+/** The query as sent: booleans travel as `'true'` or `'false'` (F01C `hasImage`). */
+export type UserListFilters = NonNullable<paths['/api/users']['get']['parameters']['query']>;
 
 export const usersKeys = {
   all: ['users'] as const,

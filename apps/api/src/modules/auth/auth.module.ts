@@ -22,6 +22,7 @@ import { SessionActivity } from './session-activity.js';
 import { SignedInDevicesController } from './signed-in-devices.controller.js';
 import { SignedInDevicesService } from './signed-in-devices.service.js';
 import { UserDirectory } from './user-directory.js';
+import { UserImages } from './user-images.js';
 import { UserLifecycle } from './user-lifecycle.js';
 import { UserLinksService } from './user-links.service.js';
 import { UsersController } from './users.controller.js';
@@ -64,6 +65,7 @@ import { UsersService } from './users.service.js';
     ResponsibilityRegistry,
     DevicePushStates,
     UserDirectory,
+    UserImages,
     IpLocations,
     SessionActivity,
     SignedInDevicesService,
@@ -76,6 +78,7 @@ import { UsersService } from './users.service.js';
     AccountNotices,
     UserLifecycle,
     AccountArchiver,
+    UserImages,
   ],
 })
 export class AuthModule {}

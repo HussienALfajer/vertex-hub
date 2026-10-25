@@ -26,10 +26,12 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { departmentCodeEnum, users } from './auth.js';
+import { users } from './auth.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { deliverableKindEnum } from './deliverables.js';
+import { departmentCodeEnum } from './department-codes.js';
+import { images } from './images.js';
 import { currencyEnum, projects } from './projects.js';
 import { quotes } from './quotes.js';
 import { workTemplates } from './templates.js';
@@ -86,6 +88,8 @@ export const retainers = pgTable(
     /** The currency of the fee and of extra work estimates. */
     currency: currencyEnum('currency').notNull().default('USD'),
     monthlyFeeMinor: minorAmount('monthly_fee_minor'),
+    /** F01C: its own image; the client's logo shows without one. */
+    imageId: uuid('image_id').references((): AnyPgColumn => images.id),
     ...timestamps(),
     archivedAt: archivedAt(),
   },
@@ -96,6 +100,7 @@ export const retainers = pgTable(
     index('retainers_client_id_idx').on(table.clientId),
     index('retainers_status_idx').on(table.status),
     index('retainers_departments_idx').using('gin', table.departments),
+    index('retainers_image_id_idx').on(table.imageId),
     check('retainers_renewal_date_check', sql`${table.renewalDate} > ${table.startDate}`),
     check('retainers_monthly_fee_check', sql`${table.monthlyFeeMinor} >= 0`),
   ],

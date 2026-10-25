@@ -302,7 +302,12 @@ describe('approval links (F09 rules 13–15, 20–23)', () => {
         .select()
         .from(notifications)
         .where(
-          and(eq(notifications.recipientId, cast.am.id), eq(notifications.subjectId, request.id)),
+          and(
+            eq(notifications.recipientId, cast.am.id),
+            eq(notifications.subjectId, request.id),
+            // The request also has its opened and completed notices for the account manager.
+            eq(notifications.type, 'approval_responded'),
+          ),
         );
       expect(merged).toMatchObject({ count: 2, actorId: null });
       expect(merged?.data).toMatchObject({ decision: 'changes_requested', contact });

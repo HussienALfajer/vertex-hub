@@ -18,3 +18,4 @@ export {
   GeneratedFiles,
   type StoredObject,
 } from './generated-files.js';
+export { ImagesService } from './images.service.js';

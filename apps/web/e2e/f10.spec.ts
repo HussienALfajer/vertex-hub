@@ -135,7 +135,7 @@ test('everyone adds references; only task workers and managers change deliverabl
   // A designer who is neither the assignee nor a manager of the task.
   const designer: MeResponse = {
     ...employeeMe,
-    user: { id: seedIds.basel, name: 'باسل يوسف', email: 'basel@vertex.example', image: null },
+    user: { id: seedIds.basel, name: 'باسل يوسف', email: 'basel@vertex.example', imageId: null },
   };
   await mockApi(page, { signedIn: true, me: designer });
   await page.goto(`/tasks/${seedIds.autumnMenu}`);

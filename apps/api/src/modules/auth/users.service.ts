@@ -3,7 +3,10 @@ import {
   type AssignableRole,
   type CreateUser,
   hasPermission,
+  type Image,
+  type ProfileChange,
   type Responsibility,
+  type SetImage,
   type SkillListResponse,
   type UpdateOwnProfile,
   type UpdateUser,
@@ -34,6 +37,7 @@ import {
   eq,
   ilike,
   inArray,
+  isNotNull,
   isNull,
   ne,
   or,
@@ -49,6 +53,7 @@ import type { CurrentUserInfo } from './current-user.decorator.js';
 import { resetTwoFactor } from './reset-two-factor.js';
 import { ResponsibilityRegistry } from './responsibility-registry.js';
 import { UserDirectory } from './user-directory.js';
+import { UserImages } from './user-images.js';
 import { UserLifecycle } from './user-lifecycle.js';
 import { UserLinksService } from './user-links.service.js';
 import { hasPassword, lockAccessChanges, statusOf } from './user-status.js';
@@ -60,6 +65,7 @@ const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${ch
 interface LoadedUser {
   id: string;
   name: string;
+  imageId: string | null;
   email: string;
   title: string | null;
   phone: string | null;
@@ -91,6 +97,7 @@ export class UsersService {
     private readonly notices: AccountNotices,
     private readonly directory: UserDirectory,
     private readonly lifecycle: UserLifecycle,
+    private readonly userImages: UserImages,
   ) {}
 
   async list(actor: CurrentUserInfo, query: UserListQuery): Promise<UserPage> {
@@ -98,7 +105,10 @@ export class UsersService {
     // Status and assigned roles are for user managers only; managing a department is public.
     const assignedRoleFilter =
       query.role && !['employee', 'department_manager'].includes(query.role);
-    if ((query.status !== 'active' || assignedRoleFilter) && !manager) {
+    if (
+      (query.status !== 'active' || assignedRoleFilter || query.hasImage !== undefined) &&
+      !manager
+    ) {
       throw new ForbiddenException();
     }
 
@@ -123,6 +133,9 @@ export class UsersService {
     if (query.skill) {
       filters.push(sql`exists (select 1 from unnest(${users.skills}) as skill
         where lower(skill) = lower(${query.skill}))`);
+    }
+    if (query.hasImage !== undefined) {
+      filters.push(query.hasImage ? isNotNull(users.imageId) : isNull(users.imageId));
     }
     const where = and(...filters);
 
@@ -239,6 +252,13 @@ export class UsersService {
           entityId: id,
           ...profileChange,
         });
+        // F01C rule 19: the user hears of profile edits by someone else; email is an access change.
+        await this.notifyProfileChanged(
+          tx,
+          actor,
+          id,
+          PROFILE_FIELDS.filter((field) => field in profileChange.after),
+        );
       }
 
       await this.changeDepartments(tx, actor, current, primaryDepartmentId, secondaryDepartmentIds);
@@ -380,7 +400,107 @@ export class UsersService {
     return this.detail(actor, actor.id);
   }
 
+  /** The signed-in user's current photo (F01C), for `GET /api/me`. */
+  async imageIdOf(id: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ imageId: users.imageId })
+      .from(users)
+      .where(eq(users.id, id));
+    return row?.imageId ?? null;
+  }
+
+  /**
+   * F01C rules 1, 5 and 18: one's own photo, or another user's for `users.manage` within F01's
+   * scope (only a General Manager changes a General Manager's).
+   */
+  async setImage(actor: CurrentUserInfo, id: string, input: SetImage): Promise<Image> {
+    const image = await this.db.transaction(async (tx) => {
+      const current = await this.lockForImage(tx, actor, id);
+      const stored = await this.userImages.images.set(tx, actor, { type: 'user', id }, input);
+      await tx.update(users).set({ imageId: stored.image.id }).where(eq(users.id, id));
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'user.image_set',
+        entityType: 'user',
+        entityId: id,
+        ...(current.imageId && { before: { imageId: current.imageId } }),
+        after: { imageId: stored.image.id, source: stored.source },
+      });
+      await this.notifyProfileChanged(tx, actor, id, ['photo']);
+      return stored.image;
+    });
+    await this.userImages.images.queueRenders();
+    return image;
+  }
+
+  /** F01C rule 4: removing when there is no photo changes nothing. */
+  async removeImage(actor: CurrentUserInfo, id: string): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const current = await this.lockForImage(tx, actor, id);
+      if (!current.imageId) return;
+      await this.userImages.images.remove(tx, actor, { type: 'user', id });
+      await tx.update(users).set({ imageId: null }).where(eq(users.id, id));
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'user.image_removed',
+        entityType: 'user',
+        entityId: id,
+        before: { imageId: current.imageId },
+        after: { imageId: null },
+      });
+      await this.notifyProfileChanged(tx, actor, id, ['photo']);
+    });
+  }
+
   // Helpers
+
+  /**
+   * Locks a user whose photo changes: unknown is 404, another user's needs `users.manage` (403)
+   * and a General Manager's a General Manager; an archived user's is refused (rule 5).
+   */
+  private async lockForImage(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    id: string,
+  ): Promise<{ imageId: string | null }> {
+    const [user] = await tx
+      .select({ imageId: users.imageId, archivedAt: users.archivedAt })
+      .from(users)
+      .where(eq(users.id, id))
+      .for('update');
+    if (!user) throw new NotFoundException();
+    if (id !== actor.id) {
+      if (!canManage(actor)) throw new ForbiddenException();
+      const [generalManager] = await tx
+        .select({ userId: userRoles.userId })
+        .from(userRoles)
+        .where(and(eq(userRoles.userId, id), eq(userRoles.role, 'general_manager')));
+      if (generalManager && !isGeneralManager(actor)) throw this.generalManagerOnly();
+    }
+    if (user.archivedAt) {
+      throw new CodedException(409, 'USER_ARCHIVED', 'Restore the user before changing them');
+    }
+    return user;
+  }
+
+  /** F01C rules 18–19: `profile_changed` to the user, unless they made the change themselves. */
+  private async notifyProfileChanged(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    userId: string,
+    changes: ProfileChange[],
+  ): Promise<void> {
+    if (changes.length === 0 || actor.id === userId) return;
+    await this.notices.send(tx, [
+      {
+        type: 'profile_changed',
+        data: { changes },
+        recipients: [userId],
+        actorId: actor.id,
+        subjectId: userId,
+      },
+    ]);
+  }
 
   private async load(executor: Executor, ids: string[]): Promise<Map<string, LoadedUser>> {
     if (ids.length === 0) return new Map();
@@ -389,6 +509,7 @@ export class UsersService {
         .select({
           id: users.id,
           name: users.name,
+          imageId: users.imageId,
           email: users.email,
           title: users.title,
           phone: users.phone,
@@ -444,6 +565,7 @@ export class UsersService {
     const response: UserResponse = {
       id: user.id,
       name: user.name,
+      imageId: user.imageId,
       email: manager || user.status !== 'archived' ? user.email : null,
       title: user.title,
       phone: user.phone,
@@ -795,6 +917,9 @@ export class UsersService {
     );
   }
 }
+
+/** The profile fields whose edit by someone else the user is told of (F01C rule 19). */
+const PROFILE_FIELDS = ['name', 'title', 'phone', 'skills'] as const satisfies ProfileChange[];
 
 /** Roles only a General Manager grants or removes (F01 rule 7). */
 const isGeneralManagerGranted = (role: string) => role === 'general_manager' || role === 'finance';

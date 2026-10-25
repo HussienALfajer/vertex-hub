@@ -17,3 +17,8 @@ overrides:
   exceljs>uuid: ^11.1.1
   # drizzle-kit's legacy loader pins esbuild ~0.18; drizzle-kit itself already uses ^0.25. GHSA-67mh-4wv8-2f99.
   '@esbuild-kit/core-utils>esbuild': ^0.25.0
+  # express 5 and @nestjs/platform-express pin older ranges. GHSA-27r3-jxmh-p828, GHSA-q7qp-rjg7-q26m.
+  body-parser: ^2.4.0
+  multer: ^2.5.0
+  # @hookform/resolvers pins zod 4.6.5. GHSA-mrhx-c7xc-m3w5.
+  '@hookform/resolvers>zod': ^4.6.7

@@ -15,10 +15,18 @@ import {
   type ClientResponse,
   type ClientStatus,
   type CreateClient,
+  type Image,
   type SectorListResponse,
+  type SetImage,
   type UpdateClient,
 } from '@vertex-hub/contracts';
-import { clientContacts, clientPlatformAccounts, clients, type Database } from '@vertex-hub/db';
+import {
+  clientContacts,
+  clientPlatformAccounts,
+  clients,
+  type Database,
+  type Transaction,
+} from '@vertex-hub/db';
 import {
   and,
   asc,
@@ -42,6 +50,8 @@ import {
   UserDirectory,
   type UserSummary,
 } from '../auth/index.js';
+import { ImagesService } from '../files/index.js';
+import { NotificationCenter } from '../notifications/index.js';
 import {
   actorOf,
   covers,
@@ -98,6 +108,8 @@ export class ClientsService implements OnModuleInit {
     private readonly responsibilities: ResponsibilityRegistry,
     private readonly factory: ClientFactory,
     private readonly flagHooks: ClientFlagHooks,
+    private readonly images: ImagesService,
+    private readonly notifications: NotificationCenter,
   ) {}
 
   /** A user cannot be archived or lose the Account Manager role while they manage a live client. */
@@ -459,6 +471,83 @@ export class ClientsService implements OnModuleInit {
         });
       }
       return kit;
+    });
+  }
+
+  /**
+   * F01C rules 1, 5, 6 and 18: a new logo, uploaded or cut from a logo brand file; the primary
+   * account manager hears of it when someone else sets it.
+   */
+  async setImage(actor: CurrentUserInfo, id: string, input: SetImage): Promise<Image> {
+    const image = await this.db.transaction(async (tx) => {
+      const current = await this.lockForImage(tx, actor, id);
+      const stored = await this.images.set(tx, actor, { type: 'client', id }, input);
+      await tx.update(clients).set({ imageId: stored.image.id }).where(eq(clients.id, id));
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'client.image_set',
+        entityType: 'client',
+        entityId: id,
+        ...(current.imageId && { before: { imageId: current.imageId } }),
+        after: {
+          imageId: stored.image.id,
+          source: stored.source,
+          ...(stored.brandVersionId && { brandVersionId: stored.brandVersionId }),
+        },
+      });
+      await this.notifyLogoChanged(tx, actor, current, false);
+      return stored.image;
+    });
+    await this.images.queueRenders();
+    return image;
+  }
+
+  /** F01C rule 4: removing when there is no logo changes nothing. */
+  async removeImage(actor: CurrentUserInfo, id: string): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const current = await this.lockForImage(tx, actor, id);
+      if (!current.imageId) return;
+      await this.images.remove(tx, actor, { type: 'client', id });
+      await tx.update(clients).set({ imageId: null }).where(eq(clients.id, id));
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'client.image_removed',
+        entityType: 'client',
+        entityId: id,
+        before: { imageId: current.imageId },
+        after: { imageId: null },
+      });
+      await this.notifyLogoChanged(tx, actor, current, true);
+    });
+  }
+
+  private async lockForImage(tx: Transaction, actor: CurrentUserInfo, id: string) {
+    await manageableClient(tx, actor, id);
+    const [current] = await tx
+      .select({
+        id: clients.id,
+        tradeName: clients.tradeName,
+        accountManagerId: clients.accountManagerId,
+        imageId: clients.imageId,
+      })
+      .from(clients)
+      .where(eq(clients.id, id));
+    if (!current) throw new NotFoundException();
+    return current;
+  }
+
+  private async notifyLogoChanged(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    client: { id: string; tradeName: string; accountManagerId: string },
+    removed: boolean,
+  ): Promise<void> {
+    await this.notifications.notify(tx, {
+      type: 'client_logo_changed',
+      recipients: [client.accountManagerId],
+      actorId: actor.id,
+      subjectId: client.id,
+      data: { client: client.tradeName, removed },
     });
   }
 }

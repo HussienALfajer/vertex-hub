@@ -11,6 +11,7 @@ import {
   businessDate,
   type CreateProject,
   canChangeProjectStatus,
+  type Image,
   isProjectClosed,
   OPEN_PROJECT_STATUSES,
   PROJECT_LIMITS,
@@ -21,6 +22,7 @@ import {
   type ProjectStatus,
   type ProjectStatusChange,
   permissionScopes,
+  type SetImage,
   type UpdateProject,
 } from '@vertex-hub/contracts';
 import {
@@ -60,6 +62,7 @@ import {
   type UserSummary,
 } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
+import { ImagesService } from '../files/index.js';
 import { BillingLocks } from './billing-locks.js';
 import { changedDepartments } from './engagement-departments.js';
 import { EngagementNotices } from './engagement-notices.js';
@@ -122,6 +125,7 @@ export class ProjectsService implements OnModuleInit {
     private readonly progress: WorkProgress,
     private readonly locks: BillingLocks,
     private readonly notices: EngagementNotices,
+    private readonly images: ImagesService,
   ) {}
 
   /** Rule 4: a user cannot be archived while they manage an open project. */
@@ -591,6 +595,58 @@ export class ProjectsService implements OnModuleInit {
       });
     });
     return this.detail(actor, id);
+  }
+
+  /** F01C rules 1, 3, 5 and 18: the project's own image, shown instead of its client's logo. */
+  async setImage(actor: CurrentUserInfo, id: string, input: SetImage): Promise<Image> {
+    const image = await this.db.transaction(async (tx) => {
+      const { project, imageId } = await this.lockForImage(tx, actor, id);
+      const stored = await this.images.set(tx, actor, { type: 'project', id }, input);
+      await tx.update(projects).set({ imageId: stored.image.id }).where(eq(projects.id, id));
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'project.image_set',
+        entityType: 'project',
+        entityId: id,
+        ...(imageId && { before: { imageId } }),
+        after: { imageId: stored.image.id, source: stored.source },
+      });
+      await this.notices.imageChanged(tx, { kind: 'project', ...project }, false, actor.id);
+      return stored.image;
+    });
+    await this.images.queueRenders();
+    return image;
+  }
+
+  /** F01C rules 3 and 4: back to the client's logo; nothing changes without an image. */
+  async removeImage(actor: CurrentUserInfo, id: string): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const { project, imageId } = await this.lockForImage(tx, actor, id);
+      if (!imageId) return;
+      await this.images.remove(tx, actor, { type: 'project', id });
+      await tx.update(projects).set({ imageId: null }).where(eq(projects.id, id));
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'project.image_removed',
+        entityType: 'project',
+        entityId: id,
+        before: { imageId },
+        after: { imageId: null },
+      });
+      await this.notices.imageChanged(tx, { kind: 'project', ...project }, true, actor.id);
+    });
+  }
+
+  /** Client scope or project manager, on a project that is not archived (closed ones too). */
+  private async lockForImage(tx: Transaction, actor: CurrentUserInfo, id: string) {
+    const project = await readableProject(tx, this.clients, actor, id, { forUpdate: true });
+    if (!canWork(actor, project)) throw new ForbiddenException();
+    assertNotArchived(project);
+    const [row] = await tx
+      .select({ imageId: projects.imageId })
+      .from(projects)
+      .where(eq(projects.id, id));
+    return { project, imageId: row?.imageId ?? null };
   }
 
   /** Rule 2: a non-archived user; an invited user qualifies. */

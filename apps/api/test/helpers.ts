@@ -45,6 +45,7 @@ import {
   hrOpinions,
   hrRequests,
   hrSettings,
+  images,
   invoiceLines,
   invoices,
   leadInterests,
@@ -194,6 +195,15 @@ export async function seedUser(db: Database, input: SeedUser = {}): Promise<Seed
 /** Removes seeded users with everything that points at them (test cleanup only). */
 export async function removeUsers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Their photos and the images they set or removed on any record (F01C).
+  await removeImages(
+    db,
+    or(
+      inArray(images.userId, ids),
+      inArray(images.createdById, ids),
+      inArray(images.archivedById, ids),
+    ) as SQL,
+  );
   // Emails point at their sender (F14 email).
   await db.delete(emailMessages).where(inArray(emailMessages.senderId, ids));
   // Payments point at their recorder and their proof document (F13): they go first.
@@ -541,8 +551,34 @@ export async function removeLeftoverUsers(db: Database): Promise<number> {
  * Removes seeded clients, their contacts, accounts, notes, projects and audit entries (test
  * cleanup only).
  */
+/** F01C: the images the filter selects, unlinked from the records showing them first. */
+export async function removeImages(db: Database, filter: SQL): Promise<void> {
+  const ids = (await db.select({ id: images.id }).from(images).where(filter)).map((row) => row.id);
+  if (ids.length === 0) return;
+  await db.update(users).set({ imageId: null }).where(inArray(users.imageId, ids));
+  await db.update(clients).set({ imageId: null }).where(inArray(clients.imageId, ids));
+  await db.update(projects).set({ imageId: null }).where(inArray(projects.imageId, ids));
+  await db.update(retainers).set({ imageId: null }).where(inArray(retainers.imageId, ids));
+  await db.delete(images).where(inArray(images.id, ids));
+}
+
 export async function removeClients(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Their logos (brand picks point at brand file versions) and their work's images (F01C).
+  await removeImages(
+    db,
+    or(
+      inArray(images.clientId, ids),
+      inArray(
+        images.projectId,
+        db.select({ id: projects.id }).from(projects).where(inArray(projects.clientId, ids)),
+      ),
+      inArray(
+        images.retainerId,
+        db.select({ id: retainers.id }).from(retainers).where(inArray(retainers.clientId, ids)),
+      ),
+    ) as SQL,
+  );
   // Retainer contracts point at their PDFs and signed copies (F05C): they go before file items.
   await removeRetainerContracts(
     db,
@@ -793,6 +829,7 @@ async function removeRuns(db: Database, runIds: string[]): Promise<void> {
 /** Removes seeded projects, their milestones, template runs and audit entries (test cleanup only). */
 export async function removeProjects(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeImages(db, inArray(images.projectId, ids));
   await removeFileItems(db, inArray(fileItems.projectId, ids));
   await removeRuns(
     db,
@@ -873,6 +910,7 @@ export async function removeRetainerContracts(db: Database, retainerIds: string[
 
 export async function removeRetainers(db: Database, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  await removeImages(db, inArray(images.retainerId, ids));
   await removeRetainerContracts(db, ids);
   await removeFileItems(db, inArray(fileItems.retainerId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));

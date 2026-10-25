@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -11,12 +12,24 @@ import {
   Query,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiPayloadTooLargeResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   type CreateRetainer,
   createRetainerSchema,
   type DeliverableLineList,
   deliverableLineListSchema,
+  type Image,
+  imageSchema,
   type RetainerDeliverables,
   type RetainerDetail,
   type RetainerListQuery,
@@ -27,6 +40,8 @@ import {
   retainerListQuerySchema,
   retainerPageSchema,
   retainerStatusChangeSchema,
+  type SetImage,
+  setImageSchema,
   type UpdateRetainer,
   updateRetainerSchema,
 } from '@vertex-hub/contracts';
@@ -157,5 +172,44 @@ export class RetainersController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<RetainerDetail> {
     return this.retainers.restore(actor, id);
+  }
+
+  @Put(':id/image')
+  @RequirePermissions('projects.manage')
+  @SerializeOptions({ schema: imageSchema })
+  @ApiOkResponse({
+    description: 'The new retainer image, pending until rendered',
+    standardSchema: imageSchema,
+  })
+  @ApiBadRequestResponse({
+    description:
+      '`UPLOAD_NOT_FOUND`, `IMAGE_TYPE_NOT_ALLOWED`, `IMAGE_TOO_SMALL`, `BRAND_FILE_NOT_FOUND` (only client logos come from brand files)',
+  })
+  @ApiPayloadTooLargeResponse({ description: '`IMAGE_TOO_LARGE`: above 10 MB' })
+  @ApiForbiddenResponse({ description: 'A retainer outside the `projects.manage` scope' })
+  @ApiNotFoundResponse({ description: 'No such readable retainer' })
+  @ApiConflictResponse({ description: '`RETAINER_ARCHIVED`, `CLIENT_ARCHIVED`' })
+  setImage(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: setImageSchema }) input: SetImage,
+  ): Promise<Image> {
+    return this.retainers.setImage(actor, id, input);
+  }
+
+  @Delete(':id/image')
+  @HttpCode(204)
+  @RequirePermissions('projects.manage')
+  @ApiNoContentResponse({
+    description: "The retainer's own image is removed: it shows its client's logo again",
+  })
+  @ApiForbiddenResponse({ description: 'A retainer outside the `projects.manage` scope' })
+  @ApiNotFoundResponse({ description: 'No such readable retainer' })
+  @ApiConflictResponse({ description: '`RETAINER_ARCHIVED`, `CLIENT_ARCHIVED`' })
+  removeImage(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.retainers.removeImage(actor, id);
   }
 }

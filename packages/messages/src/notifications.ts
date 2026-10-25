@@ -505,6 +505,27 @@ export const NOTIFICATION_TEXT = {
   directions: { in: 'الحضور', out: 'الانصراف' },
   kiosk_offline: 'شاشة الدخول «{{name}}» غير متصلة منذ {{when}}',
   attendance_month_closed: 'أُغلق حضور شهر {{month}} وملخّصه جاهز',
+  /** F01C rules 18–19: the parts are listed in display order. */
+  profile_changed: 'عدّل {{actor}} ملفك الشخصي: {{changes}}',
+  profileChanges: {
+    photo: 'الصورة',
+    name: 'الاسم',
+    title: 'المسمّى الوظيفي',
+    phone: 'الهاتف',
+    skills: 'المهارات',
+  },
+  client_logo_changed: {
+    set: 'غيّر {{actor}} شعار العميل «{{client}}»',
+    removed: 'أزال {{actor}} شعار العميل «{{client}}»',
+  },
+  project_image_changed: {
+    set: 'غيّر {{actor}} صورة المشروع «{{project}}»',
+    removed: 'أزال {{actor}} صورة المشروع «{{project}}»',
+  },
+  retainer_image_changed: {
+    set: 'غيّر {{actor}} صورة العقد الشهري «{{retainer}}»',
+    removed: 'أزال {{actor}} صورة العقد الشهري «{{retainer}}»',
+  },
   /** F16 rule B11: each escalation step wraps the original's text. */
   action_reminder: 'تذكير: {{text}}',
   action_escalated: 'تصعيد: {{text}}',
@@ -1430,6 +1451,37 @@ export function notificationText(
         text: fill(text.attendance_month_closed, { month: formatMonth(notification.data.month) }),
         context: null,
       };
+    case 'profile_changed':
+      return {
+        text: fill(text.profile_changed, {
+          actor,
+          changes: notification.data.changes
+            .map((change) => text.profileChanges[change])
+            .join('، '),
+        }),
+        context: null,
+      };
+    case 'client_logo_changed': {
+      const { client, removed } = notification.data;
+      return {
+        text: fill(text.client_logo_changed[removed ? 'removed' : 'set'], { actor, client }),
+        context: null,
+      };
+    }
+    case 'project_image_changed': {
+      const { project, client, removed } = notification.data;
+      return {
+        text: fill(text.project_image_changed[removed ? 'removed' : 'set'], { actor, project }),
+        context: client,
+      };
+    }
+    case 'retainer_image_changed': {
+      const { retainer, client, removed } = notification.data;
+      return {
+        text: fill(text.retainer_image_changed[removed ? 'removed' : 'set'], { actor, retainer }),
+        context: client,
+      };
+    }
     case 'colleague_on_leave':
       return {
         text: fill(text.colleague_on_leave, {
@@ -1575,6 +1627,7 @@ type TaskNotification = Exclude<
       | `field_punch_${string}`
       | 'kiosk_offline'
       | 'attendance_month_closed'
+      | 'profile_changed'
       | CalendarNotification['type'];
   }
 >;

@@ -45,7 +45,8 @@ export const meResponseSchema = z
       id: z.uuid(),
       name: z.string(),
       email: z.email(),
-      image: z.string().nullable(),
+      /** The current photo (F01C); null shows the initial. */
+      imageId: z.uuid().nullable(),
     }),
     /** Effective roles: assigned and derived (ADR 0014). */
     roles: z.array(roleSchema),

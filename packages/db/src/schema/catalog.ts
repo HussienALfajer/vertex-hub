@@ -11,9 +11,9 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { departmentCodeEnum } from './auth.js';
 import { archivedAt, id, timestamps } from './columns.js';
 import { deliverableKindEnum } from './deliverables.js';
+import { departmentCodeEnum } from './department-codes.js';
 import { workTemplates } from './templates.js';
 
 /*

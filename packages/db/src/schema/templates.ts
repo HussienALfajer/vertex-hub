@@ -14,9 +14,10 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { departmentCodeEnum, users } from './auth.js';
+import { users } from './auth.js';
 import { archivedAt, id, timestamps } from './columns.js';
 import { deliverableKindEnum } from './deliverables.js';
+import { departmentCodeEnum } from './department-codes.js';
 import { projects } from './projects.js';
 import { retainerCycleLines, retainerCycles, retainers } from './retainers.js';
 import { taskPriorityEnum, tasks } from './tasks.js';
