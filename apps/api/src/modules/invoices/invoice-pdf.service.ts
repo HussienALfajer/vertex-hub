@@ -542,7 +542,12 @@ export class InvoicePdfService implements OnModuleInit {
     query: ClientStatementQuery,
   ) {
     const statement = await this.billing.statement(actor, clientId, query);
-    const snapshot = { ...statement, companyDetails: await this.quotes.companyDetails() };
+    const snapshot: StatementSnapshot = {
+      ...statement,
+      // F01C: names only, so the hash is the same as before images (the logo is not hashed).
+      client: { id: statement.client.id, name: statement.client.name },
+      companyDetails: await this.quotes.companyDetails(),
+    };
     return { snapshot, hash: invoicePdfHash('statement', snapshot) };
   }
 

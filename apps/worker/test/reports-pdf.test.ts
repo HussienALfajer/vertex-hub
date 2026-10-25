@@ -6,6 +6,7 @@ import {
   type ClientReportSnapshot,
   type CycleReportSnapshot,
   type ReportPdfJob,
+  reportPdfJobSchema,
   reportPdfStorageKey,
   type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
@@ -24,13 +25,13 @@ const uuid = (n: number) => `0190a3c2-0000-7000-8000-${String(n).padStart(12, '0
 
 const report: ClientReportSnapshot = {
   companyDetails: 'فيرتكس ميديا\nدمشق - المزة',
-  client: { id: uuid(1), name: 'مطعم الياسمين', imageId: null },
+  client: { id: uuid(1), name: 'مطعم الياسمين' },
   month: '2026-09',
   period: { from: '2026-09-01', to: '2026-09-30' },
   preliminary: false,
   summary: {
     text: 'شهر جيد: ارتفع التفاعل على المنشورات.',
-    updatedBy: { id: uuid(2), name: 'سارة', imageId: null },
+    updatedBy: { id: uuid(2), name: 'سارة' },
     updatedAt: '2026-10-01T09:00:00.000Z',
   },
   retainers: [
@@ -291,6 +292,17 @@ describe('reports.pdf', () => {
     expectLogo(cycleReportHtml(cycleReport, withLogo));
     expectNoLogo(clientReportHtml(report, assets));
     expectNoLogo(cycleReportHtml(cycleReport, assets));
+  });
+
+  it('takes a payload queued before F01C: names only, no logo key', () => {
+    const queued = reportPdfJobSchema.parse({
+      kind: 'client_report',
+      id,
+      hash: '7'.repeat(64),
+      snapshot: report,
+    });
+    expect(queued.clientLogoKey).toBeNull();
+    expect(queued.snapshot.client).toEqual({ id: report.client.id, name: report.client.name });
   });
 
   it('renders without a logo file that is gone, and logs it (F01C)', async () => {

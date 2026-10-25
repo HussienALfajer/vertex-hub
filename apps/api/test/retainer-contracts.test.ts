@@ -30,6 +30,7 @@ import {
   documentNumbers,
   fileItems,
   fileVersions,
+  images,
   invoiceSettings,
   notifications,
 } from '@vertex-hub/db';
@@ -647,7 +648,25 @@ describe('retainer contracts (F05C K1–K12)', () => {
       });
       expect((await list(held.id))[0]?.changedSinceIssue).toBe(true);
       expect((await annex(change, finance.cookie)).status).toBe(403);
+      // F01C rule 14: the job carries the client's logo, found through the annex's contract.
+      const storageKey = `objects/2026/10/${randomUUID()}`;
+      const [logo] = await db
+        .insert(images)
+        .values({
+          subjectType: 'client',
+          clientId: held.client.id,
+          source: 'upload',
+          storageKey,
+          mimeType: 'image/png',
+          sizeBytes: 1_000,
+          status: 'ready',
+          createdById: cast.gm.id,
+        })
+        .returning({ id: images.id });
+      if (!logo) throw new Error('No logo');
       const first = await ok(await annex(change), (body) => contractAnnexSchema.parse(body), 201);
+      await db.delete(images).where(eq(images.id, logo.id));
+      expect(lastJob('annex', first.id).clientLogoKey).toBe(`${storageKey}.md.webp`);
       expect(first).toMatchObject({
         contractId: contract.id,
         annexNumber: 1,

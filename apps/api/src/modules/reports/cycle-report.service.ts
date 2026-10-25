@@ -315,6 +315,12 @@ export class CycleReportService implements OnModuleInit {
     const report = await this.compose(found, client, viewer);
     const snapshot: CycleReportSnapshot = {
       ...report,
+      // F01C: names only, so the hash is the same as before images (the logo is not hashed).
+      client: { id: report.client.id, name: report.client.name },
+      summary: report.summary && {
+        ...report.summary,
+        updatedBy: { id: report.summary.updatedBy.id, name: report.summary.updatedBy.name },
+      },
       companyDetails: await this.quotes.companyDetails(),
     };
     return { snapshot, hash: payloadHash({ kind: 'cycle_report', snapshot }) };

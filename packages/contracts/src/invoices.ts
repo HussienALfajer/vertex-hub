@@ -663,8 +663,12 @@ export const clientStatementSchema = z
 
 export type ClientStatement = z.infer<typeof clientStatementSchema>;
 
-/** The render payload of a statement PDF (rule 29): the statement with the company details. */
+/**
+ * The render payload of a statement PDF (rule 29): the statement with the company details. The
+ * client carries no image (F01C): the logo travels beside the payload, outside its hash.
+ */
 export const statementSnapshotSchema = clientStatementSchema.extend({
+  client: clientRefSchema.omit({ imageId: true }),
   companyDetails: z.string(),
 });
 

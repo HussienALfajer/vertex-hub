@@ -11,6 +11,7 @@ import {
   fileUploadSchema,
   imageSchema,
   meResponseSchema,
+  notificationPageSchema,
   projectDetailSchema,
   projectPageSchema,
   retainerDetailSchema,
@@ -665,6 +666,20 @@ describe('images (F01C)', () => {
         after: { imageId: logo.id, source: 'upload' },
       });
       expect((await remove(`/api/users/${cast.am.id}`, cast.am.cookie)).status).toBe(204);
+    });
+
+    it("shows a notification's actor with their photo", async () => {
+      const owned = await cast.createClient();
+      const photo = await setOk(`/api/users/${cast.gm.id}`, cast.gm.cookie);
+      await setOk(`/api/clients/${owned.id}`, cast.gm.cookie);
+      const page = notificationPageSchema.parse(
+        await (await client.get('/api/me/notifications?pageSize=100', cast.am.cookie)).json(),
+      );
+      const notice = page.items.find(
+        (item) => item.type === 'client_logo_changed' && item.subject.id === owned.id,
+      );
+      expect(notice?.actor).toEqual({ id: cast.gm.id, name: cast.gm.name, imageId: photo.id });
+      expect((await remove(`/api/users/${cast.gm.id}`, cast.gm.cookie)).status).toBe(204);
     });
 
     it('gives the greeting the photo as a data URL while pending or ready, never once removed', async () => {

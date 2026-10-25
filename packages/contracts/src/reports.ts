@@ -731,8 +731,21 @@ export const clientMonthlyReportSchema = z
 
 export type ClientMonthlyReport = z.infer<typeof clientMonthlyReportSchema>;
 
+/**
+ * A report's client and summary author as its PDF payload freezes them: names only (F01C), so a
+ * photo or logo change neither changes the hash nor fails payloads queued before F01C.
+ */
+const snapshotNames = {
+  client: clientRefSchema.omit({ imageId: true }),
+  summary: clientMonthlyReportSchema.shape.summary
+    .unwrap()
+    .extend({ updatedBy: personSchema.omit({ imageId: true }) })
+    .nullable(),
+};
+
 /** The render payload of the monthly report PDF (rule 20): the report with the company details. */
 export const clientReportSnapshotSchema = clientMonthlyReportSchema.extend({
+  ...snapshotNames,
   companyDetails: z.string(),
 });
 
@@ -790,6 +803,9 @@ export const updateCycleReportSummarySchema = z
 export type UpdateCycleReportSummary = z.infer<typeof updateCycleReportSummarySchema>;
 
 /** The render payload of the cycle report PDF (R1, R3): the report with the company details. */
-export const cycleReportSnapshotSchema = cycleReportSchema.extend({ companyDetails: z.string() });
+export const cycleReportSnapshotSchema = cycleReportSchema.extend({
+  ...snapshotNames,
+  companyDetails: z.string(),
+});
 
 export type CycleReportSnapshot = z.infer<typeof cycleReportSnapshotSchema>;

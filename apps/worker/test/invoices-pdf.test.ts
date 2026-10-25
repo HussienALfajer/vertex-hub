@@ -75,7 +75,7 @@ const receipt: ReceiptSnapshot = {
 
 const statement: StatementSnapshot = {
   companyDetails: company,
-  client: { id: clientId, name: 'الياسمين', imageId: null },
+  client: { id: clientId, name: 'الياسمين' },
   billingName: invoice.billingName,
   billingAddress: invoice.billingAddress,
   currency: 'USD',

@@ -19,7 +19,7 @@ export async function notificationResponses(
   );
   const person = (id: string | null) => {
     const found = id ? people.get(id) : undefined;
-    return found ? { id: found.id, name: found.name } : null;
+    return found ? { id: found.id, name: found.name, imageId: found.imageId } : null;
   };
   return rows.map((row) => {
     return {
