@@ -68,6 +68,7 @@ import {
   fromBusinessDateTimeInput,
   toBusinessDateTimeInput,
 } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { ALL } from '../../lib/search-params';
 import { useReturnFocus } from '../../lib/use-return-focus';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
@@ -362,7 +363,7 @@ function TimelineEntry({
             </span>
           )}
           <span className="ms-auto flex items-center gap-2">
-            <Avatar name={note.author.name} size="sm" />
+            <Avatar name={note.author.name} src={imageSrc(note.author.imageId, 'sm')} size="sm" />
             <span className="text-muted-foreground">{note.author.name}</span>
             {(canEdit || canWithdraw) && (
               <DropdownMenu>

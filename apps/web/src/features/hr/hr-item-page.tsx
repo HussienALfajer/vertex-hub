@@ -34,6 +34,7 @@ import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { FormDialog } from '../quotes/quote-dialogs';
 import { DayDetail, fractionText, itemSummary } from './attendance-month';
@@ -89,7 +90,7 @@ function Item({ item }: { item: AttendanceItemDetail }) {
   return (
     <>
       <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6 sm:flex-row sm:items-center">
-        <Avatar name={item.user.name} size="lg" />
+        <Avatar name={item.user.name} src={imageSrc(item.user.imageId, 'lg')} size="lg" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <p className="text-sm text-muted-foreground">{item.user.name}</p>
           <div className="flex flex-wrap items-center gap-3">

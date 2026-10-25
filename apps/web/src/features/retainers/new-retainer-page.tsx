@@ -31,6 +31,7 @@ import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { useMe } from '../../lib/auth';
 import { useFocusFirstError } from '../../lib/focus-first-invalid';
 import { formatCalendarDate, formatNumber, formatPeriod } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { formatMoney } from '../../lib/money';
 import { idParam } from '../../lib/search-params';
 import { hasMoneyAccess } from '../projects/project-access';
@@ -389,6 +390,7 @@ function Preview({
       <div className="relative flex items-center gap-3">
         <Avatar
           name={client?.tradeName ?? t('projects.form.client')}
+          src={imageSrc(client?.imageId, 'lg')}
           shape="square"
           size="lg"
           tone={client ? 'brand' : 'muted'}

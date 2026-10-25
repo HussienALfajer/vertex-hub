@@ -34,6 +34,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { can, scopesOf } from '../../lib/auth';
 import { formatDateTime, formatTime, formatWeekdayDate } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 
 /*
  * How shoots, meetings and key dates look wherever the calendar lists them (spec F11, screen 1):
@@ -427,7 +428,12 @@ export function EntryRows({ entries, me }: { entries: CalendarEntry[]; me: MeRes
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="flex items-center gap-1.5 text-sm">
-                <Avatar name={person.name} size="sm" tone={person.archived ? 'muted' : 'brand'} />
+                <Avatar
+                  name={person.name}
+                  src={imageSrc(person.imageId, 'sm')}
+                  size="sm"
+                  tone={person.archived ? 'muted' : 'brand'}
+                />
                 {person.name}
               </span>
               {cancelled && (

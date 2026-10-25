@@ -37,10 +37,12 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { formatMoney } from '../../lib/money';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
+import { ImageActions } from '../images/image-actions';
 import { RetainerBillingTab } from '../invoices/retainer-billing-tab';
 import { ExtraWorkTab } from '../projects/extra-work-tab';
 import { ArchivedBadge, DepartmentChips, PersonName } from '../projects/project-badges';
@@ -271,19 +273,25 @@ function RetainerHero({
       <AscentLines className="absolute inset-y-0 end-0 hidden h-full w-32 text-border md:block" />
       <div className="relative flex flex-col gap-6 p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-          <Link
-            to="/clients/$clientId"
-            params={{ clientId: retainer.client.id }}
-            aria-label={retainer.client.name}
-            className="shrink-0 rounded-lg outline-offset-4"
-          >
-            <Avatar
-              name={retainer.client.name}
-              shape="square"
-              size="lg"
-              tone={muted ? 'muted' : 'brand'}
-            />
-          </Link>
+          <div className="flex shrink-0 flex-col items-start gap-1.5">
+            <Link
+              to="/clients/$clientId"
+              params={{ clientId: retainer.client.id }}
+              aria-label={retainer.client.name}
+              className="shrink-0 rounded-lg outline-offset-4"
+            >
+              <Avatar
+                name={retainer.client.name}
+                src={imageSrc(retainer.imageId, 'lg')}
+                shape="square"
+                size="lg"
+                tone={muted ? 'muted' : 'brand'}
+              />
+            </Link>
+            {!retainer.ownImageId && retainer.imageId && (
+              <span className="text-xs text-muted-foreground">{t('images.clientLogo')}</span>
+            )}
+          </div>
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <div className="flex flex-col gap-1">
               <Link
@@ -316,7 +324,10 @@ function RetainerHero({
                     params={{ userId: retainer.accountManager.id }}
                     className="font-medium hover:underline"
                   >
-                    <PersonName name={retainer.accountManager.name} />
+                    <PersonName
+                      name={retainer.accountManager.name}
+                      imageId={retainer.accountManager.imageId}
+                    />
                   </Link>
                 </dd>
               </div>
@@ -328,6 +339,13 @@ function RetainerHero({
               </div>
               <SourceQuotes retainerId={retainer.id} />
             </dl>
+            {retainer.permissions.canManage && !archived && (
+              <ImageActions
+                subject={{ type: 'retainer', id: retainer.id }}
+                imageId={retainer.ownImageId}
+                showsClientLogo={!!retainer.imageId}
+              />
+            )}
           </div>
           <RetainerActions retainer={retainer} focus={focus} onArchive={onArchive} />
         </div>

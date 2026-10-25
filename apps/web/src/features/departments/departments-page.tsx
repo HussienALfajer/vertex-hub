@@ -6,6 +6,7 @@ import { UsersIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { capabilityKey } from './capabilities';
 import { departmentListQuery } from './departments.queries';
 
@@ -55,7 +56,11 @@ function DepartmentCard({ department }: { department: DepartmentResponse }) {
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4 text-sm">
         {department.manager ? (
           <span className="flex min-w-0 items-center gap-2">
-            <Avatar name={department.manager.name} size="sm" />
+            <Avatar
+              name={department.manager.name}
+              src={imageSrc(department.manager.imageId, 'sm')}
+              size="sm"
+            />
             <span className="flex min-w-0 flex-col">
               <span className="text-xs text-muted-foreground">{t('departments.manager')}</span>
               <span className="truncate font-medium">{department.manager.name}</span>

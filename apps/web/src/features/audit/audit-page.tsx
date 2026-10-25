@@ -45,6 +45,7 @@ import {
   formatMonth,
   formatNumber,
 } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { ALL, dayParam, idParam, oneOfParam, pageParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { serviceListQuery } from '../catalog/catalog.queries';
@@ -499,7 +500,7 @@ function AuditRow({ entry, names }: { entry: AuditEntry; names: EntityNames }) {
         </time>
         <span className="flex min-w-0 items-center gap-2">
           {entry.actorName ? (
-            <Avatar name={entry.actorName} size="sm" />
+            <Avatar name={entry.actorName} src={imageSrc(entry.actorImageId, 'sm')} size="sm" />
           ) : (
             <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <CpuIcon className="size-4" aria-hidden="true" />

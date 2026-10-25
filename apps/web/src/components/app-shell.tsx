@@ -65,6 +65,7 @@ import { hasReports } from '../features/reports/reports-page';
 import { managesTeams } from '../features/tasks/task-access';
 import { authClient, can, leaveSession, useMe } from '../lib/auth';
 import { formatList } from '../lib/format';
+import { imageSrc } from '../lib/images';
 import { useOnline } from '../lib/use-online';
 import { ThemeToggle } from './theme-toggle';
 
@@ -337,7 +338,12 @@ function UserMenu({ me }: { me: MeResponse }) {
       <DropdownMenuTrigger
         render={<Button variant="ghost" className="h-10 gap-2 px-2" aria-label={t('user.menu')} />}
       >
-        <Avatar name={me.user.name} size="sm" className="size-8" />
+        <Avatar
+          name={me.user.name}
+          src={imageSrc(me.user.imageId, 'sm')}
+          size="sm"
+          className="size-8"
+        />
         <span className="hidden max-w-40 truncate text-sm font-medium sm:inline">
           {me.user.name}
         </span>

@@ -43,6 +43,9 @@ const REFERENCE_FIELDS = new Set([
   // F17 part B: an opinion's request and an adjustment's ledger row.
   'requestId',
   'ledgerRowId',
+  // F01C: the image itself shows on the record; the brand logo version it was cut from.
+  'imageId',
+  'brandVersionId',
 ]);
 
 /** The fields an entry shows: the changed ones, without links and references to other records. */

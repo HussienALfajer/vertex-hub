@@ -41,6 +41,7 @@ import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage, errorRole, type Failure, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { capabilityKey } from './capabilities';
 import { departmentQuery, useUpdateDepartment } from './departments.queries';
 
@@ -103,7 +104,11 @@ function Department({ department }: { department: DepartmentDetailResponse }) {
               params={{ userId: department.manager.id }}
               className="group flex min-w-0 items-center gap-3"
             >
-              <Avatar name={department.manager.name} size="lg" />
+              <Avatar
+                name={department.manager.name}
+                src={imageSrc(department.manager.imageId, 'lg')}
+                size="lg"
+              />
               <span className="min-w-0 text-lg font-bold wrap-anywhere group-hover:underline">
                 {department.manager.name}
               </span>
@@ -134,7 +139,7 @@ function Department({ department }: { department: DepartmentDetailResponse }) {
             <ul className="flex flex-col divide-y divide-border">
               {department.members.map((member) => (
                 <li key={member.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  <Avatar name={member.name} size="md" />
+                  <Avatar name={member.name} src={imageSrc(member.imageId, 'md')} size="md" />
                   <div className="flex min-w-0 flex-1 flex-col">
                     <Link
                       to="/team/$userId"

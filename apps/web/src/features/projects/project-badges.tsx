@@ -11,6 +11,7 @@ import {
 import { ArchiveIcon, CalendarClockIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatList, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { departmentListQuery } from '../departments/departments.queries';
 
 /** Running work in the workflow colors; completed takes Vertex Green, like delivered work (§2). */
@@ -58,17 +59,24 @@ export function ArchivedBadge() {
 /** A person on a project, faded with a badge once their account is archived (edge case 8). */
 export function PersonName({
   name,
+  imageId,
   archived = false,
   size = 'sm',
 }: {
   name: string;
+  imageId?: string | null;
   archived?: boolean;
   size?: 'sm' | 'md';
 }) {
   const { t } = useTranslation();
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <Avatar name={name} size={size} tone={archived ? 'muted' : 'brand'} />
+      <Avatar
+        name={name}
+        src={imageSrc(imageId, size)}
+        size={size}
+        tone={archived ? 'muted' : 'brand'}
+      />
       <span className="truncate">{name}</span>
       {archived && <Badge tone="outline">{t('projects.archivedBadge')}</Badge>}
     </span>

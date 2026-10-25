@@ -49,6 +49,7 @@ import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { clientQuery } from '../clients/clients.queries';
 import { lineName } from '../retainers/retainer-badges';
 import { retainerListQuery } from '../retainers/retainers.queries';
@@ -359,6 +360,7 @@ export function ApprovalField({ form }: { form: PostFormMethods }) {
 interface PersonOption {
   id: string;
   name: string;
+  imageId: string | null;
 }
 
 /**
@@ -372,7 +374,7 @@ function useResponsibleOptions(clientId: string, current?: PersonOption): Person
   const members = useDepartmentMembers('content_management');
   const options = new Map<string, PersonOption>();
   if (current) options.set(current.id, current);
-  options.set(me.user.id, { id: me.user.id, name: me.user.name });
+  options.set(me.user.id, { id: me.user.id, name: me.user.name, imageId: me.user.imageId });
   const manager = client.data?.accountManager;
   if (manager && !manager.archived) options.set(manager.id, manager);
   for (const member of members) options.set(member.id, member);
@@ -410,7 +412,7 @@ export function ResponsibleField({
               {options.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
                   <span className="flex items-center gap-2">
-                    <Avatar name={option.name} size="sm" />
+                    <Avatar name={option.name} src={imageSrc(option.imageId, 'sm')} size="sm" />
                     {option.name}
                   </span>
                 </SelectItem>

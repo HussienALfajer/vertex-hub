@@ -99,6 +99,7 @@ function ProjectCard({ project }: { project: Project }) {
         <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4 text-sm">
           <PersonName
             name={project.projectManager.name}
+            imageId={project.projectManager.imageId}
             archived={project.projectManager.archived}
           />
           <MilestoneProgress progress={project.milestoneProgress} />

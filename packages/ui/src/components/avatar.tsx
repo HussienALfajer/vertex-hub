@@ -52,15 +52,18 @@ function initialsOf(name: string): string {
     .join(ARABIC.test(name) ? THIN_SPACE : '');
 }
 
-type AvatarProps = Omit<AvatarPrimitive.Root.Props, 'children'> &
+type AvatarProps = Omit<AvatarPrimitive.Root.Props, 'children' | 'className'> &
   VariantProps<typeof avatarVariants> & {
     /** The person's name: the source of the initials. */
     name: string;
+    /** The picture's URL; the initials show while it loads, without it and when it fails. */
     src?: string | null;
+    className?: string;
   };
 
 /**
- * A person's or organization's picture, or their initials until pictures exist (F10). Decorative:
+ * A person's or organization's picture, or their initials when there is none (F01C). A loaded
+ * picture sits on a white surface in both themes, so a transparent logo reads on it. Decorative:
  * show the name nearby.
  */
 function Avatar({ name, src, size, shape, tone, className, ...props }: AvatarProps) {
@@ -68,7 +71,14 @@ function Avatar({ name, src, size, shape, tone, className, ...props }: AvatarPro
     <AvatarPrimitive.Root
       data-slot="avatar"
       aria-hidden="true"
-      className={cn(avatarVariants({ size, shape, tone }), className)}
+      className={(state) =>
+        cn(
+          avatarVariants({ size, shape, tone }),
+          // A hairline keeps a white logo apart from a white card.
+          state.imageLoadingStatus === 'loaded' && 'bg-avatar-image ring-1 ring-border',
+          className,
+        )
+      }
       {...props}
     >
       {src && <AvatarPrimitive.Image src={src} alt="" className="size-full object-cover" />}

@@ -50,6 +50,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import {
   ALL,
   flagParam,
@@ -529,6 +530,7 @@ function ProjectsTable({ projects, archived }: { projects: Project[]; archived: 
               >
                 <Avatar
                   name={project.client.name}
+                  src={imageSrc(project.imageId)}
                   shape="square"
                   tone={archived || project.status === 'cancelled' ? 'muted' : 'brand'}
                 />
@@ -541,6 +543,7 @@ function ProjectsTable({ projects, archived }: { projects: Project[]; archived: 
             <TableCell>
               <PersonName
                 name={project.projectManager.name}
+                imageId={project.projectManager.imageId}
                 archived={project.projectManager.archived}
               />
             </TableCell>

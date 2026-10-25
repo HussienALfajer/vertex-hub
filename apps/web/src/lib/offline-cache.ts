@@ -6,6 +6,7 @@ import {
 } from '@tanstack/query-persist-client-core';
 import { onlineManager, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { del, get, set } from 'idb-keyval';
+import { IMAGE_CACHE } from '../service-worker/image-cache';
 
 /*
  * F16 rule A5 (ADR 0036): the query cache is kept in IndexedDB for 7 days, so the installed app
@@ -140,6 +141,12 @@ export async function clearOfflineCache(): Promise<void> {
     await persister.removeClient();
   } catch {
     // Nothing kept, or storage unavailable: nothing to erase.
+  }
+  try {
+    // The service worker's photos and logos (F01C rule 13).
+    await globalThis.caches?.delete(IMAGE_CACHE);
+  } catch {
+    // No Cache Storage (an insecure origin, a private window): nothing kept.
   }
 }
 

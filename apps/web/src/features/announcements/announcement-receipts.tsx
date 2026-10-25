@@ -28,6 +28,7 @@ import { LoadError } from '../../components/load-error';
 import { useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { announcementReceiptsQuery, useRemindAnnouncement } from './announcements.queries';
 
 type Filter = AnnouncementReceiptsQuery['filter'];
@@ -134,7 +135,11 @@ export function AnnouncementReceipts({ announcement }: { announcement: Announcem
               <TableRow key={item.user.id}>
                 <TableCell>
                   <span className="flex items-center gap-2">
-                    <Avatar name={item.user.name} size="sm" />
+                    <Avatar
+                      name={item.user.name}
+                      src={imageSrc(item.user.imageId, 'sm')}
+                      size="sm"
+                    />
                     {item.user.name}
                     {item.user.archived && (
                       <Badge tone="neutral">{t('announcements.receipts.archived')}</Badge>

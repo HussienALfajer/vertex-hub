@@ -42,6 +42,7 @@ import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
 import { formatCalendarDate, formatList, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { useDepartmentNames } from '../projects/project-badges';
 import { DeliverableIcon, lineName } from '../retainers/retainer-badges';
 import { useDepartmentMembers } from '../tasks/task-form';
@@ -337,13 +338,24 @@ function AssigneeChoice({
   const members = useDepartmentMembers(department);
   const fallback = template.assignees.find((a) => a.department === department);
   const options = [
-    { value: QUEUE, label: t('templates.departmentQueue'), note: null as string | null },
-    ...members.map((member) => ({ value: member.id, label: member.name, note: member.note })),
+    {
+      value: QUEUE,
+      label: t('templates.departmentQueue'),
+      imageId: null as string | null,
+      note: null as string | null,
+    },
+    ...members.map((member) => ({
+      value: member.id,
+      label: member.name,
+      imageId: member.imageId,
+      note: member.note,
+    })),
   ];
   if (fallback && !members.some((member) => member.id === fallback.user.id)) {
     options.push({
       value: fallback.user.id,
       label: fallback.user.name,
+      imageId: fallback.user.imageId,
       note: t('templates.invalidAssigneeNote'),
     });
   }
@@ -364,7 +376,9 @@ function AssigneeChoice({
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               <span className="flex items-center gap-2">
-                {option.value !== QUEUE && <Avatar name={option.label} size="sm" />}
+                {option.value !== QUEUE && (
+                  <Avatar name={option.label} src={imageSrc(option.imageId, 'sm')} size="sm" />
+                )}
                 {option.label}
                 {option.note && (
                   <span className="text-sm text-muted-foreground">{option.note}</span>

@@ -36,6 +36,7 @@ import {
   formatPeriod,
   formatTimeOfDay,
 } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { leaveBalanceQuery } from './hr.queries';
 import { AdjustmentDialog } from './leave-dialogs';
@@ -141,7 +142,13 @@ export function RequestRows({
           className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
         >
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            {showUser && <Avatar name={request.user.name} size="sm" />}
+            {showUser && (
+              <Avatar
+                name={request.user.name}
+                src={imageSrc(request.user.imageId, 'sm')}
+                size="sm"
+              />
+            )}
             <div className="flex min-w-0 flex-col gap-0.5">
               <Link
                 to="/hr/requests/$requestId"

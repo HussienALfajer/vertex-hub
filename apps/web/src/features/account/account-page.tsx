@@ -49,7 +49,10 @@ import {
   passwordFailure,
   SCREEN_ERROR,
 } from '../../lib/errors';
+import { imageSrc } from '../../lib/images';
 import { useReturnFocus } from '../../lib/use-return-focus';
+import { AddPhotoCard } from '../images/add-photo-card';
+import { ImageActions } from '../images/image-actions';
 import { DepartmentChips } from '../users/user-badges';
 import { SkillsInput } from '../users/user-form';
 import { skillsQuery, userQuery, useUpdateOwnProfile } from '../users/users.queries';
@@ -76,6 +79,7 @@ export function AccountPage() {
           {/* The two-factor card sticks within its own row, above the devices card. */}
           <div className="grid items-start gap-6 lg:grid-cols-3">
             <div className="flex flex-col gap-6 lg:col-span-2">
+              {!user.data.imageId && <AddPhotoCard userId={user.data.id} />}
               <ProfileCard user={user.data} />
               <ContactForm user={user.data} />
               <PasswordForm />
@@ -95,13 +99,14 @@ function ProfileCard({ user }: { user: UserResponse }) {
   return (
     <Card>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <Avatar name={user.name} size="lg" />
+        <Avatar name={user.name} src={imageSrc(user.imageId, 'xl')} size="xl" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2 className="text-xl font-bold">{user.name}</h2>
           <span dir="ltr" className="self-start text-sm text-muted-foreground">
             {user.email}
           </span>
           {user.title && <span className="text-sm">{user.title}</span>}
+          <ImageActions subject={{ type: 'user', id: user.id }} imageId={user.imageId} />
         </div>
       </div>
       <div className="flex flex-col gap-3 border-t border-border pt-4">

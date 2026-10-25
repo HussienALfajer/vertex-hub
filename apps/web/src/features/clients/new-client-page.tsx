@@ -13,6 +13,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { FormSection } from '../../components/form-section';
+import { imageSrc } from '../../lib/images';
 import { ClientStatusBadge, HealthcareBadge } from './client-badges';
 import {
   AccountManagerField,
@@ -141,7 +142,7 @@ function Preview({ form }: { form: ClientFormMethods }) {
       <div className="relative flex items-center gap-2 border-t border-border pt-4 text-sm">
         {manager ? (
           <>
-            <Avatar name={manager.name} size="sm" />
+            <Avatar name={manager.name} src={imageSrc(manager.imageId, 'sm')} size="sm" />
             <span className="flex flex-col">
               <span className="text-xs text-muted-foreground">
                 {t('clients.profile.accountManager')}

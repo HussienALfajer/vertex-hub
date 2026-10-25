@@ -23,6 +23,8 @@ import {
   EXTRA_WORK_BILLING,
   FILE_FINAL_SOURCES,
   FILE_VERSION_KINDS,
+  IMAGE_SOURCES,
+  IMAGE_SUBJECT_TYPES,
   INVOICE_ORIGINS,
   INVOICE_STATUSES,
   LEAD_LOSS_REASONS,
@@ -357,6 +359,11 @@ function enumLabel(
     if (brandKind) return t(`clients.brandKit.fileKinds.${brandKind}`);
     const source = field === 'source' ? find(FILE_FINAL_SOURCES) : undefined;
     if (source) return t(`files.finalSources.${source}`);
+  }
+  // F01C: where a photo, logo or image came from, on the record's own entry.
+  if (field === 'source' && (IMAGE_SUBJECT_TYPES as readonly string[]).includes(entityType)) {
+    const source = find(IMAGE_SOURCES);
+    if (source) return t(`images.sources.${source}`);
   }
   if (field === 'kind' && (value === 'activation' || value === 'reset')) {
     return t(`audit.kinds.${value}`);

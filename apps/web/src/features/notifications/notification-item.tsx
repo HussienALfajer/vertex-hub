@@ -16,6 +16,7 @@ import { AlarmClockIcon, BellRingIcon, OctagonAlertIcon, VideoIcon } from 'lucid
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime, formatRelativeTime } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { useDepartmentNames } from '../projects/project-badges';
 import { notificationLink, notificationText } from './notification-content';
 import { useMarkRead, useSnooze, useUnsnooze } from './notifications.queries';
@@ -55,7 +56,12 @@ export function NotificationItem({
       className="relative flex items-start gap-3 px-4 py-3 transition-colors duration-150 ease-out hover:bg-muted/60"
     >
       {notification.actor ? (
-        <Avatar name={notification.actor.name} size="sm" className="size-8" />
+        <Avatar
+          name={notification.actor.name}
+          src={imageSrc(notification.actor.imageId, 'sm')}
+          size="sm"
+          className="size-8"
+        />
       ) : (
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <BellRingIcon className="size-4" aria-hidden="true" />

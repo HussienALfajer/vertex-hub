@@ -33,6 +33,7 @@ import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { leaveSession } from '../../lib/auth';
 import { formatDateTime, formatNumber, formatRelativeTime, isolateLtr } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { type ReturnFocus, useReturnFocus } from '../../lib/use-return-focus';
 import { usePushActions, usePushState } from '../notifications/device-push-card';
 import { pushConfigQuery } from '../notifications/push.queries';
@@ -258,7 +259,7 @@ function SharedWith({ device }: { device: SignedInDevice }) {
         <ul className="flex flex-col gap-2">
           {device.sharedWith.map((shared) => (
             <li key={shared.user.id} className="flex items-start gap-2">
-              <Avatar name={shared.user.name} size="sm" />
+              <Avatar name={shared.user.name} src={imageSrc(shared.user.imageId, 'sm')} size="sm" />
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="flex items-start gap-1.5">
                   <span>

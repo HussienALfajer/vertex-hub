@@ -467,7 +467,10 @@ export function InvoicesTable({
                 <span className="flex flex-col">
                   <span>{invoice.client.name}</span>
                   <span className="text-xs text-muted-foreground">
-                    <PersonName name={invoice.accountManager.name} />
+                    <PersonName
+                      name={invoice.accountManager.name}
+                      imageId={invoice.accountManager.imageId}
+                    />
                   </span>
                 </span>
               </TableCell>

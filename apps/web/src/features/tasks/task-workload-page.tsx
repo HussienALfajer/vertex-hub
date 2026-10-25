@@ -32,6 +32,7 @@ import { useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { dayParam, listParam } from '../../lib/search-params';
 import { departmentListQuery } from '../departments/departments.queries';
 import { useDepartmentNames } from '../projects/project-badges';
@@ -269,7 +270,7 @@ function PeopleTable({ workload }: { workload: TaskWorkload }) {
             <TableRow key={user.id}>
               <TableCell>
                 <div className="flex items-center gap-3">
-                  <Avatar name={user.name} size="sm" />
+                  <Avatar name={user.name} src={imageSrc(user.imageId, 'sm')} size="sm" />
                   <div className="flex min-w-0 flex-col">
                     <span className="font-medium">{user.name}</span>
                     <span className="truncate text-xs text-muted-foreground">

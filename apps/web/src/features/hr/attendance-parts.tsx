@@ -4,7 +4,7 @@ import type {
   AttendanceItemStatus,
   AttendancePunch,
 } from '@vertex-hub/contracts';
-import { Badge, type BadgeProps } from '@vertex-hub/ui';
+import { Avatar, Badge, type BadgeProps } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { LogInIcon, LogOutIcon, MapPinIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -102,6 +102,13 @@ export function GreetingView({
       data-testid="attendance-greeting"
       className="flex flex-col items-center gap-3 text-center"
     >
+      {/* F01C rule 15: the photo comes inside the greeting, as the screen has no session. */}
+      <Avatar
+        name={greeting.firstName}
+        src={greeting.photo}
+        size="xl"
+        className={large ? 'size-32 text-4xl' : undefined}
+      />
       <p className={large ? 'text-4xl font-bold' : 'text-2xl font-bold'}>
         {arriving
           ? t(`hr.attendance.greeting.${greeting.partOfDay ?? 'morning'}`, {

@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatList, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { ALL, idParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
@@ -43,6 +44,8 @@ export interface TeamSearch {
   departmentId?: string;
   skill?: string;
   status?: UserStatus;
+  /** F01C rule 17: users without a photo, for user managers. */
+  photo?: 'without';
   page?: number;
 }
 
@@ -55,6 +58,7 @@ export function parseTeamSearch(search: Record<string, unknown>): TeamSearch {
     departmentId: idParam(search.departmentId),
     skill: textParam(search.skill, 100),
     status: oneOfParam(USER_STATUSES, search.status),
+    photo: oneOfParam(['without'] as const, search.photo),
     page: pageParam(search.page),
   };
 }
@@ -72,6 +76,7 @@ export function TeamPage({ search }: { search: TeamSearch }) {
       departmentId: search.departmentId,
       skill: search.skill,
       status: manager ? (search.status ?? 'active') : 'active',
+      ...(manager && search.photo === 'without' && { hasImage: 'false' as const }),
       page,
       pageSize: PAGE_SIZE,
     }),
@@ -168,6 +173,10 @@ function Filters({
     { value: ALL, label: t('users.allSkills') },
     ...(skills.data?.items ?? []).map((skill) => ({ value: skill, label: skill })),
   ];
+  const photoItems = [
+    { value: ALL, label: t('users.anyPhoto') },
+    { value: 'without', label: t('users.withoutPhoto') },
+  ];
   const statusItems = USER_STATUSES.map((status) => ({
     value: status,
     label: t(`users.statuses.${status}`),
@@ -210,6 +219,14 @@ function Filters({
           onChange={(value) =>
             onChange({ status: value === 'active' ? undefined : (value as UserStatus) })
           }
+        />
+      )}
+      {manager && (
+        <FilterSelect
+          label={t('users.photo')}
+          items={photoItems}
+          value={search.photo ?? ALL}
+          onChange={(value) => onChange({ photo: value === 'without' ? 'without' : undefined })}
         />
       )}
     </div>
@@ -270,6 +287,7 @@ function UsersTable({ users, manager }: { users: UserResponse[]; manager: boolea
               >
                 <Avatar
                   name={user.name}
+                  src={imageSrc(user.imageId, 'sm')}
                   size="sm"
                   tone={user.status === 'archived' ? 'muted' : 'brand'}
                 />

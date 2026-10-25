@@ -61,6 +61,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatList, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { useDepartmentNames } from '../projects/project-badges';
 import { useDepartmentMembers } from '../tasks/task-form';
 import { type EditingStep, type NewOrStoredStep, StepDialog } from './step-dialog';
@@ -916,18 +917,31 @@ function AssigneeRow({
   // The stored default, kept while unchanged even when it is no longer valid.
   const kept = stored && stored.user.id === userId ? stored : undefined;
   const options = [
-    { value: UNASSIGNED, label: t('templates.departmentQueue'), note: null as string | null },
-    ...members.map((member) => ({ value: member.id, label: member.name, note: member.note })),
+    {
+      value: UNASSIGNED,
+      label: t('templates.departmentQueue'),
+      imageId: null as string | null,
+      note: null as string | null,
+    },
+    ...members.map((member) => ({
+      value: member.id,
+      label: member.name,
+      imageId: member.imageId,
+      note: member.note,
+    })),
   ];
   if (kept && !members.some((member) => member.id === kept.user.id)) {
     options.push({
       value: kept.user.id,
       label: kept.user.name,
+      imageId: kept.user.imageId,
       note: t('templates.invalidAssigneeNote'),
     });
   }
   const invalid = !!kept && !kept.valid;
-  const name = kept?.user.name ?? options.find((option) => option.value === userId)?.label;
+  const chosen = options.find((option) => option.value === userId);
+  const name = kept?.user.name ?? chosen?.label;
+  const imageId = kept ? kept.user.imageId : (chosen?.imageId ?? null);
 
   return (
     <li className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
@@ -939,7 +953,12 @@ function AssigneeRow({
           <span className="flex items-center gap-2 text-sm">
             {userId && name ? (
               <>
-                <Avatar name={name} size="sm" tone={invalid ? 'muted' : 'brand'} />
+                <Avatar
+                  name={name}
+                  src={imageSrc(imageId, 'sm')}
+                  size="sm"
+                  tone={invalid ? 'muted' : 'brand'}
+                />
                 {name}
               </>
             ) : (
@@ -965,7 +984,9 @@ function AssigneeRow({
               {options.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   <span className="flex items-center gap-2">
-                    {option.value !== UNASSIGNED && <Avatar name={option.label} size="sm" />}
+                    {option.value !== UNASSIGNED && (
+                      <Avatar name={option.label} src={imageSrc(option.imageId, 'sm')} size="sm" />
+                    )}
                     {option.label}
                     {option.note && (
                       <span className="text-sm text-muted-foreground">{option.note}</span>

@@ -75,6 +75,8 @@ import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatList } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
+import { ImageActions } from '../images/image-actions';
 import { LinkDialog } from './link-dialog';
 import { TwoFactorIndicator, UserStatusBadge } from './user-badges';
 import { UserForm } from './user-form';
@@ -151,6 +153,8 @@ function Profile({ user }: { user: UserResponse }) {
     <>
       <ProfileHero
         user={user}
+        // The user themself, or a user manager in scope; never on an archived account (rule 5).
+        canChangePhoto={(canChange || user.id === me.user.id) && user.status !== 'archived'}
         actions={
           canChange && (
             <ProfileActions user={user} editButton={editButton} onEdit={() => setEditing(true)} />
@@ -173,7 +177,15 @@ function Profile({ user }: { user: UserResponse }) {
 }
 
 /** The person at a glance, with the 60° hairlines at the edge of the card (§5). */
-function ProfileHero({ user, actions }: { user: UserResponse; actions: ReactNode }) {
+function ProfileHero({
+  user,
+  canChangePhoto,
+  actions,
+}: {
+  user: UserResponse;
+  canChangePhoto: boolean;
+  actions: ReactNode;
+}) {
   const { t } = useTranslation();
   const primary = user.departments.find((d) => d.isPrimary);
   return (
@@ -181,6 +193,7 @@ function ProfileHero({ user, actions }: { user: UserResponse; actions: ReactNode
       <AscentLines className="absolute inset-y-0 end-0 hidden h-full w-32 text-border md:block" />
       <Avatar
         name={user.name}
+        src={imageSrc(user.imageId, 'xl')}
         size="xl"
         tone={user.status === 'archived' ? 'muted' : 'brand'}
         className="ring-4 ring-muted"
@@ -193,6 +206,9 @@ function ProfileHero({ user, actions }: { user: UserResponse; actions: ReactNode
         <p className="text-muted-foreground">
           {[user.title, primary?.name].filter(Boolean).join(' · ') || t('common.none')}
         </p>
+        {canChangePhoto && (
+          <ImageActions subject={{ type: 'user', id: user.id }} imageId={user.imageId} />
+        )}
       </div>
       {actions && <div className="relative flex shrink-0 items-center gap-2">{actions}</div>}
     </section>

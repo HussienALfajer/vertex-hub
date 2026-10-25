@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatDate, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { formatMoney } from '../../lib/money';
 import { ALL, idParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
@@ -233,6 +234,7 @@ function PeopleTable({
                 >
                   <Avatar
                     name={employee.name}
+                    src={imageSrc(employee.imageId, 'sm')}
                     size="sm"
                     tone={employee.status === 'ended' ? 'muted' : 'brand'}
                   />

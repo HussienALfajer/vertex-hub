@@ -33,6 +33,7 @@ import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { can, useMe } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
 import { useDepartmentNames } from '../projects/project-badges';
@@ -357,7 +358,7 @@ function PersonChip({
   const { t } = useTranslation();
   return (
     <li className="flex items-center gap-2 rounded-full border border-border bg-surface py-0.5 ps-0.5 pe-1 text-sm">
-      <Avatar name={user.name} size="sm" className="size-6" />
+      <Avatar name={user.name} src={imageSrc(user.imageId, 'sm')} size="sm" className="size-6" />
       <span className="flex flex-col leading-tight">
         <span>{user.name}</span>
         {department && <span className="text-xs text-muted-foreground">{department}</span>}

@@ -226,7 +226,11 @@ function TaskHero({
                 params={{ userId: task.assignee.id }}
                 className="font-medium hover:underline"
               >
-                <PersonName name={task.assignee.name} archived={task.assignee.archived} />
+                <PersonName
+                  name={task.assignee.name}
+                  imageId={task.assignee.imageId}
+                  archived={task.assignee.archived}
+                />
               </Link>
               {!task.assignee.inDepartment && <NotInDepartmentBadge />}
             </span>

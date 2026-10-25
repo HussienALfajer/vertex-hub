@@ -18,6 +18,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { ApiError } from '../../lib/api/client';
 import { formatDateTime, formatList, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { useDepartmentNames } from '../projects/project-badges';
 import { TemplateKindBadge } from './template-badges';
 import { templateFormValues } from './template-document';
@@ -275,7 +276,12 @@ function LinkedRetainers({ template }: { template: TemplateDetail }) {
         <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
           {retainers.map((retainer) => (
             <li key={retainer.id} className="flex items-center gap-3 px-4 py-3">
-              <Avatar name={retainer.client.name} shape="square" size="sm" />
+              <Avatar
+                name={retainer.client.name}
+                src={imageSrc(retainer.client.imageId, 'sm')}
+                shape="square"
+                size="sm"
+              />
               <div className="flex min-w-0 flex-col">
                 <Link
                   to="/retainers/$retainerId"
