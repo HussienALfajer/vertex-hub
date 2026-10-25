@@ -15,7 +15,7 @@ Three PRs, each accepted by the owner before the next starts. One session per PR
 - [x] api: every reference builder fills `imageId` (projects and retainers fall back to the client's logo through the client directory); greeting photo as a data URL (rule 15); PDF payloads carry `clientLogoKey` (rule 14); tests
 - [x] worker: client block logo tile in each client-facing template, missing file logged; tests with and without the key
 - [x] bridge; `e2e/fixtures.ts` adapted to the new shapes
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+- [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-25), PR with auto-merge
   - found: the audit screen's actor photo goes through `AuditActorPhotos`, which `auth` registers (`audit` cannot import `auth`); project and retainer details carry `ownImageId` for the A3 header
 
 ## PR A3 — web and E2E
