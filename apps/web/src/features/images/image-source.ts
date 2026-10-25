@@ -12,6 +12,19 @@ export function isPickable(file: File): boolean {
   return PICKABLE_TYPES.includes(file.type);
 }
 
+/**
+ * A picked file as a `data:` URL: the app's CSP allows `data:` images, not `blob:` ones
+ * (`deploy/nginx/vertexhub-csp.conf`).
+ */
+export function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 /** The image decoded by the browser; rejects when it cannot open it (rule 9, edge case 11). */
 export async function loadImage(url: string): Promise<HTMLImageElement> {
   const image = new Image();

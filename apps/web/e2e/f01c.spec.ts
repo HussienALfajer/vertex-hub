@@ -192,3 +192,23 @@ test('photos and logos show across the app: task list and projects list', async 
   await page.goto('/projects');
   await expect(avatarImage(page.getByRole('main'), imageId(10)).first()).toBeVisible();
 });
+
+test('a save the connection drops says so in place, and the photo can be saved again', async ({
+  page,
+}) => {
+  await mockApi(page, { signedIn: true, me: employeeMe });
+  await page.goto('/account');
+  await page.getByRole('button', { name: t.actions.user.add }).first().click();
+  const dialog = page.getByRole('dialog', { name: t.dialog.title.user });
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: 'portrait.png',
+    mimeType: 'image/png',
+    buffer: portraitPng(),
+  });
+  await page.route(`**/api/users/${seedIds.karim}/image`, (route) => route.abort(), { times: 1 });
+  await dialog.getByRole('button', { name: ar.common.save }).click();
+  await expect(dialog.getByRole('alert')).toHaveText(t.dialog.network);
+  await dialog.getByRole('button', { name: ar.common.save }).click();
+  await expect(dialog).toBeHidden();
+  await expect(avatarImage(page.getByRole('main'))).toBeVisible();
+});

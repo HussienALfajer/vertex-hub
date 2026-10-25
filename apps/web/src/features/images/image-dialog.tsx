@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { IMAGE_MIN_SIDE, type ImageSubjectType, imagePath } from '@vertex-hub/contracts';
 import {
@@ -23,13 +23,13 @@ import { CameraIcon, ImageOffIcon, PaletteIcon, UploadIcon } from 'lucide-react'
 import { type PointerEvent, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
+import { ApiError } from '../../lib/api/client';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import {
   fileItemsQuery,
   filePreviewUrl,
   fileThumbnailUrl,
-  UploadNetworkError,
   uploadFile,
 } from '../files/files.queries';
 import {
@@ -42,7 +42,7 @@ import {
   scaleRange,
   zoomCrop,
 } from './crop';
-import { encodeSquare, isPickable, loadImage } from './image-source';
+import { encodeSquare, isPickable, loadImage, readAsDataUrl } from './image-source';
 import { type ImageSubject, useSetImage } from './images.queries';
 
 /** People are round; clients, projects and retainers square, as their avatars (rule 8). */
@@ -53,8 +53,6 @@ interface Source {
   image: HTMLImageElement;
   size: ImageSize;
   brandVersionId?: string;
-  /** The object URL of a picked file, revoked when the source is dropped. */
-  objectUrl?: string;
 }
 
 type Failure = { kind: 'message'; text: string } | { kind: 'cannotOpen' } | { kind: 'notAllowed' };
@@ -82,12 +80,12 @@ export function ImageDialog({
   const [failure, setFailure] = useState<Failure | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const upload = useRef<AbortController | null>(null);
+  const queryClient = useQueryClient();
   const save = useSetImage(subject);
   const fit = !isPerson(subject.type);
   const lastFailed = useImageFailed(open ? imageId : null);
 
   function dropSource() {
-    if (source?.objectUrl) URL.revokeObjectURL(source.objectUrl);
     setSource(null);
     setCrop(null);
   }
@@ -99,10 +97,13 @@ export function ImageDialog({
     setFailure(null);
     setProgress(null);
     setDecoding(false);
+    // A refused save may come from a changed right (edge case 8): the page catches up once the
+    // dialog has said so and closed.
+    if (save.isError) void queryClient.invalidateQueries();
     save.reset();
   }
 
-  async function openSource(url: string, origin: Pick<Source, 'brandVersionId' | 'objectUrl'>) {
+  async function openSource(url: string, origin: Pick<Source, 'brandVersionId'> = {}) {
     setFailure(null);
     setDecoding(true);
     try {
@@ -111,20 +112,24 @@ export function ImageDialog({
       setSource({ image, size, ...origin });
       setCrop(initialCrop(size));
     } catch {
-      if (origin.objectUrl) URL.revokeObjectURL(origin.objectUrl);
       setFailure({ kind: 'cannotOpen' });
     } finally {
       setDecoding(false);
     }
   }
 
-  function pickFile(file: File) {
+  async function pickFile(file: File) {
     if (!isPickable(file)) {
       setFailure({ kind: 'notAllowed' });
       return;
     }
-    const objectUrl = URL.createObjectURL(file);
-    void openSource(objectUrl, { objectUrl });
+    setDecoding(true);
+    try {
+      void openSource(await readAsDataUrl(file));
+    } catch {
+      setDecoding(false);
+      setFailure({ kind: 'cannotOpen' });
+    }
   }
 
   async function submit() {
@@ -138,8 +143,22 @@ export function ImageDialog({
     upload.current = controller;
     // Busy from here: a second click must not upload twice while the square is encoded.
     setProgress(0);
+    let file: File;
     try {
-      const file = await encodeSquare(source.image, crop);
+      file = await encodeSquare(source.image, crop);
+    } catch {
+      setProgress(null);
+      upload.current = null;
+      setFailure({ kind: 'cannotOpen' });
+      return;
+    }
+    // Cancelled while the square was encoded: nothing is uploaded.
+    if (controller.signal.aborted) {
+      setProgress(null);
+      upload.current = null;
+      return;
+    }
+    try {
       const uploaded = await uploadFile(file, {
         onProgress: setProgress,
         signal: controller.signal,
@@ -157,12 +176,8 @@ export function ImageDialog({
       if (error instanceof DOMException && error.name === 'AbortError') return;
       setFailure({
         kind: 'message',
-        text:
-          error instanceof UploadNetworkError
-            ? t('images.dialog.network')
-            : error instanceof Error && !('status' in error)
-              ? t('images.dialog.cannotOpen')
-              : errorMessage(t, error),
+        // Anything but the API's own answer is the connection: the upload's, or the save's fetch.
+        text: error instanceof ApiError ? errorMessage(t, error) : t('images.dialog.network'),
       });
     } finally {
       upload.current = null;

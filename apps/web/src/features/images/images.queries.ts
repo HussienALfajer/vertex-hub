@@ -39,11 +39,18 @@ function deleteImage({ type, id }: ImageSubject) {
 /**
  * Every screen showing the record carries its `imageId` (a client's logo also shows on its
  * projects, retainers, tasks and invoices; a photo on every list and the session user), so a change
- * refreshes them all, also on failure: a 403 reloads the page with its current actions.
+ * refreshes them all. Not awaited: the dialog closes first, and the refresh would otherwise remove
+ * it (the "Add your photo" card) before it does. A refusal refreshes when its dialog closes, after
+ * saying why (edge case 8).
  */
 function useImageMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn, onSettled: () => queryClient.invalidateQueries() });
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      void queryClient.invalidateQueries();
+    },
+  });
 }
 
 export const useSetImage = (subject: ImageSubject) =>

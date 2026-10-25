@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@vertex-hub/ui';
 import { ImageIcon, ImagePlusIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
@@ -25,6 +26,7 @@ export function ImageActions({
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const queryClient = useQueryClient();
   const remove = useRemoveImage(subject);
   const label =
     !imageId && showsClientLogo && (subject.type === 'project' || subject.type === 'retainer')
@@ -50,7 +52,12 @@ export function ImageActions({
       />
       <ConfirmDialog
         open={removing}
-        onClose={() => setRemoving(false)}
+        onClose={() => {
+          setRemoving(false);
+          // A refusal may come from a changed right: the page catches up once it has said so.
+          if (remove.isError) void queryClient.invalidateQueries();
+          remove.reset();
+        }}
         title={t(`images.remove.${subject.type}.title`)}
         body={t(`images.remove.${subject.type}.body`)}
         action={t('images.actions.remove')}
