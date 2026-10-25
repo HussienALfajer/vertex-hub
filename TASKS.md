@@ -8,7 +8,7 @@ Three PRs, each accepted by the owner before the next starts. One session per PR
 - [x] db (`/db-migration`): `images` (enums, checks, partial unique indexes, pending index); `image_id` on `users`, `clients`, `projects`, `retainers`; `TABLE_OWNERS`
 - [x] api: `files` `ImagesService` (set, remove, brand version check) and `GET /api/images/:id/:size` (pending `no-store`, ready `immutable`, 404 otherwise, `X-Accel-Redirect`); `files.preview` renders pending images (rule 10); `PUT`/`DELETE …/:id/image` on users, clients, projects, retainers with scopes, archived refusals, audit, notifications (rule 18); `profile_changed` on profile edits by another person (rule 19); `hasImage` filter; `test/images.test.ts`
 - [x] bridge: `openapi:export`, `api:generate`; web typecheck
-- [ ] checks, reviewer, acceptance (API at `/api/docs`), PR with auto-merge
+- [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-25), PR with auto-merge
 
 ## PR A2 — references, greeting and PDFs: contracts, api, worker
 - [ ] contracts: one shared `personSchema` and `clientRefSchema` with `imageId` replacing the duplicated ones; project and retainer references with the effective image (rule 3); the `image` string fields become `imageId`; `attendanceGreetingSchema.photo`; `clientLogoKey` on client-facing PDF payloads
@@ -20,5 +20,6 @@ Three PRs, each accepted by the owner before the next starts. One session per PR
 ## PR A3 — web and E2E
 - [ ] `Avatar` takes `src` (white surface, initial while loading and on error); `imageSrc(imageId, size)` helper; `features/images/` dialog (choose, brand files tab, crop with fill/fit zoom, preview sizes, upload progress, errors) with crop-maths unit tests
 - [ ] My account (photo, "Add your photo" card), team profile and list ("Without photo" filter), client, project and retainer headers; `imageId` passed to every avatar (spec Screens 6); entrance screen photo; offline cache-first for image routes
+- [ ] audit screen: `imageId` and `brandVersionId` as reference fields (not shown as raw ids), `source` labelled for images
 - [ ] E2E: `f01c.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`
 - [ ] checks, reviewer, acceptance (spec steps 1–8), PR with auto-merge, `docs/ROADMAP.md`
