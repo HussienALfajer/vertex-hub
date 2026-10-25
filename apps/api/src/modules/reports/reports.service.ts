@@ -17,7 +17,7 @@ import {
 import { CodedException } from '../../core/errors/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { CatalogDirectory } from '../catalog/index.js';
-import { ClientDirectory } from '../clients/index.js';
+import { ClientDirectory, clientRef } from '../clients/index.js';
 import { InvoiceReports } from '../invoices/index.js';
 import { TaskReports } from '../tasks/index.js';
 import { reportDepartments } from './report-access.js';
@@ -83,7 +83,7 @@ export class ReportsService {
           measures: department?.measures ?? emptyMeasures(),
           unassigned: department?.unassigned ?? { count: 0, oldestOn: null },
           people: listed.sort(byName).map((user) => ({
-            user: { id: user.id, name: user.name, archived: user.archived },
+            user: { id: user.id, name: user.name, imageId: user.imageId, archived: user.archived },
             measures: people.get(user.id) ?? emptyMeasures(),
           })),
         };
@@ -103,7 +103,7 @@ export class ReportsService {
     const managers = await this.users.summaries(
       [...clients.values()].map((client) => client.accountManagerId),
     );
-    const named = (id: string) => ({ id, name: clients.get(id)?.name ?? '' });
+    const named = (id: string) => clientRef(clients, id);
     const keys = [...figures.byTarget.keys()];
     const idsOf = (prefix: string) =>
       keys.flatMap((key) => (key?.startsWith(prefix) ? [key.slice(prefix.length)] : []));
@@ -134,7 +134,9 @@ export class ReportsService {
           const manager = managers.get(clients.get(id)?.accountManagerId ?? '');
           return {
             client: named(id),
-            accountManager: manager ? { id: manager.id, name: manager.name } : null,
+            accountManager: manager
+              ? { id: manager.id, name: manager.name, imageId: manager.imageId }
+              : null,
             ...row,
           };
         })
@@ -173,8 +175,10 @@ export class ReportsService {
         const days = daysOverdue(row.dueOn, today);
         return {
           ...row,
-          client: { id: clientId, name: client?.name ?? '' },
-          accountManager: manager ? { id: manager.id, name: manager.name } : null,
+          client: clientRef(clients, clientId),
+          accountManager: manager
+            ? { id: manager.id, name: manager.name, imageId: manager.imageId }
+            : null,
           daysOverdue: days,
           bucket: agingBucket(days),
         };

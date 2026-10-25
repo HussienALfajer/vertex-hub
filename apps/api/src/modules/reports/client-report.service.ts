@@ -17,6 +17,7 @@ import {
   type ReportPdfJob,
   type ReportPdfReadyJob,
   reportPdfReadyJobSchema,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import { clientReportNotes, clientReportPdfs, type Database, newId } from '@vertex-hub/db';
 import { and, eq, lt } from 'drizzle-orm';
@@ -25,12 +26,12 @@ import { CodedException } from '../../core/errors/index.js';
 import { JobQueue, payloadHash } from '../../core/jobs/index.js';
 import { ApprovalReports } from '../approvals/index.js';
 import { recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { ShootReports } from '../calendar/index.js';
 import { CampaignReports } from '../campaigns/index.js';
 import { ClientDirectory, ClientEmails, type ClientSummary } from '../clients/index.js';
 import { ContentReports } from '../content/index.js';
-import { FilePurges, GeneratedFiles } from '../files/index.js';
+import { FilePurges, GeneratedFiles, ImagesService } from '../files/index.js';
 import { EngagementReports } from '../projects/index.js';
 import { QuoteDirectory } from '../quotes/index.js';
 import { TaskReports } from '../tasks/index.js';
@@ -69,6 +70,7 @@ export class ClientReportService implements OnModuleInit {
     private readonly purges: FilePurges,
     private readonly jobs: JobQueue,
     private readonly cycleReports: CycleReportService,
+    private readonly images: ImagesService,
   ) {}
 
   onModuleInit(): void {
@@ -122,18 +124,16 @@ export class ClientReportService implements OnModuleInit {
       this.users.departmentNames(),
     ]);
     const titles = await this.approvals.taskTitles(delivered.map((task) => task.id));
-    const author = note
-      ? (await this.users.summaries([note.updatedById])).get(note.updatedById)
-      : null;
+    const authors = await this.users.summaries(note ? [note.updatedById] : []);
     const report: Omit<ClientMonthlyReport, 'empty'> = {
-      client: { id: client.id, name: client.name },
+      client: { id: client.id, name: client.name, imageId: client.imageId },
       month,
       period,
       preliminary: isPreliminaryMonth(month, today),
       summary: note
         ? {
             text: note.summary,
-            updatedBy: { id: note.updatedById, name: author?.name ?? '' },
+            updatedBy: personRef(authors, note.updatedById),
             updatedAt: note.updatedAt.toISOString(),
           }
         : null,
@@ -388,8 +388,13 @@ export class ClientReportService implements OnModuleInit {
     return { snapshot, hash: payloadHash({ kind: 'client_report', snapshot }) };
   }
 
-  private async queue(job: ReportPdfJob): Promise<void> {
-    await this.jobs.send(REPORTS_PDF_JOB.queue, job, { retryLimit: REPORTS_PDF_JOB.retryLimit });
+  /** F01C rule 14: with the client's current logo. */
+  private async queue(job: UnqueuedPdfJob<ReportPdfJob>): Promise<void> {
+    const clientLogoKey = await this.images.clientLogoKey(job.snapshot.client.id);
+    const queued: ReportPdfJob = { ...job, clientLogoKey };
+    await this.jobs.send(REPORTS_PDF_JOB.queue, queued, {
+      retryLimit: REPORTS_PDF_JOB.retryLimit,
+    });
   }
 
   private async removeObject(key: string): Promise<void> {

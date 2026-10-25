@@ -12,7 +12,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { AttendancePasskeys, type PasskeyRow } from './attendance-passkeys.js';
 import { AttendanceWebAuthn } from './attendance-webauthn.js';
 import { HrRequestsService } from './hr-requests.service.js';
@@ -188,7 +188,7 @@ export class AttendancePasskeysService {
     const people = await this.users.summaries(
       rows.flatMap((row) => [row.userId, ...(row.decidedById ? [row.decidedById] : [])]),
     );
-    const person = (id: string) => ({ id, name: people.get(id)?.name ?? '' });
+    const person = (id: string) => personRef(people, id);
     return rows.map((row) => ({
       id: row.id,
       user: person(row.userId),

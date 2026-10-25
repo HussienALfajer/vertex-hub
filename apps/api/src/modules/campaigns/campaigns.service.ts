@@ -22,7 +22,7 @@ import { and, asc, count, desc, eq, inArray, isNull, max, or, type SQL, sql } fr
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, UserDirectory, type UserSummary } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { TaskLinks } from '../tasks/index.js';
@@ -353,7 +353,7 @@ export class CampaignsService {
       row.funding === 'wallet' ? await this.wallets.totalsOf(executor, row.clientId) : null;
     const person = (userId: string) => {
       const user = users.get(userId);
-      return { id: userId, name: user?.name ?? '' };
+      return { id: userId, name: user?.name ?? '', imageId: user?.imageId ?? null };
     };
     const totals = metricsOf(updates);
     const lastUpdateEnd = updates.reduce<string | null>(
@@ -462,7 +462,7 @@ export class CampaignsService {
   private summary(
     row: CampaignRow,
     client: ClientSummary,
-    owner: { name: string; archived: boolean } | undefined,
+    owner: UserSummary | undefined,
     totals: { spendMinor: number; results: number; costPerResultMinor: number | null },
     lastUpdateEnd: string | null,
   ): Campaign {
@@ -470,14 +470,19 @@ export class CampaignsService {
     return {
       id: row.id,
       name: row.name,
-      client: { id: client.id, name: client.name },
+      client: { id: client.id, name: client.name, imageId: client.imageId },
       platform: row.platform,
       objective: row.objective,
       funding: row.funding,
       status: row.status,
       startsOn: row.startsOn,
       endsOn: row.endsOn,
-      owner: { id: row.ownerId, name: owner?.name ?? '', archived: owner?.archived ?? false },
+      owner: {
+        id: row.ownerId,
+        name: owner?.name ?? '',
+        imageId: owner?.imageId ?? null,
+        archived: owner?.archived ?? false,
+      },
       budgetMinor: row.budgetMinor,
       spendMinor: totals.spendMinor,
       budgetUsed: budgetUsed(totals.spendMinor, row.budgetMinor),

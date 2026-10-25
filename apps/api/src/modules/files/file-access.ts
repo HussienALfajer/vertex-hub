@@ -12,6 +12,7 @@ import { and, eq, type SQL } from 'drizzle-orm';
 import { CodedException } from '../../core/errors/index.js';
 import type { AuditActor } from '../audit/index.js';
 import type { CurrentUserInfo, UserSummary } from '../auth/index.js';
+import { personRef } from '../auth/index.js';
 import type { FileOwner } from './file-owner-registry.js';
 
 /*
@@ -215,11 +216,6 @@ function itemPermissions(
   };
 }
 
-const person = (people: Map<string, UserSummary>, id: string) => ({
-  id,
-  name: people.get(id)?.name ?? '',
-});
-
 export function toVersion(
   version: VersionRow,
   people: Map<string, UserSummary>,
@@ -239,10 +235,10 @@ export function toVersion(
     url: version.url,
     linkLabel: version.linkLabel,
     note: version.note,
-    uploadedBy: person(people, version.uploadedById),
+    uploadedBy: personRef(people, version.uploadedById),
     isFinal: version.isFinal,
     finalSource: version.finalSource,
-    finalMarkedBy: version.finalMarkedById ? person(people, version.finalMarkedById) : null,
+    finalMarkedBy: version.finalMarkedById ? personRef(people, version.finalMarkedById) : null,
     finalMarkedAt: version.finalMarkedAt?.toISOString() ?? null,
     createdAt: version.createdAt.toISOString(),
     archivedAt: version.archivedAt?.toISOString() ?? null,
@@ -276,7 +272,7 @@ export function toItem(
     name: item.name,
     brandKind: item.brandKind,
     confidential: item.confidential,
-    createdBy: person(people, item.createdById),
+    createdBy: personRef(people, item.createdById),
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
     archivedAt: item.archivedAt?.toISOString() ?? null,

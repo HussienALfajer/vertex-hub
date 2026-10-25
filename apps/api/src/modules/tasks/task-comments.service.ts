@@ -249,7 +249,8 @@ export class TaskCommentsService {
     const people = await this.users.summaries(
       rows.flatMap((row) => [row.authorId, ...(row.archivedAt ? [] : row.mentionedUserIds)]),
     );
-    const person = (id: string) => people.get(id) ?? { id, name: '', archived: false };
+    const person = (id: string) =>
+      people.get(id) ?? { id, name: '', imageId: null, archived: false };
     const writable = !isReadOnly(task);
     const removesAny = holdsAll(actor, 'tasks.manage');
     return rows.map((row) => {

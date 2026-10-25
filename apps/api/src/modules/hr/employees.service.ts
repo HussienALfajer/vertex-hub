@@ -394,6 +394,7 @@ export class EmployeesService {
     const result: EmployeeFile = {
       userId: profile.id,
       name: profile.name,
+      imageId: profile.imageId,
       title: profile.title,
       departments: profile.departments,
       status: this.statusOf(profile, file),

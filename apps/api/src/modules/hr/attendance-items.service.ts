@@ -23,7 +23,7 @@ import { and, asc, count, desc, eq, gte, inArray, lte, type SQL } from 'drizzle-
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { AttendanceService } from './attendance.service.js';
 import { AttendanceItems, type ItemRow } from './attendance-items.js';
@@ -134,7 +134,7 @@ export class AttendanceItemsService {
       ...presented,
       day: presentedDay,
       opinions: opinionRows.map((opinion) =>
-        toOpinion(opinion, authors.get(opinion.authorId)?.name ?? ''),
+        toOpinion(opinion, personRef(authors, opinion.authorId)),
       ),
       permissions: {
         canDecide: holdsAll(actor, 'hr.approve') && item.status !== 'void',
@@ -268,7 +268,7 @@ export class AttendanceItemsService {
       });
       return opinion;
     });
-    return toOpinion(row, actor.name);
+    return toOpinion(row, personRef(await this.users.summaries([actor.id]), actor.id));
   }
 
   private async one(id: string): Promise<AttendanceItem> {
@@ -340,7 +340,7 @@ export class AttendanceItemsService {
       rows.flatMap(({ item }) => [item.userId, ...(item.decidedById ? [item.decidedById] : [])]),
       executor,
     );
-    const person = (id: string) => ({ id, name: people.get(id)?.name ?? '' });
+    const person = (id: string) => personRef(people, id);
     return rows.map(({ item, date }) => ({
       id: item.id,
       user: person(item.userId),

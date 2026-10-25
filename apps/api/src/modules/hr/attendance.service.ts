@@ -43,7 +43,8 @@ import { and, asc, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { AuditService, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
+import { ImagesService } from '../files/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { AttendanceDays, type DayRow } from './attendance-days.js';
 import { AttendanceFieldWork } from './attendance-field-work.js';
@@ -126,6 +127,7 @@ export class AttendanceService {
     private readonly users: UserDirectory,
     private readonly center: NotificationCenter,
     private readonly audit: AuditService,
+    private readonly images: ImagesService,
   ) {}
 
   /** `GET /attendance/me/today`. */
@@ -337,13 +339,16 @@ export class AttendanceService {
         });
       }
       const greeting = await this.greeting(tx, actor, direction, day, now);
-      if (kiosk) await this.stream.publish(tx, kiosk.id, greeting);
-      return { punch, day, greeting };
+      // F01C rule 15: the photo is read once committed, never carried by the notification.
+      const imageId = (await this.users.summaries([actor.id], tx)).get(actor.id)?.imageId ?? null;
+      if (kiosk) await this.stream.publish(tx, kiosk.id, greeting, imageId);
+      return { punch, day, greeting, imageId };
     });
     const [day] = await this.presentDays(this.db, actor.id, [result.day]);
     const [punch] = await this.presentPunches(this.db, [result.punch]);
     if (!day || !punch) throw new NotFoundException();
-    return { punch, day, greeting: result.greeting };
+    const photo = await this.images.photoDataUrl(result.imageId);
+    return { punch, day, greeting: { ...result.greeting, photo } };
   }
 
   /**
@@ -469,7 +474,7 @@ export class AttendanceService {
       const row = dayOf.get(profile.id);
       return [
         {
-          user: { id: profile.id, name: profile.name },
+          user: { id: profile.id, name: profile.name, imageId: profile.imageId },
           state: exemption ? 'exempt' : stateOf(row),
           late: (row?.lateMinutes ?? 0) > 0,
           method: lastMethod.get(profile.id) ?? null,
@@ -487,14 +492,14 @@ export class AttendanceService {
       },
       { showsPay: false },
     );
-    const names = new Map(profiles.map((profile) => [profile.id, profile.name]));
+    const names = new Map(profiles.map((profile) => [profile.id, profile]));
     const refusals: PunchRefusal[] = audit.items.flatMap((entry) => {
       const after = (entry.after ?? {}) as { reason?: string; ipAddress?: string | null };
       const reason = PUNCH_REFUSALS.find((value) => value === after.reason);
       if (!reason || !names.has(entry.entityId)) return [];
       return [
         {
-          user: { id: entry.entityId, name: names.get(entry.entityId) ?? '' },
+          user: personRef(names, entry.entityId),
           at: entry.occurredAt,
           reason,
           ipAddress: after.ipAddress ?? null,
@@ -607,7 +612,10 @@ export class AttendanceService {
     return row;
   }
 
-  /** Rule C20: no client names; open tasks due today and the first shoot or meeting today. */
+  /**
+   * Rule C20: no client names; open tasks due today and the first shoot or meeting today. The
+   * photo is added once the punch committed (F01C rule 15).
+   */
   private async greeting(
     tx: Transaction,
     actor: CurrentUserInfo,
@@ -624,6 +632,7 @@ export class AttendanceService {
         tasksDueToday: null,
         firstEventAt: null,
         workedMinutes: day.workedMinutes,
+        photo: null,
       };
     }
     const today = businessDate(now);
@@ -639,6 +648,7 @@ export class AttendanceService {
       tasksDueToday: work.filter((item) => item.kind === 'task').length,
       firstEventAt: events[0] ?? null,
       workedMinutes: null,
+      photo: null,
     };
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
   FILES_PREVIEW_JOB,
   IMAGE_MAX_BYTES,
@@ -6,8 +6,16 @@ import {
   IMAGE_MIN_SIDE,
   type SetImage,
 } from '@vertex-hub/contracts';
-import { fileItems, fileUploads, fileVersions, images, type Transaction } from '@vertex-hub/db';
-import { and, eq, isNull } from 'drizzle-orm';
+import {
+  type Database,
+  fileItems,
+  fileUploads,
+  fileVersions,
+  images,
+  type Transaction,
+} from '@vertex-hub/db';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
 import {
@@ -17,6 +25,8 @@ import {
   type StoredImage,
   UserImages,
 } from '../auth/index.js';
+import { imageRenditionKey } from './file-content.service.js';
+import { FileStorage } from './file-storage.js';
 
 /** The column of `images` that holds the subject's id. */
 const subjectColumn = (type: ImageSubject['type']) =>
@@ -42,9 +52,13 @@ const subjectValues = (subject: ImageSubject) => ({
  */
 @Injectable()
 export class ImagesService implements ImageStore, OnModuleInit {
+  private readonly logger = new Logger(ImagesService.name);
+
   constructor(
+    @Inject(DATABASE) private readonly db: Database,
     private readonly jobs: JobQueue,
     private readonly userImages: UserImages,
+    private readonly storage: FileStorage,
   ) {}
 
   onModuleInit(): void {
@@ -100,6 +114,54 @@ export class ImagesService implements ImageStore, OnModuleInit {
 
   async remove(tx: Transaction, actor: CurrentUserInfo, subject: ImageSubject): Promise<void> {
     await this.archiveCurrent(tx, actor, subject);
+  }
+
+  /**
+   * Rule 14: the storage key a client-facing PDF embeds beside the client's name: the `md`
+   * rendition of the client's current logo when ready, the uploaded square while pending, null
+   * without a logo or when it failed.
+   */
+  async clientLogoKey(
+    clientId: string | null,
+    executor: Database | Transaction = this.db,
+  ): Promise<string | null> {
+    if (!clientId) return null;
+    const [image] = await executor
+      .select({ storageKey: images.storageKey, status: images.status })
+      .from(images)
+      .where(and(eq(images.clientId, clientId), isNull(images.archivedAt)));
+    if (!image || image.status === 'failed') return null;
+    return image.status === 'ready' ? imageRenditionKey(image.storageKey, 'md') : image.storageKey;
+  }
+
+  /**
+   * Rule 15: a user's photo as a data URL, for the entrance screen, which has no session: the `md`
+   * rendition when ready, the uploaded square while pending; null without a photo, when it
+   * failed or when the file cannot be read (the greeting then shows the initial).
+   */
+  async photoDataUrl(imageId: string | null): Promise<string | null> {
+    if (!imageId) return null;
+    const [image] = await this.db
+      .select({ storageKey: images.storageKey, mimeType: images.mimeType, status: images.status })
+      .from(images)
+      .where(
+        and(
+          eq(images.id, imageId),
+          eq(images.subjectType, 'user'),
+          inArray(images.status, ['ready', 'pending']),
+          isNull(images.archivedAt),
+        ),
+      );
+    if (!image) return null;
+    const ready = image.status === 'ready';
+    const key = ready ? imageRenditionKey(image.storageKey, 'md') : image.storageKey;
+    try {
+      const bytes = Buffer.concat(await this.storage.read(key).toArray());
+      return `data:${ready ? 'image/webp' : image.mimeType};base64,${bytes.toString('base64')}`;
+    } catch (error) {
+      this.logger.warn(`Could not read the photo ${key}: ${String(error)}`);
+      return null;
+    }
   }
 
   queueRenders(): Promise<void> {

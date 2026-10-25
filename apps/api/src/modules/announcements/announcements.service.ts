@@ -53,7 +53,7 @@ import {
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import {
   type AnnouncementRow,
@@ -567,7 +567,7 @@ export class AnnouncementsService {
         user: {
           id: member.id,
           name: member.name,
-          image: member.image,
+          imageId: member.imageId,
           archived: people.get(member.id)?.archived ?? false,
         },
         openedAt: iso(r.openedAt),
@@ -727,7 +727,7 @@ export class AnnouncementsService {
       const receipt = receiptOf.get(row.id) ?? null;
       return {
         id: row.id,
-        author: { id: row.authorId, name: people.get(row.authorId)?.name ?? '' },
+        author: personRef(people, row.authorId),
         title: row.title,
         excerpt: announcementExcerpt(row.body as AnnouncementBody),
         priority: row.priority,
@@ -783,9 +783,7 @@ export class AnnouncementsService {
         linkLabel: row.linkLabel,
         audience: showsAudience ? storedAudience(row.audience) : null,
         renotifiedAt: iso(row.renotifiedAt),
-        withdrawnBy: row.withdrawnById
-          ? { id: row.withdrawnById, name: withdrawers.get(row.withdrawnById)?.name ?? '' }
-          : null,
+        withdrawnBy: row.withdrawnById ? personRef(withdrawers, row.withdrawnById) : null,
         poll: polls.get(row.id) ?? null,
         rights: rightsOf(actor, row, receiptOf.get(row.id) ?? null),
       };

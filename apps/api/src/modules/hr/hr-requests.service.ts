@@ -22,6 +22,7 @@ import {
   lastOfMonth,
   leaveSplit,
   leaveUnits,
+  type PersonRef,
   type PunchDirection,
   paidDaysByYear,
   permissionMinutes,
@@ -55,7 +56,7 @@ import {
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory, UserLifecycle } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory, UserLifecycle } from '../auth/index.js';
 import { FileVersions } from '../files/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { AttendanceDays } from './attendance-days.js';
@@ -398,7 +399,7 @@ export class HrRequestsService implements OnModuleInit {
     return {
       ...request,
       opinions: opinionRows.map((opinion) =>
-        toOpinion(opinion, authors.get(opinion.authorId)?.name ?? ''),
+        toOpinion(opinion, personRef(authors, opinion.authorId)),
       ),
       overlappingWork:
         approver && row.kind === 'leave'
@@ -592,7 +593,7 @@ export class HrRequestsService implements OnModuleInit {
       });
       return opinion;
     });
-    return toOpinion(row, actor.name);
+    return toOpinion(row, personRef(await this.users.summaries([actor.id]), actor.id));
   }
 
   /**
@@ -1054,7 +1055,7 @@ export class HrRequestsService implements OnModuleInit {
       ),
       this.settings.row(executor),
     ]);
-    const person = (id: string) => ({ id, name: people.get(id)?.name ?? '' });
+    const person = (id: string) => personRef(people, id);
     return rows.map((row) => ({
       id: row.id,
       user: person(row.userId),
@@ -1260,12 +1261,12 @@ function spanOfInput(input: CreateHrRequest): Omit<RequestSpan, 'kind'> {
   }
 }
 
-export function toOpinion(row: typeof hrOpinions.$inferSelect, authorName: string): HrOpinion {
+export function toOpinion(row: typeof hrOpinions.$inferSelect, author: PersonRef): HrOpinion {
   return {
     id: row.id,
     requestId: row.requestId,
     itemId: row.itemId,
-    author: { id: row.authorId, name: authorName },
+    author,
     body: row.body,
     createdAt: row.createdAt.toISOString(),
   };

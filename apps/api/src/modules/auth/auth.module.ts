@@ -4,6 +4,7 @@ import { AuthModule as BetterAuthModule } from '@thallesp/nestjs-better-auth';
 import type { Database } from '@vertex-hub/db';
 import { ENV, type Env } from '../../core/config/env.js';
 import { DATABASE } from '../../core/database/database.module.js';
+import { AuditModule } from '../audit/index.js';
 import { EmailModule, Mailer } from '../email/index.js';
 import { AccessService } from './access.service.js';
 import { AccountArchiver } from './account-archiver.js';
@@ -35,6 +36,7 @@ import { UsersService } from './users.service.js';
  */
 @Module({
   imports: [
+    AuditModule,
     EmailModule,
     BetterAuthModule.forRootAsync({
       imports: [EmailModule],

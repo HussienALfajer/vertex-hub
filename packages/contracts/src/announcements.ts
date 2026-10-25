@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { type Audience, audienceSchema } from './audiences.js';
 import { calendarDateSchema, instantSchema } from './dates.js';
+import { personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
 import { notificationPrioritySchema } from './notifications.js';
 
@@ -331,8 +332,6 @@ export function isSchedulable(at: Date, now: Date): boolean {
 
 /* Responses */
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
-
 /**
  * A poll as the caller may see it (rule D11). Counts show to the author and holders of
  * `announcements.manage` `all`, and to recipients once they voted or the poll closed when the
@@ -477,7 +476,7 @@ export const announcementReceiptsSchema = z
     totals: announcementTotalsSchema,
     items: z.array(
       z.object({
-        user: personSchema.extend({ image: z.string().nullable(), archived: z.boolean() }),
+        user: personSchema.extend({ archived: z.boolean() }),
         openedAt: z.iso.datetime().nullable(),
         acknowledgedAt: z.iso.datetime().nullable(),
         remindersSent: z.number().int().min(0),

@@ -25,6 +25,7 @@ import {
   emailMessages,
   fileItems,
   fileVersions,
+  images,
   invoiceSettings,
   invoices,
   payments,
@@ -179,6 +180,41 @@ describe('invoice PDFs', () => {
     await connection.close();
     delete process.env.FILES_ROOT;
     if (filesRoot) await rm(filesRoot, { recursive: true, force: true });
+  });
+
+  it("carries the client's current logo: the square while pending, then its rendition (F01C rule 14)", async () => {
+    const draft = await draftInvoice();
+    await renderPdf(draft.id);
+    expect(lastJob('invoice_draft').clientLogoKey).toBeNull();
+    const storageKey = `objects/2026/10/${randomUUID()}`;
+    const [logo] = await db
+      .insert(images)
+      .values({
+        subjectType: 'client',
+        clientId,
+        source: 'upload',
+        storageKey,
+        mimeType: 'image/png',
+        sizeBytes: 1_000,
+        createdById: cast.gm.id,
+      })
+      .returning();
+    if (!logo) throw new Error('No logo');
+    try {
+      await save(await detail(draft.id), 60_000);
+      await renderPdf(draft.id);
+      expect(lastJob('invoice_draft').clientLogoKey).toBe(storageKey);
+      await db.update(images).set({ status: 'ready' }).where(eq(images.id, logo.id));
+      await save(await detail(draft.id), 70_000);
+      await renderPdf(draft.id);
+      expect(lastJob('invoice_draft').clientLogoKey).toBe(`${storageKey}.md.webp`);
+      await db.update(images).set({ status: 'failed' }).where(eq(images.id, logo.id));
+      await save(await detail(draft.id), 80_000);
+      await renderPdf(draft.id);
+      expect(lastJob('invoice_draft').clientLogoKey).toBeNull();
+    } finally {
+      await db.delete(images).where(eq(images.id, logo.id));
+    }
   });
 
   it('requires a session', async () => {

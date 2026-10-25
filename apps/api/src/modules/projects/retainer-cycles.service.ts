@@ -50,7 +50,12 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { JobQueue, runEach } from '../../core/jobs/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
+import {
+  type CurrentUserInfo,
+  lockAccessChanges,
+  personRef,
+  UserDirectory,
+} from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { CycleClosedHooks } from './cycle-closed-hooks.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
@@ -597,7 +602,7 @@ export class RetainerCyclesService implements OnModuleInit {
             id: entry.id,
             delta: entry.delta,
             reason: entry.reason,
-            author: { id: entry.authorId, name: authors.get(entry.authorId)?.name ?? '' },
+            author: personRef(authors, entry.authorId),
             createdAt: entry.createdAt.toISOString(),
           })),
       })),

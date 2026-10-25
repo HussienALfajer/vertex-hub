@@ -34,7 +34,7 @@ import { ENV, type Env } from '../../core/config/env.js';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { JobQueue } from '../../core/jobs/index.js';
-import { type CurrentUserInfo, DevicePushStates, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, DevicePushStates, personRef, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from './notification-center.js';
 import { notificationResponses } from './notification-responses.js';
 import { PushQueue } from './push-queue.js';
@@ -284,7 +284,7 @@ export class PushService implements OnModuleInit {
     return {
       items: rows.map((row) => ({
         id: row.id,
-        user: { id: row.userId, name: people.get(row.userId)?.name ?? '' },
+        user: personRef(people, row.userId),
         device: row.deviceLabel,
         kind: row.kind,
         notification: (row.notificationId && shown.get(row.notificationId)) || null,

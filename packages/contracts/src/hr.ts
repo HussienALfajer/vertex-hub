@@ -14,6 +14,7 @@ import {
   weekday,
 } from './dates.js';
 import { userDepartmentSchema } from './departments.js';
+import { personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryListSchema, sortOrderSchema } from './lists.js';
 import { currencySchema } from './money.js';
 import { optionalText } from './text.js';
@@ -160,6 +161,8 @@ export const employeeFileSchema = z
   .object({
     userId: z.uuid(),
     name: z.string(),
+    /** The current photo (F01C); null shows the initial. */
+    imageId: z.uuid().nullable(),
     title: z.string().nullable(),
     /** Primary first. */
     departments: z.array(userDepartmentSchema),
@@ -281,7 +284,7 @@ export const salaryChangeSchema = z
     amountMinor: z.number().int(),
     currency: currencySchema,
     reason: z.string(),
-    createdBy: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    createdBy: personSchema.nullable(),
     createdAt: instantSchema,
     archivedAt: instantSchema.nullable(),
     archiveReason: z.string().nullable(),
@@ -714,8 +717,6 @@ export const HR_REQUEST_LIMITS = {
   remoteDays: 31,
 } as const;
 
-export const personRefSchema = z.object({ id: z.uuid(), name: z.string() });
-
 /** The weekday of a date (`WEEKDAYS`). */
 export function weekdayOf(date: CalendarDate): Weekday {
   return WEEKDAYS[(weekday(date) + 1) % 7] as Weekday;
@@ -1002,7 +1003,7 @@ export type HrRequestPreview = z.infer<typeof hrRequestPreviewSchema>;
 export const hrRequestSchema = z
   .object({
     id: z.uuid(),
-    user: personRefSchema,
+    user: personSchema,
     kind: hrRequestKindSchema,
     /** Leave only. */
     leaveType: leaveTypeSchema.nullable(),
@@ -1029,8 +1030,8 @@ export const hrRequestSchema = z
     certificateRequired: z.boolean(),
     /** Live documents attached to the request (F10 owner `hr_request`). */
     documents: z.number().int().min(0),
-    createdBy: personRefSchema,
-    decidedBy: personRefSchema.nullable(),
+    createdBy: personSchema,
+    decidedBy: personSchema.nullable(),
     decidedAt: instantSchema.nullable(),
     decisionNote: z.string().nullable(),
     createdAt: instantSchema,
@@ -1069,7 +1070,7 @@ export const hrOpinionSchema = z
     id: z.uuid(),
     requestId: z.uuid().nullable(),
     itemId: z.uuid().nullable(),
-    author: personRefSchema,
+    author: personSchema,
     body: z.string(),
     createdAt: instantSchema,
   })
@@ -1177,7 +1178,7 @@ export const ledgerRowSchema = z
     itemId: z.uuid().nullable(),
     note: z.string().nullable(),
     /** Null for the daily job. */
-    createdBy: personRefSchema.nullable(),
+    createdBy: personSchema.nullable(),
     createdAt: instantSchema,
   })
   .meta({ id: 'LedgerRow' });
@@ -1240,7 +1241,7 @@ export type CreateLeaveAdjustment = z.infer<typeof createLeaveAdjustmentSchema>;
 export const calendarLeaveSchema = z
   .object({
     requestId: z.uuid(),
-    user: personRefSchema,
+    user: personSchema,
     startsOn: calendarDateSchema,
     endsOn: calendarDateSchema,
     half: leaveHalfSchema.nullable(),

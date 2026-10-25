@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { personSchema } from './images.js';
 import {
   pageQuerySchema,
   pageSchema,
@@ -299,10 +300,12 @@ export const clientResponseSchema = z
   .object({
     id: z.uuid(),
     tradeName: z.string(),
+    /** The current logo (F01C); null shows the initial. */
+    imageId: z.uuid().nullable(),
     sector: z.string().nullable(),
     status: clientStatusSchema,
     isHealthcare: z.boolean(),
-    accountManager: z.object({ id: z.uuid(), name: z.string(), archived: z.boolean() }),
+    accountManager: personSchema.extend({ archived: z.boolean() }),
     /** A non-archived contact has final-approval authority (rule 9). */
     hasApprovalContact: z.boolean(),
   })
@@ -397,7 +400,7 @@ export const noteSchema = z
     occurredAt: z.iso.datetime(),
     channel: noteChannelSchema,
     summary: z.string(),
-    author: z.object({ id: z.uuid(), name: z.string() }),
+    author: personSchema,
     /** Kept when the contact is removed later (rule 10). */
     contact: z.object({ id: z.uuid(), name: z.string(), archived: z.boolean() }).nullable(),
     canEdit: z.boolean(),

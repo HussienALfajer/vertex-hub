@@ -8,6 +8,7 @@ import {
   contractSnapshotSchema,
   currentCycleNumber,
   formatContractNumber,
+  type PersonRef,
   type RetainerContract,
   type RetainerContractDetail,
   type RetainerContractList,
@@ -598,7 +599,7 @@ export class RetainerContractsService {
     );
     const person = (id: string | null) => {
       const user = id ? people.get(id) : undefined;
-      return user ? { id: user.id, name: user.name } : null;
+      return user ? { id: user.id, name: user.name, imageId: user.imageId } : null;
     };
     const changed = await this.changedSinceIssue(executor, retainerId, rows);
     return rows.map((row) => {
@@ -873,7 +874,7 @@ function assertArticles(articles: NonNullable<UpdateContract['articles']>): void
 export function presentAnnex(
   annex: AnnexRow,
   amendmentNumber: number,
-  issuedBy: { id: string; name: string } | null,
+  issuedBy: PersonRef | null,
 ): ContractAnnex {
   return {
     id: annex.id,

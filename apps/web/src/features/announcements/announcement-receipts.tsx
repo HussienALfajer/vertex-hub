@@ -134,7 +134,7 @@ export function AnnouncementReceipts({ announcement }: { announcement: Announcem
               <TableRow key={item.user.id}>
                 <TableCell>
                   <span className="flex items-center gap-2">
-                    <Avatar name={item.user.name} src={item.user.image ?? undefined} size="sm" />
+                    <Avatar name={item.user.name} size="sm" />
                     {item.user.name}
                     {item.user.archived && (
                       <Badge tone="neutral">{t('announcements.receipts.archived')}</Badge>

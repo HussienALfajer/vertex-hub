@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,7 @@ import {
   invoicePdfStorageKey,
   type ReceiptSnapshot,
   type StatementSnapshot,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import { chromium } from 'playwright';
 import { extractText, getDocumentProxy } from 'unpdf';
@@ -17,6 +18,13 @@ import { InvoicesPdfJob } from '../src/jobs/invoices-pdf.job.js';
 import type { PgBossService } from '../src/jobs/pg-boss.service.js';
 import { invoiceHtml, receiptHtml, statementHtml } from '../src/pdf/invoice-templates.js';
 import { loadAssets, PdfRenderer } from '../src/pdf/pdf-renderer.js';
+import {
+  expectLogo,
+  expectMissingLogoLogged,
+  expectNoLogo,
+  LOGO,
+  PNG,
+} from './client-logo-cases.js';
 
 const id = '0190a3c2-0000-7000-8000-0000000000bb';
 const clientId = '0190a3c2-0000-7000-8000-0000000000cc';
@@ -67,7 +75,7 @@ const receipt: ReceiptSnapshot = {
 
 const statement: StatementSnapshot = {
   companyDetails: company,
-  client: { id: clientId, name: 'الياسمين' },
+  client: { id: clientId, name: 'الياسمين', imageId: null },
   billingName: invoice.billingName,
   billingAddress: invoice.billingAddress,
   currency: 'USD',
@@ -129,7 +137,7 @@ describe('invoices.pdf', () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  async function render(payload: InvoicePdfJob): Promise<string> {
+  async function render(payload: UnqueuedPdfJob<InvoicePdfJob>): Promise<string> {
     const result = await job.render(payload);
     expect(result).toMatchObject({ kind: payload.kind, id: payload.id, hash: payload.hash });
     expect(result.file?.storageKey).toBe(invoicePdfStorageKey(payload));
@@ -184,7 +192,7 @@ describe('invoices.pdf', () => {
   });
 
   it('is safe to run twice: the second run reuses the file', async () => {
-    const payload: InvoicePdfJob = {
+    const payload: UnqueuedPdfJob<InvoicePdfJob> = {
       kind: 'receipt',
       id,
       hash: 'e'.repeat(64),
@@ -227,5 +235,38 @@ describe('invoices.pdf', () => {
     } finally {
       await browser.close();
     }
+  });
+
+  it("prints the client's logo beside the client's name, and the name alone without (F01C)", async () => {
+    const assets = await loadAssets();
+    const withLogo = { ...assets, clientLogo: LOGO };
+    expectLogo(invoiceHtml(invoice, withLogo));
+    expectLogo(receiptHtml(receipt, withLogo));
+    expectLogo(statementHtml(statement, withLogo));
+    expectNoLogo(invoiceHtml(invoice, assets));
+    expectNoLogo(receiptHtml(receipt, assets));
+    expectNoLogo(statementHtml(statement, assets));
+  });
+
+  it('renders with the logo file, and without one that is gone, logging it (F01C)', async () => {
+    await mkdir(join(root, 'objects/2026/10'), { recursive: true });
+    await writeFile(join(root, 'objects/2026/10/logo.md.webp'), PNG);
+    const result = await job.render({
+      kind: 'invoice',
+      id,
+      hash: '8'.repeat(64),
+      snapshot: invoice,
+      clientLogoKey: 'objects/2026/10/logo.md.webp',
+    });
+    expect(result.file).not.toBeNull();
+    await expectMissingLogoLogged((clientLogoKey) =>
+      job.render({
+        kind: 'statement',
+        id,
+        hash: '9'.repeat(64),
+        snapshot: statement,
+        clientLogoKey,
+      }),
+    );
   });
 });

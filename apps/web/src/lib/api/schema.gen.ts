@@ -5916,6 +5916,8 @@ export interface components {
             /** Format: uuid */
             actorId: string | null;
             actorName: string | null;
+            /** Format: uuid */
+            actorImageId: string | null;
             action: components["schemas"]["AuditAction"];
             entityType: components["schemas"]["AuditEntityType"];
             /** Format: uuid */
@@ -6097,12 +6099,7 @@ export interface components {
             local: true;
         }) | null;
         SharedDeviceUser: {
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                image: string | null;
-            };
+            user: components["schemas"]["PersonRef"];
             department: {
                 code: components["schemas"]["DepartmentCode"];
                 name: string;
@@ -6110,6 +6107,13 @@ export interface components {
             match: components["schemas"]["DeviceMatch"];
             /** Format: date-time */
             lastActiveAt: string;
+        };
+        PersonRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            imageId: string | null;
         };
         /** @enum {string} */
         DeviceMatch: "same_browser" | "same_device";
@@ -6204,11 +6208,7 @@ export interface components {
             id: string;
             code: components["schemas"]["DepartmentCode"];
             name: string;
-            manager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            manager: components["schemas"]["PersonRef"] | null;
             memberCount: number;
         };
         DepartmentDetail: {
@@ -6216,16 +6216,14 @@ export interface components {
             id: string;
             code: components["schemas"]["DepartmentCode"];
             name: string;
-            manager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            manager: components["schemas"]["PersonRef"] | null;
             memberCount: number;
             members: {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 title: string | null;
                 isPrimary: boolean;
                 /** @enum {string} */
@@ -6280,6 +6278,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6301,6 +6304,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6331,6 +6339,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6352,6 +6365,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6383,6 +6401,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6404,6 +6427,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6436,6 +6464,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6457,6 +6490,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6487,6 +6525,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6508,6 +6551,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6538,6 +6586,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6559,6 +6612,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6589,6 +6647,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6610,6 +6673,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6640,6 +6708,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6661,6 +6734,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6689,6 +6767,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6710,6 +6793,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6736,6 +6824,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6757,6 +6850,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6783,6 +6881,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6804,6 +6907,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6846,6 +6954,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6867,6 +6980,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6898,6 +7016,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6919,6 +7042,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -6950,6 +7078,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -6971,6 +7104,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7001,6 +7139,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7022,6 +7165,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7053,6 +7201,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7074,6 +7227,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7106,6 +7264,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7127,6 +7290,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7157,6 +7325,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7178,6 +7351,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7210,6 +7388,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7231,6 +7414,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7261,6 +7449,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7282,6 +7475,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7315,6 +7513,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7336,6 +7539,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7367,6 +7575,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7388,6 +7601,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7419,6 +7637,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7440,6 +7663,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7471,6 +7699,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7492,6 +7725,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7523,6 +7761,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7544,6 +7787,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7577,6 +7825,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7598,6 +7851,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7630,6 +7888,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7651,6 +7914,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7685,6 +7953,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7706,6 +7979,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7739,6 +8017,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7760,6 +8043,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7795,6 +8083,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7816,6 +8109,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7850,6 +8148,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7871,6 +8174,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7903,6 +8211,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7924,6 +8237,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -7958,6 +8276,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -7979,6 +8302,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8012,6 +8340,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8033,6 +8366,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8066,6 +8404,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8087,6 +8430,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8120,6 +8468,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8141,6 +8494,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8175,6 +8533,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8196,6 +8559,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8229,6 +8597,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8250,6 +8623,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8281,6 +8659,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8302,6 +8685,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8333,6 +8721,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8354,6 +8747,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8387,6 +8785,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8408,6 +8811,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8441,6 +8849,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8462,6 +8875,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8494,6 +8912,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8515,6 +8938,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8540,6 +8968,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8561,6 +8994,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8587,6 +9025,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8608,6 +9051,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8638,6 +9086,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8659,6 +9112,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8696,6 +9154,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8717,6 +9180,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8752,6 +9220,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8773,6 +9246,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8807,6 +9285,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8828,6 +9311,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8858,6 +9346,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8879,6 +9372,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8907,6 +9405,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8928,6 +9431,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -8957,6 +9465,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -8978,6 +9491,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9010,6 +9528,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9031,6 +9554,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9062,6 +9590,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9083,6 +9616,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9112,6 +9650,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9133,6 +9676,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9161,6 +9709,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9182,6 +9735,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9209,6 +9767,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9230,6 +9793,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9258,6 +9826,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9279,6 +9852,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9304,6 +9882,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9325,6 +9908,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9351,6 +9939,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9372,6 +9965,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9400,6 +9998,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9421,6 +10024,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9448,6 +10056,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9469,6 +10082,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9499,6 +10117,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9520,6 +10143,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9551,6 +10179,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9572,6 +10205,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9605,6 +10243,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9626,6 +10269,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9657,6 +10305,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9678,6 +10331,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9709,6 +10367,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9730,6 +10393,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9762,6 +10430,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9783,6 +10456,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9814,6 +10492,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9835,6 +10518,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9863,6 +10551,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9884,6 +10577,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9910,6 +10608,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9931,6 +10634,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -9957,6 +10665,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -9978,6 +10691,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10011,6 +10729,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10032,6 +10755,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10065,6 +10793,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10086,6 +10819,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10119,6 +10857,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10140,6 +10883,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10166,6 +10914,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10187,6 +10940,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10213,6 +10971,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10234,6 +10997,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10259,6 +11027,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10280,6 +11053,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10311,6 +11089,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10332,6 +11115,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10361,6 +11149,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10382,6 +11175,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10411,6 +11209,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10432,6 +11235,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10460,6 +11268,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10481,6 +11294,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10511,6 +11329,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10532,6 +11355,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10562,6 +11390,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10583,6 +11416,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10613,6 +11451,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10634,6 +11477,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10662,6 +11510,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10683,6 +11536,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10709,6 +11567,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10730,6 +11593,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10757,6 +11625,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10778,6 +11651,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10805,6 +11683,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10826,6 +11709,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10853,6 +11741,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10874,6 +11767,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10901,6 +11799,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10922,6 +11825,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10950,6 +11858,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -10971,6 +11884,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -10999,6 +11917,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11020,6 +11943,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11048,6 +11976,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11069,6 +12002,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11098,6 +12036,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11119,6 +12062,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11149,6 +12097,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11170,6 +12123,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11195,6 +12153,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11216,6 +12179,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11243,6 +12211,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11264,6 +12237,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11290,6 +12268,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11311,6 +12294,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11338,6 +12326,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11359,6 +12352,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11386,6 +12384,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11407,6 +12410,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11432,6 +12440,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11453,6 +12466,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11481,6 +12499,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11502,6 +12525,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11527,6 +12555,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11548,6 +12581,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11574,6 +12612,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11595,6 +12638,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11622,6 +12670,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11643,6 +12696,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11669,6 +12727,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11690,6 +12753,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11717,6 +12785,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11738,6 +12811,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11765,6 +12843,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11786,6 +12869,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11813,6 +12901,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11834,6 +12927,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11860,6 +12958,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11881,6 +12984,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11912,6 +13020,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11933,6 +13046,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -11964,6 +13082,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -11985,6 +13108,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12017,6 +13145,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12038,6 +13171,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12067,6 +13205,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12088,6 +13231,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12115,6 +13263,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12136,6 +13289,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12164,6 +13322,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12185,6 +13348,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12213,6 +13381,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12234,6 +13407,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12262,6 +13440,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12283,6 +13466,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12309,6 +13497,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12330,6 +13523,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12356,6 +13554,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12377,6 +13580,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12405,6 +13613,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12426,6 +13639,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12455,6 +13673,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12476,6 +13699,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12509,6 +13737,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12530,6 +13763,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12557,6 +13795,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12578,6 +13821,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12603,6 +13851,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12624,6 +13877,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12655,6 +13913,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12676,6 +13939,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12707,6 +13975,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12728,6 +14001,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12759,6 +14037,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12780,6 +14063,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12805,6 +14093,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12826,6 +14119,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12852,6 +14150,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12873,6 +14176,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12900,6 +14208,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12921,6 +14234,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -12948,6 +14266,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -12969,6 +14292,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -13000,6 +14328,11 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
             } | null;
             subject: {
                 type: components["schemas"]["NotificationSubjectType"];
@@ -13021,6 +14354,11 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
                 } | null;
                 /** Format: date-time */
                 at: string;
@@ -13143,11 +14481,7 @@ export interface components {
             };
             push: components["schemas"]["ChannelMode"];
             email: components["schemas"]["ChannelMode"];
-            updatedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            updatedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             updatedAt: string | null;
         };
@@ -13182,11 +14516,7 @@ export interface components {
         PushDelivery: {
             /** Format: uuid */
             id: string;
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             device: string;
             kind: components["schemas"]["PushDeliveryKind"];
             notification: components["schemas"]["Notification"] | null;
@@ -13230,11 +14560,7 @@ export interface components {
             name: string;
             brandKind: components["schemas"]["BrandFileKind"] | null;
             confidential: boolean;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -13261,18 +14587,10 @@ export interface components {
             url: string | null;
             linkLabel: string | null;
             note: string | null;
-            uploadedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            uploadedBy: components["schemas"]["PersonRef"];
             isFinal: boolean;
             finalSource: components["schemas"]["FileFinalSource"] | null;
-            finalMarkedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            finalMarkedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             finalMarkedAt: string | null;
             /** Format: date-time */
@@ -13375,11 +14693,7 @@ export interface components {
             name: string;
             brandKind: components["schemas"]["BrandFileKind"] | null;
             confidential: boolean;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -13413,6 +14727,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             tradeName: string;
+            /** Format: uuid */
+            imageId: string | null;
             sector: string | null;
             status: components["schemas"]["ClientStatus"];
             isHealthcare: boolean;
@@ -13420,6 +14736,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             hasApprovalContact: boolean;
@@ -13432,6 +14750,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             tradeName: string;
+            /** Format: uuid */
+            imageId: string | null;
             sector: string | null;
             status: components["schemas"]["ClientStatus"];
             isHealthcare: boolean;
@@ -13439,6 +14759,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             hasApprovalContact: boolean;
@@ -13597,11 +14919,7 @@ export interface components {
             occurredAt: string;
             channel: components["schemas"]["NoteChannel"];
             summary: string;
-            author: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            author: components["schemas"]["PersonRef"];
             contact: {
                 /** Format: uuid */
                 id: string;
@@ -13637,15 +14955,15 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
+            /** Format: uuid */
+            imageId: string | null;
             projectManager: {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             departments: components["schemas"]["DepartmentCode"][];
@@ -13661,19 +14979,26 @@ export interface components {
             };
             progress: number | null;
         };
+        ClientRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            imageId: string | null;
+        };
         ProjectDetail: {
             /** Format: uuid */
             id: string;
             name: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
+            /** Format: uuid */
+            imageId: string | null;
             projectManager: {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             departments: components["schemas"]["DepartmentCode"][];
@@ -13688,6 +15013,8 @@ export interface components {
                 total: number;
             };
             progress: number | null;
+            /** Format: uuid */
+            ownImageId: string | null;
             description: string | null;
             milestones: components["schemas"]["Milestone"][];
             tasks: components["schemas"]["TaskCounts"];
@@ -13717,11 +15044,7 @@ export interface components {
             overdue: boolean;
             /** Format: date-time */
             doneAt: string | null;
-            doneBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            doneBy: components["schemas"]["PersonRef"] | null;
             tasks: components["schemas"]["TaskCounts"];
             money?: {
                 installmentMinor: number | null;
@@ -13825,16 +15148,10 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            accountManager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
+            /** Format: uuid */
+            imageId: string | null;
+            accountManager: components["schemas"]["PersonRef"];
             departments: components["schemas"]["DepartmentCode"][];
             status: components["schemas"]["RetainerStatus"];
             /** Format: date */
@@ -13912,16 +15229,10 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            accountManager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
+            /** Format: uuid */
+            imageId: string | null;
+            accountManager: components["schemas"]["PersonRef"];
             departments: components["schemas"]["DepartmentCode"][];
             status: components["schemas"]["RetainerStatus"];
             /** Format: date */
@@ -13932,6 +15243,8 @@ export interface components {
             currentCycle: components["schemas"]["CurrentCycle"] | null;
             /** Format: date */
             nextCycleStart: string | null;
+            /** Format: uuid */
+            ownImageId: string | null;
             /** Format: date */
             startDate: string;
             /** Format: date */
@@ -14103,11 +15416,7 @@ export interface components {
             id: string;
             delta: number;
             reason: string;
-            author: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            author: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
         };
@@ -14216,20 +15525,12 @@ export interface components {
             status: components["schemas"]["AmendmentStatus"];
             reason: string;
             lines: components["schemas"]["AmendmentLine"][];
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            createdBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
             decision: {
                 approved: boolean;
-                by: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                by: components["schemas"]["PersonRef"];
                 /** Format: date-time */
                 at: string;
                 note: string | null;
@@ -14329,20 +15630,12 @@ export interface components {
             status: components["schemas"]["AmendmentStatus"];
             reason: string;
             lines: components["schemas"]["AmendmentLine"][];
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            createdBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
             decision: {
                 approved: boolean;
-                by: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                by: components["schemas"]["PersonRef"];
                 /** Format: date-time */
                 at: string;
                 note: string | null;
@@ -14364,11 +15657,7 @@ export interface components {
                 name: string;
                 currency: components["schemas"]["Currency"];
             };
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
         };
         /** @enum {string} */
         ExtraWorkBilling: "unbilled" | "billed" | "waived";
@@ -14396,11 +15685,7 @@ export interface components {
                 name: string;
                 archived: boolean;
             } | null;
-            loggedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            loggedBy: components["schemas"]["PersonRef"];
             billingStatus: components["schemas"]["ExtraWorkBilling"];
             billingNote: string | null;
             /** Format: date-time */
@@ -14449,11 +15734,7 @@ export interface components {
             articles: components["schemas"]["ContractArticle"][];
             /** Format: date-time */
             updatedAt: string;
-            updatedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            updatedBy: components["schemas"]["PersonRef"] | null;
             canEdit: boolean;
         };
         ContractArticle: {
@@ -14529,11 +15810,7 @@ export interface components {
             } | null;
             /** Format: date-time */
             issuedAt: string | null;
-            issuedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            issuedBy: components["schemas"]["PersonRef"] | null;
             changedSinceIssue: boolean;
             annexes: components["schemas"]["ContractAnnex"][];
             /** Format: date-time */
@@ -14575,11 +15852,7 @@ export interface components {
                 at: string;
                 reason: string;
             } | null;
-            issuedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            issuedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -14632,11 +15905,7 @@ export interface components {
             } | null;
             /** Format: date-time */
             issuedAt: string | null;
-            issuedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            issuedBy: components["schemas"]["PersonRef"] | null;
             changedSinceIssue: boolean;
             annexes: components["schemas"]["ContractAnnex"][];
             /** Format: date-time */
@@ -14791,6 +16060,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
                 inDepartment: boolean;
             } | null;
@@ -14802,26 +16073,14 @@ export interface components {
             dueTime: string | null;
             overdue: boolean;
             blocked: boolean;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            project: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            client: components["schemas"]["ClientRef"] | null;
+            project: components["schemas"]["EngagementRef"] | null;
             milestone: {
                 /** Format: uuid */
                 id: string;
                 name: string;
             } | null;
-            retainer: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            retainer: components["schemas"]["EngagementRef"] | null;
             cycle: {
                 /** Format: uuid */
                 id: string;
@@ -14854,6 +16113,13 @@ export interface components {
         ReviewStage: "internal" | "medical";
         /** @enum {string} */
         TaskPriority: "low" | "normal" | "high" | "urgent";
+        EngagementRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            imageId: string | null;
+        };
         TaskWorkload: {
             week: {
                 /** Format: date */
@@ -14863,11 +16129,7 @@ export interface components {
             };
             departments: components["schemas"]["DepartmentCode"][];
             people: {
-                user: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                user: components["schemas"]["PersonRef"];
                 departments: components["schemas"]["DepartmentCode"][];
                 overdue: number;
                 dueThisWeek: number;
@@ -14913,6 +16175,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
                 inDepartment: boolean;
             } | null;
@@ -14924,26 +16188,14 @@ export interface components {
             dueTime: string | null;
             overdue: boolean;
             blocked: boolean;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            project: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            client: components["schemas"]["ClientRef"] | null;
+            project: components["schemas"]["EngagementRef"] | null;
             milestone: {
                 /** Format: uuid */
                 id: string;
                 name: string;
             } | null;
-            retainer: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            retainer: components["schemas"]["EngagementRef"] | null;
             cycle: {
                 /** Format: uuid */
                 id: string;
@@ -15011,11 +16263,7 @@ export interface components {
                 /** Format: date-time */
                 expiresAt: string;
             } | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            createdBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -15052,22 +16300,14 @@ export interface components {
             done: boolean;
             /** Format: date-time */
             doneAt: string | null;
-            doneBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            doneBy: components["schemas"]["PersonRef"] | null;
         };
         TaskLink: {
             /** Format: uuid */
             id: string;
             url: string;
             label: string | null;
-            addedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            addedBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
         };
@@ -15091,18 +16331,10 @@ export interface components {
                 id: string;
                 title: string;
             } | null;
-            decidedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            decidedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             decidedAt: string | null;
-            author: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            author: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -15114,11 +16346,7 @@ export interface components {
             stage: components["schemas"]["ReviewStage"];
             outcome: components["schemas"]["ReviewOutcome"];
             note: string | null;
-            reviewer: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            reviewer: components["schemas"]["PersonRef"] | null;
             versions: components["schemas"]["ReviewVersion"][];
             clientText: string | null;
             /** Format: date-time */
@@ -15147,11 +16375,7 @@ export interface components {
             };
             note: string | null;
             versions: components["schemas"]["ReviewVersion"][];
-            recordedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            recordedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -15322,6 +16546,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             body: string | null;
@@ -15329,6 +16555,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             }[];
             /** Format: date-time */
@@ -15355,6 +16583,8 @@ export interface components {
             /** Format: uuid */
             userId: string;
             name: string;
+            /** Format: uuid */
+            imageId: string | null;
             title: string | null;
             departments: components["schemas"]["UserDepartment"][];
             status: components["schemas"]["EmployeeStatus"];
@@ -15412,6 +16642,8 @@ export interface components {
             /** Format: uuid */
             userId: string;
             name: string;
+            /** Format: uuid */
+            imageId: string | null;
             title: string | null;
             departments: components["schemas"]["UserDepartment"][];
             status: components["schemas"]["EmployeeStatus"];
@@ -15475,11 +16707,7 @@ export interface components {
             amountMinor: number;
             currency: components["schemas"]["Currency"];
             reason: string;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            createdBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -15633,11 +16861,7 @@ export interface components {
             /** Format: uuid */
             itemId: string | null;
             note: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            createdBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -15709,11 +16933,7 @@ export interface components {
         HrRequest: {
             /** Format: uuid */
             id: string;
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             kind: components["schemas"]["HrRequestKind"];
             leaveType: components["schemas"]["LeaveType"] | null;
             /** Format: date */
@@ -15732,16 +16952,8 @@ export interface components {
             status: components["schemas"]["HrRequestStatus"];
             certificateRequired: boolean;
             documents: number;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            decidedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            createdBy: components["schemas"]["PersonRef"];
+            decidedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             decidedAt: string | null;
             decisionNote: string | null;
@@ -15762,11 +16974,7 @@ export interface components {
         HrRequestDetail: {
             /** Format: uuid */
             id: string;
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             kind: components["schemas"]["HrRequestKind"];
             leaveType: components["schemas"]["LeaveType"] | null;
             /** Format: date */
@@ -15785,16 +16993,8 @@ export interface components {
             status: components["schemas"]["HrRequestStatus"];
             certificateRequired: boolean;
             documents: number;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            decidedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            createdBy: components["schemas"]["PersonRef"];
+            decidedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             decidedAt: string | null;
             decisionNote: string | null;
@@ -15813,11 +17013,7 @@ export interface components {
             requestId: string | null;
             /** Format: uuid */
             itemId: string | null;
-            author: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            author: components["schemas"]["PersonRef"];
             body: string;
             /** Format: date-time */
             createdAt: string;
@@ -16005,6 +17201,8 @@ export interface components {
             /** Format: date-time */
             firstEventAt: string | null;
             workedMinutes: number | null;
+            /** Format: starts_with */
+            photo: string | null;
         };
         /** @enum {string} */
         PartOfDay: "morning" | "afternoon" | "evening";
@@ -16017,18 +17215,10 @@ export interface components {
         AttendancePasskey: {
             /** Format: uuid */
             id: string;
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             deviceLabel: string;
             status: components["schemas"]["PasskeyStatus"];
-            decidedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            decidedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             decidedAt: string | null;
             /** Format: date-time */
@@ -16091,11 +17281,7 @@ export interface components {
         AttendanceItem: {
             /** Format: uuid */
             id: string;
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             /** Format: uuid */
             dayId: string;
             /** Format: date */
@@ -16110,11 +17296,7 @@ export interface components {
             decidedFraction: number | null;
             decidedMinutes: number | null;
             creditedDays: number | null;
-            decidedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            decidedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             decidedAt: string | null;
             decisionNote: string | null;
@@ -16126,11 +17308,7 @@ export interface components {
         AttendanceItemDetail: {
             /** Format: uuid */
             id: string;
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             /** Format: uuid */
             dayId: string;
             /** Format: date */
@@ -16145,11 +17323,7 @@ export interface components {
             decidedFraction: number | null;
             decidedMinutes: number | null;
             creditedDays: number | null;
-            decidedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            decidedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             decidedAt: string | null;
             decisionNote: string | null;
@@ -16187,11 +17361,7 @@ export interface components {
             refusals: components["schemas"]["PunchRefusal"][];
         };
         TodayBoardRow: {
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             state: components["schemas"]["TodayState"];
             late: boolean;
             method: components["schemas"]["PunchMethod"] | null;
@@ -16201,11 +17371,7 @@ export interface components {
         /** @enum {string} */
         TodayState: "in" | "out" | "not_in" | "on_leave" | "holiday" | "off" | "exempt";
         PunchRefusal: {
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             /** Format: date-time */
             at: string;
             /** @enum {string} */
@@ -16223,18 +17389,10 @@ export interface components {
         AttendanceMonth: {
             month: string;
             status: components["schemas"]["AttendanceMonthStatus"];
-            closedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            closedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             closedAt: string | null;
-            reopenedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            reopenedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             reopenedAt: string | null;
             reopenReason: string | null;
@@ -16242,11 +17400,7 @@ export interface components {
         /** @enum {string} */
         AttendanceMonthStatus: "open" | "closed";
         MonthSheetRow: {
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             days: components["schemas"]["MonthSheetDay"][];
             totals: components["schemas"]["AttendanceMonthTotals"];
             pendingRequests: number;
@@ -16311,11 +17465,7 @@ export interface components {
         Post: {
             /** Format: uuid */
             id: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             title: string;
             type: components["schemas"]["PostType"];
             platforms: components["schemas"]["PostPlatform"][];
@@ -16328,6 +17478,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             /** Format: uuid */
@@ -16379,6 +17531,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 healthcare: boolean;
             };
             title: string;
@@ -16393,6 +17547,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
                 inScope: boolean;
             };
@@ -16434,20 +17590,12 @@ export interface components {
             scheduledAt: string | null;
             /** Format: date-time */
             publishedAt: string | null;
-            publishedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            publishedBy: components["schemas"]["PersonRef"] | null;
             publishedLinks: components["schemas"]["PublishedLink"][];
             /** Format: date-time */
             cancelledAt: string | null;
             cancelReason: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -16483,6 +17631,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             } | null;
             status: components["schemas"]["TaskStatus"];
@@ -16499,11 +17649,7 @@ export interface components {
             stage: components["schemas"]["ReviewStage"];
             outcome: components["schemas"]["ReviewOutcome"];
             note: string | null;
-            reviewer: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            reviewer: components["schemas"]["PersonRef"] | null;
             versions: components["schemas"]["ReviewVersion"][];
             caption: string | null;
             hashtags: string | null;
@@ -16528,11 +17674,7 @@ export interface components {
             };
             note: string | null;
             versions: components["schemas"]["ReviewVersion"][];
-            recordedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            recordedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -16599,6 +17741,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
                 inDepartment: boolean;
             } | null;
@@ -16610,26 +17754,14 @@ export interface components {
             dueTime: string | null;
             overdue: boolean;
             blocked: boolean;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            project: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            client: components["schemas"]["ClientRef"] | null;
+            project: components["schemas"]["EngagementRef"] | null;
             milestone: {
                 /** Format: uuid */
                 id: string;
                 name: string;
             } | null;
-            retainer: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            retainer: components["schemas"]["EngagementRef"] | null;
             cycle: {
                 /** Format: uuid */
                 id: string;
@@ -16696,6 +17828,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             } | null;
             /** Format: date-time */
@@ -16707,6 +17841,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             crewCount: number;
@@ -16725,6 +17861,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             } | null;
             /** Format: date-time */
@@ -16737,6 +17875,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             attendeeCount: number;
@@ -16749,11 +17889,7 @@ export interface components {
         CalendarLeave: {
             /** Format: uuid */
             requestId: string;
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             /** Format: date */
             startsOn: string;
             /** Format: date */
@@ -16772,6 +17908,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             } | null;
             invoiceStatus: components["schemas"]["InvoiceStatus"] | null;
@@ -16785,11 +17923,7 @@ export interface components {
             items: components["schemas"]["ScheduleConflict"][];
         };
         ScheduleConflict: {
-            user: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            user: components["schemas"]["PersonRef"];
             kind: components["schemas"]["CalendarItemKind"];
             /** Format: uuid */
             id: string;
@@ -16882,6 +18016,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             } | null;
             /** Format: date-time */
@@ -16893,6 +18029,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             crewCount: number;
@@ -16928,19 +18066,11 @@ export interface components {
             rawFilesUrl: string | null;
             /** Format: date-time */
             completedAt: string | null;
-            completedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            completedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             cancelledAt: string | null;
             cancelReason: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -16952,6 +18082,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             role: components["schemas"]["CrewRole"];
@@ -16965,11 +18097,7 @@ export interface components {
             note: string | null;
             /** Format: date-time */
             doneAt: string | null;
-            doneBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            doneBy: components["schemas"]["PersonRef"] | null;
         };
         /** @description What the caller may do, for the UI */
         ShootPermissions: {
@@ -17057,6 +18185,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             } | null;
             /** Format: date-time */
@@ -17069,6 +18199,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             attendeeCount: number;
@@ -17080,6 +18212,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             }[];
             contacts: {
@@ -17093,11 +18227,7 @@ export interface components {
             /** Format: date-time */
             cancelledAt: string | null;
             cancelReason: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -17138,19 +18268,11 @@ export interface components {
             invoiceFooter: string;
             /** Format: date-time */
             rateUpdatedAt: string | null;
-            rateUpdatedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            rateUpdatedBy: components["schemas"]["PersonRef"] | null;
             rateStale: boolean;
             /** Format: date-time */
             updatedAt: string;
-            updatedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            updatedBy: components["schemas"]["PersonRef"] | null;
             canEdit: boolean;
         };
         ExchangeRate: string;
@@ -17173,16 +18295,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             displayNumber: string | null;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            accountManager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
+            accountManager: components["schemas"]["PersonRef"];
             engagement: components["schemas"]["InvoiceEngagement"] | null;
             origin: components["schemas"]["InvoiceOrigin"];
             currency: components["schemas"]["Currency"];
@@ -17270,16 +18384,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             displayNumber: string | null;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            accountManager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
+            accountManager: components["schemas"]["PersonRef"];
             engagement: components["schemas"]["InvoiceEngagement"] | null;
             origin: components["schemas"]["InvoiceOrigin"];
             currency: components["schemas"]["Currency"];
@@ -17324,26 +18430,14 @@ export interface components {
                 renderedAt: string | null;
                 outdated: boolean;
             } | null;
-            issuedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            issuedBy: components["schemas"]["PersonRef"] | null;
             voided: {
                 /** Format: date-time */
                 at: string;
-                by: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                by: components["schemas"]["PersonRef"];
                 reason: string;
             } | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            createdBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
             permissions: components["schemas"]["InvoicePermissions"];
@@ -17401,21 +18495,13 @@ export interface components {
             receiptPdf: {
                 state: components["schemas"]["QuotePdfState"];
             } | null;
-            recordedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            recordedBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             voided: {
                 /** Format: date-time */
                 at: string;
-                by: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                by: components["schemas"]["PersonRef"];
                 reason: string;
             } | null;
         };
@@ -17536,11 +18622,7 @@ export interface components {
             latest: components["schemas"]["Invoice"][];
         };
         ClientStatement: {
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             billingName: string;
             billingAddress: string | null;
             currency: components["schemas"]["Currency"];
@@ -17614,11 +18696,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             usdMinor: number;
-            loggedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            loggedBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -17920,11 +18998,7 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
-                client: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                client: components["schemas"]["ClientRef"];
             }[];
             /** Format: date-time */
             createdAt: string;
@@ -17965,6 +19039,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             valid: boolean;
@@ -18083,11 +19159,7 @@ export interface components {
             key: string;
             title: string;
             department: components["schemas"]["DepartmentCode"];
-            assignee: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            assignee: components["schemas"]["PersonRef"] | null;
             assigneeReplaced: boolean;
             /** Format: date */
             dueDate: string;
@@ -18145,11 +19217,7 @@ export interface components {
             startDate: string;
             taskCount: number;
             milestonesCreated: number;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            createdBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
             tasks?: components["schemas"]["TemplateRunTask"][];
@@ -18213,11 +19281,7 @@ export interface components {
             discountThresholdPercent: number;
             /** Format: date-time */
             updatedAt: string;
-            updatedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            updatedBy: components["schemas"]["PersonRef"] | null;
             canEdit: boolean;
             canEditThreshold: boolean;
         };
@@ -18243,11 +19307,7 @@ export interface components {
             number: number;
             version: number;
             title: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            client: components["schemas"]["ClientRef"] | null;
             recipient: {
                 /** @enum {string} */
                 kind: "client" | "lead";
@@ -18255,11 +19315,7 @@ export interface components {
                 id: string;
                 name: string;
             };
-            accountManager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            accountManager: components["schemas"]["PersonRef"];
             currency: components["schemas"]["Currency"];
             status: components["schemas"]["QuoteStatus"];
             discountApproval: components["schemas"]["DiscountApproval"];
@@ -18307,11 +19363,7 @@ export interface components {
             number: number;
             version: number;
             title: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            client: components["schemas"]["ClientRef"] | null;
             recipient: {
                 /** @enum {string} */
                 kind: "client" | "lead";
@@ -18319,11 +19371,7 @@ export interface components {
                 id: string;
                 name: string;
             };
-            accountManager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            accountManager: components["schemas"]["PersonRef"];
             currency: components["schemas"]["Currency"];
             status: components["schemas"]["QuoteStatus"];
             discountApproval: components["schemas"]["DiscountApproval"];
@@ -18349,11 +19397,7 @@ export interface components {
                 stage: components["schemas"]["LeadStage"];
             } | null;
             discountDecision: {
-                by: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                by: components["schemas"]["PersonRef"];
                 /** Format: date-time */
                 at: string;
                 note: string | null;
@@ -18366,11 +19410,7 @@ export interface components {
             terms: string | null;
             /** Format: date-time */
             sentAt: string | null;
-            sentBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            sentBy: components["schemas"]["PersonRef"] | null;
             response: {
                 /** Format: date */
                 respondedOn: string;
@@ -18380,18 +19420,10 @@ export interface components {
                     name: string;
                 } | null;
                 note: string | null;
-                by: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                by: components["schemas"]["PersonRef"];
                 rejectionReason: components["schemas"]["QuoteRejectionReason"] | null;
             } | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             lines: components["schemas"]["QuoteLine"][];
@@ -18593,11 +19625,7 @@ export interface components {
             sentOn: string;
             project: {
                 name: string;
-                projectManager: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                } | null;
+                projectManager: components["schemas"]["PersonRef"] | null;
                 departments: components["schemas"]["DepartmentCode"][];
                 /** Format: date */
                 startDate: string;
@@ -18681,21 +19709,13 @@ export interface components {
                 phone: string | null;
                 email: string | null;
             };
-            accountManagers: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            }[];
+            accountManagers: components["schemas"]["PersonRef"][];
             duplicateClients: {
                 /** Format: uuid */
                 id: string;
                 tradeName: string;
                 status: components["schemas"]["ClientStatus"];
-                accountManager: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                accountManager: components["schemas"]["PersonRef"];
             }[];
             noteCount: number;
             quoteCount: number;
@@ -18704,11 +19724,7 @@ export interface components {
                 id: string;
                 tradeName: string;
                 status: components["schemas"]["ClientStatus"];
-                accountManager: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                accountManager: components["schemas"]["PersonRef"];
                 hasContact: boolean;
             } | null;
         };
@@ -18837,6 +19853,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             /** Format: date */
@@ -18847,11 +19865,7 @@ export interface components {
             budgetCurrency: components["schemas"]["Currency"] | null;
             interests: string[];
             quoteCount: number;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            client: components["schemas"]["ClientRef"] | null;
             /** Format: date-time */
             closedAt: string | null;
             /** Format: date-time */
@@ -18876,6 +19890,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 departments: components["schemas"]["DepartmentCode"][];
             }[];
         };
@@ -18905,11 +19921,7 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 displayName: string;
-                owner: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                owner: components["schemas"]["PersonRef"];
                 stage: components["schemas"]["LeadStage"];
                 readable: boolean;
             }[];
@@ -18918,11 +19930,7 @@ export interface components {
                 id: string;
                 tradeName: string;
                 status: components["schemas"]["ClientStatus"];
-                accountManager: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                accountManager: components["schemas"]["PersonRef"];
             }[];
         };
         CreateLead: {
@@ -18969,6 +19977,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             /** Format: date */
@@ -18979,11 +19989,7 @@ export interface components {
             budgetCurrency: components["schemas"]["Currency"] | null;
             interests: components["schemas"]["LeadInterest"][];
             quoteCount: number;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            client: components["schemas"]["ClientRef"] | null;
             /** Format: date-time */
             closedAt: string | null;
             /** Format: date-time */
@@ -19002,16 +20008,8 @@ export interface components {
             ownerCanManage: boolean;
             lostReason: components["schemas"]["LeadLossReason"] | null;
             lostNote: string | null;
-            convertedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            convertedBy: components["schemas"]["PersonRef"] | null;
+            createdBy: components["schemas"]["PersonRef"];
             notes: components["schemas"]["LeadNote"][];
             permissions: components["schemas"]["LeadPermissions"];
         };
@@ -19034,11 +20032,7 @@ export interface components {
             occurredAt: string;
             channel: components["schemas"]["NoteChannel"];
             summary: string;
-            author: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            author: components["schemas"]["PersonRef"];
             canEdit: boolean;
             canArchive: boolean;
         };
@@ -19103,6 +20097,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             /** Format: date */
@@ -19113,11 +20109,7 @@ export interface components {
             budgetCurrency: components["schemas"]["Currency"] | null;
             interests: components["schemas"]["LeadInterest"][];
             quoteCount: number;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            client: components["schemas"]["ClientRef"] | null;
             /** Format: date-time */
             closedAt: string | null;
             /** Format: date-time */
@@ -19136,16 +20128,8 @@ export interface components {
             ownerCanManage: boolean;
             lostReason: components["schemas"]["LeadLossReason"] | null;
             lostNote: string | null;
-            convertedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            convertedBy: components["schemas"]["PersonRef"] | null;
+            createdBy: components["schemas"]["PersonRef"];
             notes: components["schemas"]["LeadNote"][];
             permissions: components["schemas"]["LeadPermissions"];
             rejectedQuotes: string[];
@@ -19202,6 +20186,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
                 inDepartment: boolean;
             } | null;
@@ -19213,26 +20199,14 @@ export interface components {
             dueTime: string | null;
             overdue: boolean;
             blocked: boolean;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
-            project: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            client: components["schemas"]["ClientRef"] | null;
+            project: components["schemas"]["EngagementRef"] | null;
             milestone: {
                 /** Format: uuid */
                 id: string;
                 name: string;
             } | null;
-            retainer: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            retainer: components["schemas"]["EngagementRef"] | null;
             cycle: {
                 /** Format: uuid */
                 id: string;
@@ -19266,11 +20240,7 @@ export interface components {
         ReadyPost: {
             /** Format: uuid */
             id: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             title: string;
             type: components["schemas"]["PostType"];
             platforms: components["schemas"]["PostPlatform"][];
@@ -19283,6 +20253,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             /** Format: uuid */
@@ -19306,11 +20278,7 @@ export interface components {
         ApprovalRequest: {
             /** Format: uuid */
             id: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             contact: {
                 /** Format: uuid */
                 id: string;
@@ -19330,22 +20298,14 @@ export interface components {
             expiresAt: string;
             /** Format: date-time */
             remindedAt: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
         };
         ApprovalRequestDetail: {
             /** Format: uuid */
             id: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             contact: {
                 /** Format: uuid */
                 id: string;
@@ -19359,11 +20319,7 @@ export interface components {
             expiresAt: string;
             /** Format: date-time */
             remindedAt: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             counts: {
@@ -19456,11 +20412,7 @@ export interface components {
         IssuedApprovalRequest: {
             /** Format: uuid */
             id: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             contact: {
                 /** Format: uuid */
                 id: string;
@@ -19474,11 +20426,7 @@ export interface components {
             expiresAt: string;
             /** Format: date-time */
             remindedAt: string | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             counts: {
@@ -19527,11 +20475,7 @@ export interface components {
             };
             note: string | null;
             versions: components["schemas"]["ReviewVersion"][];
-            recordedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            recordedBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
             kind: components["schemas"]["ApprovalItemKind"];
@@ -19614,11 +20558,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             platform: components["schemas"]["AdPlatform"];
             objective: components["schemas"]["AdObjective"];
             funding: components["schemas"]["AdFunding"];
@@ -19631,6 +20571,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             budgetMinor: number;
@@ -19689,11 +20631,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             platform: components["schemas"]["AdPlatform"];
             objective: components["schemas"]["AdObjective"];
             funding: components["schemas"]["AdFunding"];
@@ -19706,6 +20644,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             budgetMinor: number;
@@ -19749,11 +20689,7 @@ export interface components {
             months: components["schemas"]["CampaignMonth"][];
             updates: components["schemas"]["CampaignUpdate"][];
             walletBalanceMinor: number | null;
-            createdBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            createdBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             permissions: components["schemas"]["CampaignPermissions"];
@@ -19779,11 +20715,7 @@ export interface components {
             /** Format: date */
             periodEnd: string;
             note: string;
-            enteredBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            enteredBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -19862,16 +20794,8 @@ export interface components {
             balanceMinor: number;
             lowBalanceThresholdMinor: number | null;
             low: boolean;
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            accountManager: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
+            accountManager: components["schemas"]["PersonRef"];
             /** Format: date */
             lastDepositOn: string | null;
         };
@@ -19886,6 +20810,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
+                /** Format: uuid */
+                imageId: string | null;
                 archived: boolean;
             };
             usesWallet: boolean;
@@ -19947,21 +20873,13 @@ export interface components {
             receiptPdf: {
                 state: components["schemas"]["QuotePdfState"];
             } | null;
-            recordedBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            recordedBy: components["schemas"]["PersonRef"];
             /** Format: date-time */
             createdAt: string;
             voided: {
                 /** Format: date-time */
                 at: string;
-                by: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                by: components["schemas"]["PersonRef"];
                 reason: string;
             } | null;
         };
@@ -20013,11 +20931,7 @@ export interface components {
                 unassigned: number;
             }[];
             retainersBehind: {
-                client: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                client: components["schemas"]["ClientRef"];
                 retainer: {
                     /** Format: uuid */
                     id: string;
@@ -20034,22 +20948,14 @@ export interface components {
                     /** Format: uuid */
                     itemId: string;
                     title: string;
-                    client: {
-                        /** Format: uuid */
-                        id: string;
-                        name: string;
-                    };
+                    client: components["schemas"]["ClientRef"];
                     /** Format: date-time */
                     sentAt: string;
                     expired: boolean;
                 } | null;
             };
             lowWallets: {
-                client: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                client: components["schemas"]["ClientRef"];
                 balanceUsdMinor: number;
             }[];
             leads: {
@@ -20117,11 +21023,7 @@ export interface components {
             };
             unassigned: number;
             people: {
-                user: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                user: components["schemas"]["PersonRef"];
                 overdue: number;
                 dueThisWeek: number;
                 open: number;
@@ -20129,11 +21031,7 @@ export interface components {
         };
         MyClientsDashboard: {
             clients: {
-                client: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                client: components["schemas"]["ClientRef"];
                 retainers: {
                     retainer: {
                         /** Format: uuid */
@@ -20174,6 +21072,8 @@ export interface components {
                         /** Format: uuid */
                         id: string;
                         name: string;
+                        /** Format: uuid */
+                        imageId: string | null;
                         archived: boolean;
                     };
                     measures: components["schemas"]["ProductivityMeasures"];
@@ -20195,16 +21095,8 @@ export interface components {
             invoicedUsdMinor: number;
             collectedUsdMinor: number;
             byClient: {
-                client: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
-                accountManager: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                } | null;
+                client: components["schemas"]["ClientRef"];
+                accountManager: components["schemas"]["PersonRef"] | null;
                 invoicedUsdMinor: number;
                 collectedUsdMinor: number;
                 outstandingUsdMinor: number;
@@ -20223,11 +21115,7 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 number: string;
-                client: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                client: components["schemas"]["ClientRef"];
                 /** Format: date */
                 issuedOn: string;
                 currency: components["schemas"]["Currency"];
@@ -20244,16 +21132,8 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 number: string;
-                client: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
-                accountManager: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                } | null;
+                client: components["schemas"]["ClientRef"];
+                accountManager: components["schemas"]["PersonRef"] | null;
                 currency: components["schemas"]["Currency"];
                 totalMinor: number;
                 paidMinor: number;
@@ -20276,21 +21156,13 @@ export interface components {
         /** @enum {string} */
         AgingBucket: "1_30" | "31_60" | "61_90" | "over_90";
         ClientMonthlyReport: {
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             month: string;
             period: components["schemas"]["ReportPeriod"];
             preliminary: boolean;
             summary: {
                 text: string;
-                updatedBy: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                updatedBy: components["schemas"]["PersonRef"];
                 /** Format: date-time */
                 updatedAt: string;
             } | null;
@@ -20421,18 +21293,10 @@ export interface components {
             month: string;
         };
         CycleReport: {
-            client: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            client: components["schemas"]["ClientRef"];
             summary: {
                 text: string;
-                updatedBy: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                };
+                updatedBy: components["schemas"]["PersonRef"];
                 /** Format: date-time */
                 updatedAt: string;
             } | null;
@@ -20552,7 +21416,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
-            image: string | null;
+            /** Format: uuid */
+            imageId: string | null;
             department: components["schemas"]["DepartmentCode"] | null;
         };
         /** @enum {string} */
@@ -20567,11 +21432,7 @@ export interface components {
         AnnouncementSummary: {
             /** Format: uuid */
             id: string;
-            author: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            author: components["schemas"]["PersonRef"];
             title: string;
             excerpt: string;
             priority: components["schemas"]["NotificationPriority"];
@@ -20611,11 +21472,7 @@ export interface components {
         Announcement: {
             /** Format: uuid */
             id: string;
-            author: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
+            author: components["schemas"]["PersonRef"];
             title: string;
             excerpt: string;
             priority: components["schemas"]["NotificationPriority"];
@@ -20648,11 +21505,7 @@ export interface components {
             audience: components["schemas"]["Audience"] | null;
             /** Format: date-time */
             renotifiedAt: string | null;
-            withdrawnBy: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            } | null;
+            withdrawnBy: components["schemas"]["PersonRef"] | null;
             poll: components["schemas"]["AnnouncementPoll"] | null;
             rights: {
                 edit: boolean;
@@ -20793,11 +21646,7 @@ export interface components {
                 id: string;
                 label: string;
                 votes: number | null;
-                voters: {
-                    /** Format: uuid */
-                    id: string;
-                    name: string;
-                }[] | null;
+                voters: components["schemas"]["PersonRef"][] | null;
             }[];
             voters: number | null;
             myVote: string[];
@@ -20868,7 +21717,8 @@ export interface components {
                     /** Format: uuid */
                     id: string;
                     name: string;
-                    image: string | null;
+                    /** Format: uuid */
+                    imageId: string | null;
                     archived: boolean;
                 };
                 /** Format: date-time */

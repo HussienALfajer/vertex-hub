@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { calendarDateSchema } from './dates.js';
 import { extraWorkBillingSchema } from './extra-work.js';
+import { clientRefSchema, personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryListSchema, sortOrderSchema } from './lists.js';
 import {
   currencySchema,
@@ -124,8 +125,6 @@ export const updateInvoiceSettingsSchema = settingsFieldsSchema
   .meta({ id: 'UpdateInvoiceSettings' });
 
 export type UpdateInvoiceSettings = z.infer<typeof updateInvoiceSettingsSchema>;
-
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
 
 export const invoiceSettingsSchema = settingsFieldsSchema
   .extend({
@@ -352,7 +351,7 @@ export const invoiceSchema = z
     id: z.uuid(),
     /** `INV-2026-0012`; null on drafts. */
     displayNumber: z.string().nullable(),
-    client: namedSchema,
+    client: clientRefSchema,
     accountManager: personSchema,
     engagement: engagementSchema.nullable(),
     origin: invoiceOriginSchema,
@@ -645,7 +644,7 @@ export type StatementRowItem = z.infer<typeof statementRowSchema>;
 
 export const clientStatementSchema = z
   .object({
-    client: namedSchema,
+    client: clientRefSchema,
     /** The billing name, else the trade name. */
     billingName: z.string(),
     billingAddress: z.string().nullable(),

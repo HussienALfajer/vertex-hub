@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { addDays, type CalendarDate, calendarDateSchema, daysInclusive } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
+import { clientRefSchema, personSchema } from './images.js';
 import {
   pageQuerySchema,
   pageSchema,
@@ -440,7 +441,7 @@ export const cycleAdjustmentSchema = z
     id: z.uuid(),
     delta: z.number().int(),
     reason: z.string(),
-    author: z.object({ id: z.uuid(), name: z.string() }),
+    author: personSchema,
     createdAt: z.iso.datetime(),
   })
   .meta({ id: 'CycleAdjustment' });
@@ -822,12 +823,12 @@ export const amendmentSchema = z
     reason: z.string(),
     lines: z.array(amendmentLineSchema),
     /** Null for a system amendment (quote renewal). */
-    createdBy: amendmentPersonSchema.nullable(),
+    createdBy: personSchema.nullable(),
     createdAt: z.iso.datetime(),
     decision: z
       .object({
         approved: z.boolean(),
-        by: amendmentPersonSchema,
+        by: personSchema,
         at: z.iso.datetime(),
         note: z.string().nullable(),
       })
@@ -884,7 +885,7 @@ export type PendingAmendmentListQuery = z.infer<typeof pendingAmendmentListQuery
 export const retainerAmendmentSchema = amendmentSchema
   .extend({
     retainer: amendmentPersonSchema.extend({ currency: currencySchema }),
-    client: amendmentPersonSchema,
+    client: clientRefSchema,
   })
   .meta({ id: 'RetainerAmendment' });
 
@@ -1036,9 +1037,11 @@ export const retainerSchema = z
   .object({
     id: z.uuid(),
     name: z.string(),
-    client: z.object({ id: z.uuid(), name: z.string() }),
+    client: clientRefSchema,
+    /** The effective image (F01C rule 3): its own, else the client's logo; null for the initial. */
+    imageId: z.uuid().nullable(),
     /** The client's account manager, who is responsible for the retainer. */
-    accountManager: z.object({ id: z.uuid(), name: z.string() }),
+    accountManager: personSchema,
     departments: z.array(departmentCodeSchema),
     status: retainerStatusSchema,
     /** With an active or scheduled term, the day after its last term (F05C T3'). */
@@ -1076,6 +1079,8 @@ export type RetainerPermissions = z.infer<typeof retainerPermissionsSchema>;
 
 export const retainerDetailSchema = retainerSchema
   .extend({
+    /** Its own image (F01C); null when it shows the client's logo or its initial. */
+    ownImageId: z.uuid().nullable(),
     startDate: calendarDateSchema,
     endedOn: calendarDateSchema.nullable(),
     /** Non-archived standing lines, by position. */

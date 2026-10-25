@@ -72,7 +72,7 @@ describe('quote term', () => {
     terms: null,
   });
   const html = (months: number) =>
-    quoteHtml(snapshot(months), { draft: false }, { logo: '', fontFaces: '' });
+    quoteHtml(snapshot(months), { draft: false }, { logo: '', fontFaces: '', clientLogo: null });
 
   it('names the months with the Arabic plural', () => {
     expect(html(1)).toContain('مدة الاشتراك: شهر واحد');

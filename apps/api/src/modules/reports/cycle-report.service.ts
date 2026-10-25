@@ -9,6 +9,7 @@ import {
   REPORTS_PDF_JOB,
   type ReportPdfJob,
   type ReportPdfReadyJob,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import { type Database, retainerCycleReports, type Transaction } from '@vertex-hub/db';
 import { eq } from 'drizzle-orm';
@@ -16,12 +17,12 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { JobQueue, payloadHash } from '../../core/jobs/index.js';
 import { ApprovalReports } from '../approvals/index.js';
 import { recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { ShootReports } from '../calendar/index.js';
 import { CampaignReports } from '../campaigns/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import { ContentReports } from '../content/index.js';
-import { GeneratedFiles } from '../files/index.js';
+import { GeneratedFiles, ImagesService } from '../files/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import {
   type CycleClosed,
@@ -68,6 +69,7 @@ export class CycleReportService implements OnModuleInit {
     private readonly notifications: NotificationCenter,
     private readonly closedHooks: CycleClosedHooks,
     private readonly jobs: JobQueue,
+    private readonly images: ImagesService,
   ) {}
 
   onModuleInit(): void {
@@ -266,17 +268,13 @@ export class CycleReportService implements OnModuleInit {
         this.content.planned(client.id, found.next),
         this.shoots.booked(client.id, found.next),
       ]);
-    const [titles, departments, author] = await Promise.all([
+    const [titles, departments, authors] = await Promise.all([
       this.approvals.taskTitles(delivered.map((task) => task.id)),
       this.users.departmentNames(),
-      row?.summary && row.updatedById
-        ? this.users
-            .summaries([row.updatedById])
-            .then((people) => people.get(row.updatedById ?? ''))
-        : null,
+      this.users.summaries(row?.summary && row.updatedById ? [row.updatedById] : []),
     ]);
     const report: Omit<CycleReport, 'empty'> = {
-      client: { id: client.id, name: client.name },
+      client: { id: client.id, name: client.name, imageId: client.imageId },
       retainer: { id: retainer.id, name: retainer.name },
       cycle: { id: cycle.id, number: cycle.number, status: cycle.status },
       period,
@@ -285,7 +283,7 @@ export class CycleReportService implements OnModuleInit {
         row?.summary && row.updatedById
           ? {
               text: row.summary,
-              updatedBy: { id: row.updatedById, name: author?.name ?? '' },
+              updatedBy: personRef(authors, row.updatedById),
               updatedAt: row.updatedAt.toISOString(),
             }
           : null,
@@ -362,8 +360,13 @@ export class CycleReportService implements OnModuleInit {
     return row;
   }
 
-  private async queue(job: ReportPdfJob): Promise<void> {
-    await this.jobs.send(REPORTS_PDF_JOB.queue, job, { retryLimit: REPORTS_PDF_JOB.retryLimit });
+  /** F01C rule 14: with the client's current logo. */
+  private async queue(job: UnqueuedPdfJob<ReportPdfJob>): Promise<void> {
+    const clientLogoKey = await this.images.clientLogoKey(job.snapshot.client.id);
+    const queued: ReportPdfJob = { ...job, clientLogoKey };
+    await this.jobs.send(REPORTS_PDF_JOB.queue, queued, {
+      retryLimit: REPORTS_PDF_JOB.retryLimit,
+    });
   }
 
   private async removeObject(key: string): Promise<void> {

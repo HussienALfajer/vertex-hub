@@ -160,7 +160,7 @@ export class TaskReports {
       people: people.map((person) => {
         const row = counts.get(person.id);
         return {
-          user: { id: person.id, name: person.name },
+          user: { id: person.id, name: person.name, imageId: person.imageId },
           overdue: row?.overdue ?? 0,
           dueThisWeek: row?.dueThisWeek ?? 0,
           open: row?.open ?? 0,

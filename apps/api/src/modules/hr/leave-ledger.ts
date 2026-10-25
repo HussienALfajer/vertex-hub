@@ -13,7 +13,7 @@ import { type Database, leaveLedger, type Transaction } from '@vertex-hub/db';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 
 type Executor = Database | Transaction;
@@ -200,9 +200,7 @@ export class LeaveLedger {
         requestId: row.requestId,
         itemId: row.itemId,
         note: row.note,
-        createdBy: row.createdById
-          ? { id: row.createdById, name: people.get(row.createdById)?.name ?? '' }
-          : null,
+        createdBy: row.createdById ? personRef(people, row.createdById) : null,
         createdAt: row.createdAt.toISOString(),
       })),
     };

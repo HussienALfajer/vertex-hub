@@ -25,6 +25,8 @@ export interface RetainerAccess {
   status: RetainerStatus;
   startDate: string;
   currency: Currency;
+  /** Its own image (F01C), null when it shows the client's logo. */
+  imageId: string | null;
   archivedAt: Date | null;
   client: ClientSummary;
 }
@@ -48,6 +50,7 @@ export async function readableRetainer(
       status: retainers.status,
       startDate: retainers.startDate,
       currency: retainers.currency,
+      imageId: retainers.imageId,
       archivedAt: retainers.archivedAt,
     })
     .from(retainers)

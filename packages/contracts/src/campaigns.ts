@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { type AdCampaignStatus, adCampaignStatusSchema } from './campaign-values.js';
 import { calendarDateSchema } from './dates.js';
+import { clientRefSchema, personSchema } from './images.js';
 import { paymentMethodSchema } from './invoices.js';
 import {
   pageQuerySchema,
@@ -253,7 +254,7 @@ export type PatchCampaignUpdate = z.infer<typeof patchCampaignUpdateSchema>;
 
 // Responses
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
+const namedSchema = z.object({ id: z.uuid(), name: z.string() });
 
 const ownerSchema = personSchema.extend({ archived: z.boolean() });
 
@@ -270,7 +271,7 @@ export const campaignSchema = z
   .object({
     id: z.uuid(),
     name: z.string(),
-    client: personSchema,
+    client: clientRefSchema,
     platform: adPlatformSchema,
     objective: adObjectiveSchema,
     funding: adFundingSchema,
@@ -335,7 +336,7 @@ export const campaignPermissionsSchema = z
 
 export type CampaignPermissions = z.infer<typeof campaignPermissionsSchema>;
 
-const linkSchema = personSchema.extend({ archived: z.boolean() });
+const linkSchema = namedSchema.extend({ archived: z.boolean() });
 
 export const campaignDetailSchema = campaignSchema
   .extend({
@@ -603,7 +604,7 @@ export const walletLedgerRowSchema = z
     /** Spend: the campaign and the update's period. */
     spend: z
       .object({
-        campaign: personSchema,
+        campaign: namedSchema,
         periodStart: calendarDateSchema,
         periodEnd: calendarDateSchema,
       })
@@ -641,7 +642,7 @@ const walletTotalsSchema = z.object({
 
 export const adWalletSchema = walletTotalsSchema
   .extend({
-    client: personSchema.extend({ archived: z.boolean() }),
+    client: clientRefSchema.extend({ archived: z.boolean() }),
     /** Has a non-void deposit (rule 20). */
     usesWallet: z.boolean(),
     from: calendarDateSchema.nullable(),
@@ -674,7 +675,7 @@ export type WalletListQuery = z.infer<typeof walletListQuerySchema>;
 
 export const walletSummarySchema = walletTotalsSchema
   .extend({
-    client: personSchema,
+    client: clientRefSchema,
     accountManager: personSchema,
     lastDepositOn: calendarDateSchema.nullable(),
   })

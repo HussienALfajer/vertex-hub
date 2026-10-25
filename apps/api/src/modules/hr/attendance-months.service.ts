@@ -41,7 +41,7 @@ import { and, asc, eq, gte, inArray, isNull, lt, lte, ne, notInArray } from 'dri
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { NotificationCenter } from '../notifications/index.js';
 import { AttendanceDays, type DayRow } from './attendance-days.js';
 import { holdsAll } from './employee-access.js';
@@ -139,7 +139,7 @@ export class AttendanceMonthsService {
         items.filter((item) => item.date === date && item.status === 'pending').length;
       return [
         {
-          user: { id: profile.id, name: profile.name },
+          user: { id: profile.id, name: profile.name, imageId: profile.imageId },
           days: days.map((day) => ({
             date: day.date,
             kind: day.kind,
@@ -464,7 +464,7 @@ export class AttendanceMonthsService {
       [...data.pendingRequests.map((request) => request.userId), ...items.map((i) => i.userId)],
       executor,
     );
-    const person = (id: string) => ({ id, name: names.get(id)?.name ?? '' });
+    const person = (id: string) => personRef(names, id);
     return [
       ...data.pendingRequests.map(
         (request): MonthPending => ({
@@ -507,8 +507,7 @@ export class AttendanceMonthsService {
       [row?.closedById, row?.reopenedById].filter((id): id is string => !!id),
       executor,
     );
-    const person = (id: string | null | undefined) =>
-      id ? { id, name: names.get(id)?.name ?? '' } : null;
+    const person = (id: string | null | undefined) => (id ? personRef(names, id) : null);
     return {
       month,
       status: row?.status ?? 'open',

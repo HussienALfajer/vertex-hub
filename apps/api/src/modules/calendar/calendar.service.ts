@@ -122,6 +122,7 @@ export class CalendarService {
           ? {
               id: clientId,
               name: clients.get(clientId)?.name ?? '',
+              imageId: clients.get(clientId)?.imageId ?? null,
               archived: clients.get(clientId)?.archived ?? false,
             }
           : null,

@@ -56,6 +56,8 @@ export interface ProjectLink {
   id: string;
   name: string;
   clientId: string;
+  /** The effective image (F01C rule 3): its own, else the client's logo. */
+  imageId: string | null;
   projectManagerId: string;
   status: ProjectStatus;
   startDate: string;
@@ -75,6 +77,8 @@ export interface RetainerLink {
   id: string;
   name: string;
   clientId: string;
+  /** The effective image (F01C rule 3): its own, else the client's logo. */
+  imageId: string | null;
   status: RetainerStatus;
   archived: boolean;
 }
@@ -84,6 +88,8 @@ export interface CycleLink {
   retainerId: string;
   retainerName: string;
   clientId: string;
+  /** The retainer's effective image (F01C rule 3). */
+  imageId: string | null;
   status: CycleStatus;
   number: number;
   periodStart: string;
@@ -179,11 +185,15 @@ export class EngagementDirectory {
         status: projects.status,
         startDate: projects.startDate,
         dueDate: projects.dueDate,
+        imageId: projects.imageId,
         archivedAt: projects.archivedAt,
       })
       .from(projects)
       .where(inArray(projects.id, unique));
-    const rows = options.lock ? await query.for('share') : await query;
+    const rows = await this.withClientLogos(
+      options.lock ? await query.for('share') : await query,
+      executor,
+    );
     return byId(rows.map(({ archivedAt, ...row }) => ({ ...row, archived: !!archivedAt })));
   }
 
@@ -256,11 +266,30 @@ export class EngagementDirectory {
         name: retainers.name,
         clientId: retainers.clientId,
         status: retainers.status,
+        imageId: retainers.imageId,
         archivedAt: retainers.archivedAt,
       })
       .from(retainers)
       .where(inArray(retainers.id, unique));
-    return byId(rows.map(({ archivedAt, ...row }) => ({ ...row, archived: !!archivedAt })));
+    return byId(
+      (await this.withClientLogos(rows, executor)).map(({ archivedAt, ...row }) => ({
+        ...row,
+        archived: !!archivedAt,
+      })),
+    );
+  }
+
+  /** F01C rule 3: a project or retainer without its own image shows its client's logo. */
+  async withClientLogos<T extends { clientId: string; imageId: string | null }>(
+    rows: T[],
+    executor: Executor = this.db,
+  ): Promise<T[]> {
+    const fallbacks = rows.filter((row) => !row.imageId).map((row) => row.clientId);
+    if (fallbacks.length === 0) return rows;
+    const clients = await this.clients.summaries(fallbacks, executor);
+    return rows.map((row) =>
+      row.imageId ? row : { ...row, imageId: clients.get(row.clientId)?.imageId ?? null },
+    );
   }
 
   async cycles(ids: string[], executor: Executor = this.db): Promise<Map<string, CycleLink>> {
@@ -276,13 +305,14 @@ export class EngagementDirectory {
         number: retainerCycles.number,
         periodStart: retainerCycles.periodStart,
         periodEnd: retainerCycles.periodEnd,
+        imageId: retainers.imageId,
         retainerArchivedAt: retainers.archivedAt,
       })
       .from(retainerCycles)
       .innerJoin(retainers, eq(retainers.id, retainerCycles.retainerId))
       .where(inArray(retainerCycles.id, unique));
     return byId(
-      rows.map(({ retainerArchivedAt, ...row }) => ({
+      (await this.withClientLogos(rows, executor)).map(({ retainerArchivedAt, ...row }) => ({
         ...row,
         retainerArchived: !!retainerArchivedAt,
       })),
@@ -454,6 +484,7 @@ export class EngagementDirectory {
       id: retainer.id,
       name: retainer.name,
       clientId: retainer.clientId,
+      imageId: retainer.imageId ?? retainer.client.imageId,
       status: retainer.status,
       archived: !!retainer.archivedAt,
       canManage: retainerPermissions(actor, retainer).canManage,
@@ -474,6 +505,7 @@ export class EngagementDirectory {
       id: retainer.id,
       name: retainer.name,
       clientId: retainer.clientId,
+      imageId: retainer.imageId ?? retainer.client.imageId,
       status: retainer.status,
       archived: false,
     };

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CATALOG_BILLINGS, CATALOG_LIMITS } from './catalog.js';
 import { addDays, calendarDateSchema } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
+import { clientRefSchema, personSchema } from './images.js';
 import { convertLeadSchema, leadConversionPlanSchema, leadStageSchema } from './leads.js';
 import {
   pageQuerySchema,
@@ -216,7 +217,7 @@ export type UpdateQuoteSettings = z.infer<typeof updateQuoteSettingsSchema>;
 export const quoteSettingsSchema = settingsFieldsSchema
   .extend({
     updatedAt: z.iso.datetime(),
-    updatedBy: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    updatedBy: personSchema.nullable(),
     canEdit: z.boolean(),
     canEditThreshold: z.boolean(),
   })
@@ -383,8 +384,6 @@ export type RejectQuoteInput = z.input<typeof rejectQuoteSchema>;
 
 // Responses
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
-
 const sectionTotalsSchema = z
   .object({
     subtotalMinor: minorAmountSchema,
@@ -481,7 +480,7 @@ export const quoteSchema = z
     version: z.number().int().min(1),
     title: z.string(),
     /** Null for a quote on a lead not converted yet. */
-    client: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    client: clientRefSchema.nullable(),
     /** The client, or the lead (its display name) until it is converted (F03 rule 16). */
     recipient: z.object({ kind: z.enum(['client', 'lead']), id: z.uuid(), name: z.string() }),
     /** The client's account manager, or the lead's owner. */
@@ -759,7 +758,7 @@ export const acceptPlanSchema = z
          * The client's account manager; for a lead quote the conversion's default account
          * manager, null when it is still to be chosen.
          */
-        projectManager: acceptPersonSchema.nullable(),
+        projectManager: personSchema.nullable(),
         departments: z.array(departmentCodeSchema),
         startDate: calendarDateSchema,
         /** The latest due date of the selected templates' plans, or start + 30 days. */

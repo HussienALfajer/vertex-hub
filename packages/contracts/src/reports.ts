@@ -13,6 +13,7 @@ import {
 } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import { fileMonthSchema } from './files.js';
+import { clientRefSchema, personSchema } from './images.js';
 import { queryListSchema } from './lists.js';
 import {
   currencySchema,
@@ -118,7 +119,7 @@ export const companyDashboardSchema = z
     /** Open cycles of active retainers with at least one line behind, by client name. */
     retainersBehind: z.array(
       z.object({
-        client: namedSchema,
+        client: clientRefSchema,
         retainer: namedSchema,
         cycleId: z.uuid(),
         linesBehind: countSchema,
@@ -132,7 +133,7 @@ export const companyDashboardSchema = z
         .object({
           itemId: z.uuid(),
           title: z.string(),
-          client: namedSchema,
+          client: clientRefSchema,
           sentAt: z.iso.datetime(),
           /** The link expired before the client answered. */
           expired: z.boolean(),
@@ -141,7 +142,7 @@ export const companyDashboardSchema = z
     }),
     /** Wallets in low state, by client name; the balance may be negative (edge case 11). */
     lowWallets: z.array(
-      z.object({ client: namedSchema, balanceUsdMinor: signedMinorAmountSchema }),
+      z.object({ client: clientRefSchema, balanceUsdMinor: signedMinorAmountSchema }),
     ),
     leads: monthPairSchema(leadMonthSchema),
   })
@@ -206,7 +207,7 @@ export const departmentDashboardSchema = z
     /** As F06 Workload: each non-archived member, counts over all of their open tasks. */
     people: z.array(
       z.object({
-        user: namedSchema,
+        user: personSchema,
         overdue: countSchema,
         dueThisWeek: countSchema,
         open: countSchema,
@@ -224,7 +225,7 @@ export const myClientsDashboardSchema = z
     /** Rows with a problem first, then by client name. */
     clients: z.array(
       z.object({
-        client: namedSchema,
+        client: clientRefSchema,
         /** Active retainers with an open cycle. */
         retainers: z.array(
           z.object({ retainer: namedSchema, completion: completionSchema, behind: z.boolean() }),
@@ -467,7 +468,7 @@ export const productivityReportSchema = z
         /** Non-archived members, then anyone who delivered a task of it in the period, by name. */
         people: z.array(
           z.object({
-            user: namedSchema.extend({ archived: z.boolean() }),
+            user: personSchema.extend({ archived: z.boolean() }),
             measures: productivityMeasuresSchema,
           }),
         ),
@@ -498,8 +499,8 @@ export const revenueReportSchema = z
     /** Clients with something invoiced, collected or outstanding, by name. */
     byClient: z.array(
       z.object({
-        client: namedSchema,
-        accountManager: namedSchema.nullable(),
+        client: clientRefSchema,
+        accountManager: personSchema.nullable(),
         invoicedUsdMinor: minorAmountSchema,
         collectedUsdMinor: minorAmountSchema,
         /** Issued on or before `to`, less payments on or before `to`, at invoice rates. */
@@ -524,7 +525,7 @@ export const revenueReportSchema = z
         id: z.uuid(),
         /** `INV-…`. */
         number: z.string(),
-        client: namedSchema,
+        client: clientRefSchema,
         issuedOn: calendarDateSchema,
         currency: currencySchema,
         totalMinor: minorAmountSchema,
@@ -556,8 +557,8 @@ export const overdueInvoicesReportSchema = z
       z.object({
         id: z.uuid(),
         number: z.string(),
-        client: namedSchema,
-        accountManager: namedSchema.nullable(),
+        client: clientRefSchema,
+        accountManager: personSchema.nullable(),
         currency: currencySchema,
         totalMinor: minorAmountSchema,
         paidMinor: minorAmountSchema,
@@ -608,14 +609,14 @@ const campaignMetricsSchema = z.object({
 
 export const clientMonthlyReportSchema = z
   .object({
-    client: namedSchema,
+    client: clientRefSchema,
     month: reportMonthSchema,
     period: reportPeriodSchema,
     /** The current month (rule 17). */
     preliminary: z.boolean(),
     /** Section 1; null when no text is stored. */
     summary: z
-      .object({ text: z.string(), updatedBy: namedSchema, updatedAt: z.iso.datetime() })
+      .object({ text: z.string(), updatedBy: personSchema, updatedAt: z.iso.datetime() })
       .nullable(),
     /**
      * Section 2, F05C R4: the cycles of non-archived retainers whose period overlaps the month, by

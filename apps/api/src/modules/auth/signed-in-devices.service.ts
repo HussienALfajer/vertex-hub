@@ -70,7 +70,7 @@ export class SignedInDevicesService {
             .select({
               ...sessionColumns,
               name: users.name,
-              image: users.image,
+              imageId: users.imageId,
               departmentCode: departments.code,
               departmentName: departments.name,
             })
@@ -107,7 +107,7 @@ export class SignedInDevicesService {
           continue;
         }
         shared.set(other.userId, {
-          user: { id: other.userId, name: other.name, image: other.image ?? null },
+          user: { id: other.userId, name: other.name, imageId: other.imageId },
           department:
             other.departmentCode && other.departmentName
               ? { code: other.departmentCode, name: other.departmentName }

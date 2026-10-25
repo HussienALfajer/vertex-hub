@@ -9,6 +9,7 @@ import {
   contractPdfStorageKey,
 } from '@vertex-hub/contracts';
 import { ENV, type Env } from '../core/config/env.js';
+import { readClientLogo } from '../pdf/client-logo.js';
 import { storeOnce } from '../pdf/pdf-objects.js';
 import { PdfRenderer } from '../pdf/pdf-renderer.js';
 import { PgBossService } from './pg-boss.service.js';
@@ -62,13 +63,19 @@ export class ContractsPdfJob implements OnApplicationBootstrap {
     return { kind: job.kind, id: job.id, hash: job.hash, file };
   }
 
-  private pdf(job: ContractPdfJob): Promise<Buffer> {
+  private async pdf(job: ContractPdfJob): Promise<Buffer> {
     switch (job.kind) {
       case 'contract':
       case 'contract_draft':
-        return this.renderer.contract(job.snapshot);
+        return this.renderer.contract(
+          job.snapshot,
+          await readClientLogo(this.root, job.clientLogoKey, this.logger),
+        );
       case 'annex':
-        return this.renderer.annex(job.snapshot);
+        return this.renderer.annex(
+          job.snapshot,
+          await readClientLogo(this.root, job.clientLogoKey, this.logger),
+        );
     }
   }
 

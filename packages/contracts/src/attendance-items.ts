@@ -11,13 +11,8 @@ import {
   calendarMonthSchema,
   instantSchema,
 } from './dates.js';
-import {
-  floorHalfDay,
-  hrOpinionSchema,
-  LATENESS_FRACTIONS,
-  type LatenessTier,
-  personRefSchema,
-} from './hr.js';
+import { floorHalfDay, hrOpinionSchema, LATENESS_FRACTIONS, type LatenessTier } from './hr.js';
+import { personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryListSchema, sortOrderSchema } from './lists.js';
 import { optionalText } from './text.js';
 
@@ -204,7 +199,7 @@ export function itemOutcome(
 export const attendanceItemSchema = z
   .object({
     id: z.uuid(),
-    user: personRefSchema,
+    user: personSchema,
     dayId: z.uuid(),
     date: calendarDateSchema,
     kind: attendanceItemKindSchema,
@@ -220,7 +215,7 @@ export const attendanceItemSchema = z
     decidedMinutes: z.number().int().nullable(),
     /** `time_off` only: the days added to the annual balance. */
     creditedDays: z.number().nullable(),
-    decidedBy: personRefSchema.nullable(),
+    decidedBy: personSchema.nullable(),
     decidedAt: instantSchema.nullable(),
     decisionNote: z.string().nullable(),
     createdAt: instantSchema,
@@ -318,7 +313,7 @@ export type TodayBoardQuery = z.infer<typeof todayBoardQuerySchema>;
 
 export const todayBoardRowSchema = z
   .object({
-    user: personRefSchema,
+    user: personSchema,
     state: todayStateSchema,
     late: z.boolean(),
     /** The method of the last live punch today: office, remote, field, shoot or correction. */
@@ -337,7 +332,7 @@ export const PUNCH_REFUSALS = ['INVALID_CODE', 'OFF_OFFICE_NETWORK'] as const;
 /** Rule C6: an office punch refused today, from the audit. */
 export const punchRefusalSchema = z
   .object({
-    user: personRefSchema,
+    user: personSchema,
     at: instantSchema,
     reason: z.enum(PUNCH_REFUSALS),
     ipAddress: z.string().nullable(),

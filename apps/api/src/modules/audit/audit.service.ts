@@ -3,6 +3,7 @@ import type { AuditListQuery, AuditPage } from '@vertex-hub/contracts';
 import { auditEntries, type Database } from '@vertex-hub/db';
 import { and, count, desc, eq, gte, lte, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
+import { AuditActorPhotos } from './audit-actor-photos.js';
 
 /** F17: the pay fields of HR entries, left out for readers without `salaries.read`. */
 const PAY_FIELDS: Readonly<Record<string, readonly string[]>> = {
@@ -21,7 +22,10 @@ function withoutPay(
 
 @Injectable()
 export class AuditService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly photos: AuditActorPhotos,
+  ) {}
 
   /** Entries matching the filters, newest first (ids are UUIDv7, so they sort by time too). */
   async list(query: AuditListQuery, options: { showsPay: boolean }): Promise<AuditPage> {
@@ -44,6 +48,9 @@ export class AuditService {
         .offset((query.page - 1) * query.pageSize),
       this.db.select({ value: count() }).from(auditEntries).where(where),
     ]);
+    const photos = await this.photos.of([
+      ...new Set(rows.flatMap((row) => (row.actorId ? [row.actorId] : []))),
+    ]);
 
     return {
       items: rows.map((row) => ({
@@ -51,6 +58,7 @@ export class AuditService {
         occurredAt: row.occurredAt.toISOString(),
         actorId: row.actorId,
         actorName: row.actorName,
+        actorImageId: row.actorId ? (photos.get(row.actorId) ?? null) : null,
         // Written only through `recordAudit`, which takes the contract types.
         action: row.action as AuditPage['items'][number]['action'],
         entityType: row.entityType as AuditPage['items'][number]['entityType'],

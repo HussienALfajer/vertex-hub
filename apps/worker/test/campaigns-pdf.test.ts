@@ -6,6 +6,7 @@ import {
   type AdDepositReceiptSnapshot,
   type CampaignPdfJob,
   campaignPdfStorageKey,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import { chromium } from 'playwright';
 import { extractText, getDocumentProxy } from 'unpdf';
@@ -15,6 +16,7 @@ import { CampaignsPdfJob } from '../src/jobs/campaigns-pdf.job.js';
 import type { PgBossService } from '../src/jobs/pg-boss.service.js';
 import { adDepositReceiptHtml } from '../src/pdf/campaign-templates.js';
 import { loadAssets, PdfRenderer } from '../src/pdf/pdf-renderer.js';
+import { expectLogo, expectMissingLogoLogged, expectNoLogo, LOGO } from './client-logo-cases.js';
 
 const id = '0190a3c2-0000-7000-8000-0000000000ab';
 
@@ -54,7 +56,7 @@ describe('campaigns.pdf', () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  async function render(payload: CampaignPdfJob): Promise<string> {
+  async function render(payload: UnqueuedPdfJob<CampaignPdfJob>): Promise<string> {
     const result = await job.render(payload);
     expect(result).toMatchObject({ kind: payload.kind, id: payload.id, hash: payload.hash });
     expect(result.file?.storageKey).toBe(campaignPdfStorageKey(payload));
@@ -101,7 +103,7 @@ describe('campaigns.pdf', () => {
   });
 
   it('is safe to run twice: the second run reuses the file', async () => {
-    const payload: CampaignPdfJob = {
+    const payload: UnqueuedPdfJob<CampaignPdfJob> = {
       kind: 'ad_deposit_receipt',
       id,
       hash: 'c'.repeat(64),
@@ -139,5 +141,23 @@ describe('campaigns.pdf', () => {
     } finally {
       await browser.close();
     }
+  });
+
+  it("prints the client's logo beside the client's name, and the name alone without (F01C)", async () => {
+    const assets = await loadAssets();
+    expectLogo(adDepositReceiptHtml(deposit, { ...assets, clientLogo: LOGO }));
+    expectNoLogo(adDepositReceiptHtml(deposit, assets));
+  });
+
+  it('renders without a logo file that is gone, and logs it (F01C)', async () => {
+    await expectMissingLogoLogged((clientLogoKey) =>
+      job.render({
+        kind: 'ad_deposit_receipt',
+        id,
+        hash: '9'.repeat(64),
+        snapshot: deposit,
+        clientLogoKey,
+      }),
+    );
   });
 });

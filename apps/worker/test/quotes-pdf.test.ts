@@ -11,6 +11,7 @@ import type { PgBossService } from '../src/jobs/pg-boss.service.js';
 import { QuotesPdfJob } from '../src/jobs/quotes-pdf.job.js';
 import { loadAssets, PdfRenderer } from '../src/pdf/pdf-renderer.js';
 import { quoteHtml } from '../src/pdf/quote-template.js';
+import { expectLogo, expectMissingLogoLogged, expectNoLogo, LOGO } from './client-logo-cases.js';
 
 const quoteId = '0190a3c2-0000-7000-8000-0000000000aa';
 const hash = 'b'.repeat(64);
@@ -129,5 +130,17 @@ describe('quotes.pdf', () => {
 
   it('refuses a payload that is not a quote render', async () => {
     await expect(job.render({ quoteId, draft: false, hash })).rejects.toThrow();
+  });
+
+  it("prints the client's logo beside the client's name, and the name alone without (F01C)", async () => {
+    const assets = await loadAssets();
+    expectLogo(quoteHtml(snapshot, { draft: false }, { ...assets, clientLogo: LOGO }));
+    expectNoLogo(quoteHtml(snapshot, { draft: false }, assets));
+  });
+
+  it('renders without a logo file that is gone, and logs it (F01C)', async () => {
+    await expectMissingLogoLogged((clientLogoKey) =>
+      job.render({ quoteId, draft: false, hash: '9'.repeat(64), snapshot, clientLogoKey }),
+    );
   });
 });

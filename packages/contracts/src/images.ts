@@ -71,3 +71,24 @@ export type Image = z.infer<typeof imageSchema>;
 export function imagePath(id: string, size: ImageSize): string {
   return `/api/images/${id}/${size}`;
 }
+
+/** A record shown with an avatar elsewhere: its name and current image, null for the initial. */
+const imageRefSchema = z.object({ id: z.uuid(), name: z.string(), imageId: z.uuid().nullable() });
+
+/** A user as other records show them, with their photo: the one person reference (F01C). */
+export const personSchema = imageRefSchema.meta({ id: 'PersonRef' });
+
+export type PersonRef = z.infer<typeof personSchema>;
+
+/** A client as other records show them, with its logo. */
+export const clientRefSchema = imageRefSchema.meta({ id: 'ClientRef' });
+
+export type ClientRef = z.infer<typeof clientRefSchema>;
+
+/**
+ * A project or retainer as other records show them, with its effective image: its own, else its
+ * client's logo (rule 3).
+ */
+export const engagementRefSchema = imageRefSchema.meta({ id: 'EngagementRef' });
+
+export type EngagementRef = z.infer<typeof engagementRefSchema>;

@@ -17,7 +17,7 @@ import {
 import { ApprovalReports } from '../approvals/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
 import { CampaignReports } from '../campaigns/index.js';
-import { ClientDirectory } from '../clients/index.js';
+import { ClientDirectory, clientRef } from '../clients/index.js';
 import { InvoiceReports } from '../invoices/index.js';
 import { LeadReports } from '../leads/index.js';
 import { EngagementReports } from '../projects/index.js';
@@ -70,7 +70,7 @@ export class DashboardService {
       ...lowWallets.map((row) => row.clientId),
       ...(waiting.oldest ? [waiting.oldest.clientId] : []),
     ]);
-    const client = (id: string) => ({ id, name: names.get(id)?.name ?? '' });
+    const client = (id: string) => clientRef(names, id);
     const byName = (a: { client: { name: string } }, b: { client: { name: string } }) =>
       a.client.name.localeCompare(b.client.name, 'ar');
     const leadMonth = (counts: { new: number; won: number; lost: number }) => ({
@@ -184,7 +184,7 @@ export class DashboardService {
         : null;
       const lowWallet = lowWallets ? low.has(client.id) : null;
       return {
-        client: { id: client.id, name: client.name },
+        client: { id: client.id, name: client.name, imageId: client.imageId },
         retainers,
         openProjects: projects.get(client.id) ?? 0,
         approvals: {

@@ -9,7 +9,7 @@ import { type Database, leadNotes, leads, type Transaction } from '@vertex-hub/d
 import { and, eq, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { actorOf, holdsAll } from './lead-access.js';
 import {
   assertChangeable,
@@ -81,7 +81,12 @@ export class LeadNotesService {
           after: { ...identity(lead), nextFollowUpOn: input.nextFollowUpOn },
         });
       }
-      return noteOf(actor, lead, note, { id: actor.id, name: actor.name });
+      return noteOf(
+        actor,
+        lead,
+        note,
+        personRef(await this.users.summaries([actor.id], tx), actor.id),
+      );
     });
   }
 
@@ -167,7 +172,7 @@ export class LeadNotesService {
     note: LeadNoteRow,
     executor: Database | Transaction,
   ): Promise<LeadNote> {
-    const author = (await this.users.summaries([note.authorId], executor)).get(note.authorId);
-    return noteOf(actor, lead, note, { id: note.authorId, name: author?.name ?? '' });
+    const authors = await this.users.summaries([note.authorId], executor);
+    return noteOf(actor, lead, note, personRef(authors, note.authorId));
   }
 }

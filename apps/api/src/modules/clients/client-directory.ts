@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ClientStatus } from '@vertex-hub/contracts';
+import type { ClientRef, ClientStatus } from '@vertex-hub/contracts';
 import { clientContacts, clients, type Database, type Transaction } from '@vertex-hub/db';
 import { and, asc, eq, getTableName, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
@@ -38,9 +38,17 @@ export interface ContractParty {
   } | null;
 }
 
+/** A client as a contract's `clientRefSchema` shows it; a missing one keeps its id with no name. */
+export const clientRef = (clients: ReadonlyMap<string, ClientSummary>, id: string): ClientRef => {
+  const client = clients.get(id);
+  return { id, name: client?.name ?? '', imageId: client?.imageId ?? null };
+};
+
 export interface ClientSummary {
   id: string;
   name: string;
+  /** The current logo (F01C). */
+  imageId: string | null;
   status: ClientStatus;
   archived: boolean;
   accountManagerId: string;
@@ -310,6 +318,7 @@ const toContact = ({
 const summaryColumns = {
   id: clients.id,
   tradeName: clients.tradeName,
+  imageId: clients.imageId,
   status: clients.status,
   archivedAt: clients.archivedAt,
   accountManagerId: clients.accountManagerId,
@@ -319,6 +328,7 @@ const summaryColumns = {
 function toSummary(row: {
   id: string;
   tradeName: string;
+  imageId: string | null;
   status: ClientStatus;
   archivedAt: Date | null;
   accountManagerId: string;
@@ -327,6 +337,7 @@ function toSummary(row: {
   return {
     id: row.id,
     name: row.tradeName,
+    imageId: row.imageId,
     status: row.status,
     archived: !!row.archivedAt,
     accountManagerId: row.accountManagerId,

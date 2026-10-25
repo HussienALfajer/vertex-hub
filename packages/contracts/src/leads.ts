@@ -18,6 +18,7 @@ import {
   workDaysBefore,
 } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
+import { clientRefSchema, personSchema } from './images.js';
 import {
   pageQuerySchema,
   pageSchema,
@@ -393,7 +394,7 @@ export type UpdateLeadNote = z.infer<typeof updateLeadNoteSchema>;
 
 // Responses
 
-const personSchema = z.object({ id: z.uuid(), name: z.string() });
+const namedSchema = z.object({ id: z.uuid(), name: z.string() });
 
 const ownerSchema = personSchema.extend({ archived: z.boolean() });
 
@@ -420,7 +421,7 @@ export const leadSchema = z
     /** Quote numbers written on the lead (non-archived latest versions). */
     quoteCount: z.number().int().min(0),
     /** The created or linked client of a won lead. */
-    client: personSchema.nullable(),
+    client: clientRefSchema.nullable(),
     closedAt: z.iso.datetime().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
@@ -618,7 +619,7 @@ export type LeadOwnerOptions = z.infer<typeof leadOwnerOptionsSchema>;
  * pick (owner decision); non-archived, by name.
  */
 export const leadInterestOptionsSchema = z
-  .object({ services: z.array(personSchema), packages: z.array(personSchema) })
+  .object({ services: z.array(namedSchema), packages: z.array(namedSchema) })
   .meta({
     id: 'LeadInterestOptions',
     description: 'Non-archived catalog services and packages a lead may ask for, by name',

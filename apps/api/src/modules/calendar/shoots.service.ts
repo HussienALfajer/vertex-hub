@@ -12,6 +12,7 @@ import {
   CALENDAR_LIMITS,
   type CreateShoot,
   calendarDay,
+  type PersonRef,
   type ScheduleConflict,
   SHOOT_DEPARTMENT,
   type Shoot,
@@ -48,6 +49,7 @@ import { changedFields, recordAudit } from '../audit/index.js';
 import {
   type CurrentUserInfo,
   lockAccessChanges,
+  personRef,
   ResponsibilityRegistry,
   UserDirectory,
 } from '../auth/index.js';
@@ -223,13 +225,16 @@ export class ShootsService implements OnModuleInit {
         title: row.title,
         type: row.type,
         status: row.status,
-        client: client ? { id: client.id, name: client.name, archived: client.archived } : null,
+        client: client
+          ? { id: client.id, name: client.name, imageId: client.imageId, archived: client.archived }
+          : null,
         startsAt: row.startsAt.toISOString(),
         endsAt: row.endsAt.toISOString(),
         location: row.location,
         lead: {
           id: lead?.userId ?? row.createdById,
           name: leadUser?.name ?? '',
+          imageId: leadUser?.imageId ?? null,
           archived: leadUser?.archived ?? false,
         },
         crewCount: crew.length + row.externalCrew.length,
@@ -266,7 +271,7 @@ export class ShootsService implements OnModuleInit {
     const task = tasks.get(shoot.taskId);
     if (!item || !task) throw new NotFoundException();
     const editingTask = shoot.editingTaskId ? tasks.get(shoot.editingTaskId) : undefined;
-    const person = (userId: string) => ({ id: userId, name: people.get(userId)?.name ?? '' });
+    const person = (userId: string) => personRef(people, userId);
     const live = shoot.status === 'scheduled' && !shoot.archivedAt;
     const scope = coversClient(actor, 'shoots.manage', client);
     const isLead = leadOf(crew)?.userId === actor.id;
@@ -650,7 +655,7 @@ export class ShootsService implements OnModuleInit {
       return updated;
     });
     const people = await this.users.summaries(shot.doneById ? [shot.doneById] : []);
-    return toShot(shot, (userId) => ({ id: userId, name: people.get(userId)?.name ?? '' }));
+    return toShot(shot, (userId) => personRef(people, userId));
   }
 
   async archive(actor: CurrentUserInfo, id: string): Promise<ShootDetail> {
@@ -826,7 +831,7 @@ export const noticeShoot = (
 
 const toShot = (
   shot: typeof shootShots.$inferSelect,
-  person: (userId: string) => { id: string; name: string },
+  person: (userId: string) => PersonRef,
 ): Shot => ({
   id: shot.id,
   position: shot.position,

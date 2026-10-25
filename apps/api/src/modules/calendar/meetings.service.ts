@@ -27,6 +27,7 @@ import { changedFields, recordAudit } from '../audit/index.js';
 import {
   type CurrentUserInfo,
   lockAccessChanges,
+  personRef,
   ResponsibilityRegistry,
   UserDirectory,
 } from '../auth/index.js';
@@ -130,7 +131,9 @@ export class MeetingsService implements OnModuleInit {
         id: row.id,
         title: row.title,
         status: row.status,
-        client: client ? { id: client.id, name: client.name, archived: client.archived } : null,
+        client: client
+          ? { id: client.id, name: client.name, imageId: client.imageId, archived: client.archived }
+          : null,
         startsAt: row.startsAt.toISOString(),
         endsAt: row.endsAt.toISOString(),
         location: row.location,
@@ -138,6 +141,7 @@ export class MeetingsService implements OnModuleInit {
         organizer: {
           id: row.organizerId,
           name: organizer?.name ?? '',
+          imageId: organizer?.imageId ?? null,
           archived: organizer?.archived ?? false,
         },
         attendeeCount: (attendees.get(row.id) ?? []).length,
@@ -169,6 +173,7 @@ export class MeetingsService implements OnModuleInit {
       attendees: attendeeIds.map((userId) => ({
         id: userId,
         name: people.get(userId)?.name ?? '',
+        imageId: people.get(userId)?.imageId ?? null,
         archived: people.get(userId)?.archived ?? false,
       })),
       contacts: contactIds.flatMap((contactId) => {
@@ -195,7 +200,7 @@ export class MeetingsService implements OnModuleInit {
         : [],
       cancelledAt: meeting.cancelledAt?.toISOString() ?? null,
       cancelReason: meeting.cancelReason,
-      createdBy: { id: meeting.createdById, name: people.get(meeting.createdById)?.name ?? '' },
+      createdBy: personRef(people, meeting.createdById),
       createdAt: meeting.createdAt.toISOString(),
       updatedAt: meeting.updatedAt.toISOString(),
       permissions: {

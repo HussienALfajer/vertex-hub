@@ -7,6 +7,7 @@ import {
   type ContractPdfJob,
   type ContractSnapshot,
   contractPdfStorageKey,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import { chromium } from 'playwright';
 import { extractText, getDocumentProxy } from 'unpdf';
@@ -16,6 +17,7 @@ import { ContractsPdfJob } from '../src/jobs/contracts-pdf.job.js';
 import type { PgBossService } from '../src/jobs/pg-boss.service.js';
 import { annexHtml, contractHtml } from '../src/pdf/contract-templates.js';
 import { loadAssets, PdfRenderer } from '../src/pdf/pdf-renderer.js';
+import { expectLogo, expectMissingLogoLogged, expectNoLogo, LOGO } from './client-logo-cases.js';
 
 const id = '0190a3c2-0000-7000-8000-0000000000c5';
 
@@ -170,7 +172,7 @@ describe('contracts.pdf (F05C K6, K10)', () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  async function render(payload: ContractPdfJob) {
+  async function render(payload: UnqueuedPdfJob<ContractPdfJob>) {
     const result = await job.render(payload);
     expect(result).toMatchObject({ kind: payload.kind, id: payload.id, hash: payload.hash });
     expect(result.file?.storageKey).toBe(contractPdfStorageKey(payload));
@@ -232,7 +234,7 @@ describe('contracts.pdf (F05C K6, K10)', () => {
   });
 
   it('is safe to run twice: the second run reuses the file', async () => {
-    const payload: ContractPdfJob = {
+    const payload: UnqueuedPdfJob<ContractPdfJob> = {
       kind: 'contract',
       id,
       hash: 'd'.repeat(64),
@@ -256,5 +258,20 @@ describe('contracts.pdf (F05C K6, K10)', () => {
     const assets = await loadAssets();
     await screenshot(contractHtml(contract, assets), 'contract-pdf-page');
     await screenshot(annexHtml(annex, assets), 'contract-annex-pdf-page');
+  });
+
+  it("prints the client's logo beside the client's name, and the name alone without (F01C)", async () => {
+    const assets = await loadAssets();
+    const withLogo = { ...assets, clientLogo: LOGO };
+    expectLogo(contractHtml(contract, withLogo));
+    expectLogo(annexHtml(annex, withLogo));
+    expectNoLogo(contractHtml(contract, assets));
+    expectNoLogo(annexHtml(annex, assets));
+  });
+
+  it('renders without a logo file that is gone, and logs it (F01C)', async () => {
+    await expectMissingLogoLogged((clientLogoKey) =>
+      job.render({ kind: 'annex', id, hash: '9'.repeat(64), snapshot: annex, clientLogoKey }),
+    );
   });
 });

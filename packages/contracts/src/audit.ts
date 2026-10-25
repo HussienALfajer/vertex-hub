@@ -381,6 +381,8 @@ export const auditEntrySchema = z
     occurredAt: z.iso.datetime(),
     actorId: z.uuid().nullable(),
     actorName: z.string().nullable(),
+    /** The actor's current photo (F01C); null for the system or without a photo. */
+    actorImageId: z.uuid().nullable(),
     action: auditActionSchema,
     entityType: auditEntityTypeSchema,
     entityId: z.uuid(),

@@ -7,6 +7,7 @@ import {
   type CycleReportSnapshot,
   type ReportPdfJob,
   reportPdfStorageKey,
+  type UnqueuedPdfJob,
 } from '@vertex-hub/contracts';
 import { chromium } from 'playwright';
 import { extractText, getDocumentProxy } from 'unpdf';
@@ -16,19 +17,20 @@ import type { PgBossService } from '../src/jobs/pg-boss.service.js';
 import { ReportsPdfJob } from '../src/jobs/reports-pdf.job.js';
 import { loadAssets, PdfRenderer } from '../src/pdf/pdf-renderer.js';
 import { clientReportHtml, cycleReportHtml } from '../src/pdf/report-templates.js';
+import { expectLogo, expectMissingLogoLogged, expectNoLogo, LOGO } from './client-logo-cases.js';
 
 const id = '0190a3c2-0000-7000-8000-0000000000cd';
 const uuid = (n: number) => `0190a3c2-0000-7000-8000-${String(n).padStart(12, '0')}`;
 
 const report: ClientReportSnapshot = {
   companyDetails: 'فيرتكس ميديا\nدمشق - المزة',
-  client: { id: uuid(1), name: 'مطعم الياسمين' },
+  client: { id: uuid(1), name: 'مطعم الياسمين', imageId: null },
   month: '2026-09',
   period: { from: '2026-09-01', to: '2026-09-30' },
   preliminary: false,
   summary: {
     text: 'شهر جيد: ارتفع التفاعل على المنشورات.',
-    updatedBy: { id: uuid(2), name: 'سارة' },
+    updatedBy: { id: uuid(2), name: 'سارة', imageId: null },
     updatedAt: '2026-10-01T09:00:00.000Z',
   },
   retainers: [
@@ -175,7 +177,7 @@ describe('reports.pdf', () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  async function render(payload: ReportPdfJob): Promise<string> {
+  async function render(payload: UnqueuedPdfJob<ReportPdfJob>): Promise<string> {
     const result = await job.render(payload);
     expect(result).toMatchObject({ kind: payload.kind, id: payload.id, hash: payload.hash });
     expect(result.file?.storageKey).toBe(reportPdfStorageKey(payload));
@@ -228,7 +230,7 @@ describe('reports.pdf', () => {
   });
 
   it('is safe to run twice: the second run reuses the file', async () => {
-    const payload: ReportPdfJob = {
+    const payload: UnqueuedPdfJob<ReportPdfJob> = {
       kind: 'client_report',
       id,
       hash: 'c'.repeat(64),
@@ -280,5 +282,26 @@ describe('reports.pdf', () => {
     it('lays out the cycle report in print media (the RTL screenshot)', async () => {
       await screenshot(cycleReportHtml(cycleReport, await loadAssets()), 'cycle-report-pdf-page');
     });
+  });
+
+  it("prints the client's logo beside the client's name, and the name alone without (F01C)", async () => {
+    const assets = await loadAssets();
+    const withLogo = { ...assets, clientLogo: LOGO };
+    expectLogo(clientReportHtml(report, withLogo));
+    expectLogo(cycleReportHtml(cycleReport, withLogo));
+    expectNoLogo(clientReportHtml(report, assets));
+    expectNoLogo(cycleReportHtml(cycleReport, assets));
+  });
+
+  it('renders without a logo file that is gone, and logs it (F01C)', async () => {
+    await expectMissingLogoLogged((clientLogoKey) =>
+      job.render({
+        kind: 'client_report',
+        id,
+        hash: '9'.repeat(64),
+        snapshot: report,
+        clientLogoKey,
+      }),
+    );
   });
 });

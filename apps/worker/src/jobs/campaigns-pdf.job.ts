@@ -9,6 +9,7 @@ import {
   campaignPdfStorageKey,
 } from '@vertex-hub/contracts';
 import { ENV, type Env } from '../core/config/env.js';
+import { readClientLogo } from '../pdf/client-logo.js';
 import { storeOnce } from '../pdf/pdf-objects.js';
 import { PdfRenderer } from '../pdf/pdf-renderer.js';
 import { PgBossService } from './pg-boss.service.js';
@@ -58,8 +59,11 @@ export class CampaignsPdfJob implements OnApplicationBootstrap {
   /** Writes the PDF once per payload hash; a rerun finds it and reports the same file. */
   async render(data: unknown): Promise<CampaignPdfReadyJob> {
     const job = campaignPdfJobSchema.parse(data);
-    const file = await storeOnce(this.root, campaignPdfStorageKey(job), () =>
-      this.renderer.adDepositReceipt(job.snapshot),
+    const file = await storeOnce(this.root, campaignPdfStorageKey(job), async () =>
+      this.renderer.adDepositReceipt(
+        job.snapshot,
+        await readClientLogo(this.root, job.clientLogoKey, this.logger),
+      ),
     );
     return { kind: job.kind, id: job.id, hash: job.hash, file };
   }

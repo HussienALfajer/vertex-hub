@@ -35,6 +35,7 @@ const departmentFields = {
   name: departments.name,
   managerId: managers.id,
   managerName: managers.name,
+  managerImageId: managers.imageId,
   memberCount,
 };
 
@@ -68,6 +69,7 @@ export class DepartmentsService {
       .select({
         id: users.id,
         name: users.name,
+        imageId: users.imageId,
         title: users.title,
         isPrimary: departmentMembers.isPrimary,
         hasPassword,
@@ -221,13 +223,16 @@ function toDepartment(row: {
   name: string;
   managerId: string | null;
   managerName: string | null;
+  managerImageId: string | null;
   memberCount: number;
 }): DepartmentResponse {
   return {
     id: row.id,
     code: row.code,
     name: row.name,
-    manager: row.managerId ? { id: row.managerId, name: row.managerName ?? '' } : null,
+    manager: row.managerId
+      ? { id: row.managerId, name: row.managerName ?? '', imageId: row.managerImageId }
+      : null,
     memberCount: row.memberCount,
   };
 }

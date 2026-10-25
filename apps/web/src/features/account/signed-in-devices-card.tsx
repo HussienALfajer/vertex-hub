@@ -258,7 +258,7 @@ function SharedWith({ device }: { device: SignedInDevice }) {
         <ul className="flex flex-col gap-2">
           {device.sharedWith.map((shared) => (
             <li key={shared.user.id} className="flex items-start gap-2">
-              <Avatar name={shared.user.name} src={shared.user.image} size="sm" />
+              <Avatar name={shared.user.name} size="sm" />
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="flex items-start gap-1.5">
                   <span>

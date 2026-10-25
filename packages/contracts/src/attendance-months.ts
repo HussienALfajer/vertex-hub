@@ -15,7 +15,8 @@ import {
   instantSchema,
   lastOfMonth,
 } from './dates.js';
-import { LEAVE_TYPES, type LeaveType, type LeaveUnit, personRefSchema, sumDays } from './hr.js';
+import { LEAVE_TYPES, type LeaveType, type LeaveUnit, sumDays } from './hr.js';
+import { personSchema } from './images.js';
 
 /*
  * HR attendance months (spec F17 part D, rules D1–D5): the month sheet, closing a month with its
@@ -37,10 +38,10 @@ export const attendanceMonthSchema = z
   .object({
     month: calendarMonthSchema,
     status: attendanceMonthStatusSchema,
-    closedBy: personRefSchema.nullable(),
+    closedBy: personSchema.nullable(),
     closedAt: instantSchema.nullable(),
     /** The last reopening, kept after the month is closed again. */
-    reopenedBy: personRefSchema.nullable(),
+    reopenedBy: personSchema.nullable(),
     reopenedAt: instantSchema.nullable(),
     reopenReason: z.string().nullable(),
   })
@@ -206,7 +207,7 @@ export type MonthSheetDay = z.infer<typeof monthSheetDaySchema>;
 
 export const monthSheetRowSchema = z
   .object({
-    user: personRefSchema,
+    user: personSchema,
     /** The employee's days in the month, by date. */
     days: z.array(monthSheetDaySchema),
     /** The frozen summary once the month is closed, the live totals while it is open. */
@@ -240,7 +241,7 @@ export const monthPendingSchema = z
   .object({
     kind: z.enum(['request', 'item']),
     id: z.uuid(),
-    user: personRefSchema,
+    user: personSchema,
     /** The request's first day, or the item's day. */
     date: calendarDateSchema,
   })

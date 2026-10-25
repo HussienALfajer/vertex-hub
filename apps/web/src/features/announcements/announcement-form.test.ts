@@ -29,7 +29,7 @@ const filled = () => ({
 function stored(overrides: Partial<Announcement> = {}): Announcement {
   return {
     id: '0192a000-0000-7000-8000-000000000001',
-    author: { id: '0192a000-0000-7000-8000-000000000002', name: 'سارة' },
+    author: { id: '0192a000-0000-7000-8000-000000000002', name: 'سارة', imageId: null },
     title: 'مواعيد الدوام',
     excerpt: 'مرحبًا',
     priority: 'normal',

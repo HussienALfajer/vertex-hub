@@ -12,6 +12,7 @@ import {
   type AnnouncementPoll,
   businessDate,
   isPollCloseTime,
+  type PersonRef,
   POLL_LIMITS,
   type PollInput,
   type PollVote,
@@ -31,7 +32,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { runEach } from '../../core/jobs/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { DailyReminders, NotificationCenter, TimedNotifications } from '../notifications/index.js';
 import {
   type AnnouncementRow,
@@ -401,7 +402,7 @@ export class AnnouncementPolls implements OnModuleInit {
           this.view(actor, row, receipt, poll, {
             options: options.filter((o) => o.announcementId === poll.announcementId),
             votes: votes.filter((v) => v.announcementId === poll.announcementId),
-            name: (userId) => people.get(userId)?.name ?? '',
+            person: (userId) => personRef(people, userId),
             now,
           }),
         ];
@@ -417,11 +418,11 @@ export class AnnouncementPolls implements OnModuleInit {
     context: {
       options: OptionRow[];
       votes: VoteRow[];
-      name: (userId: string) => string;
+      person: (userId: string) => PersonRef;
       now: Date;
     },
   ): AnnouncementPoll {
-    const { options, votes, name, now } = context;
+    const { options, votes, person, now } = context;
     const closed = isClosed(poll, now);
     const privileged = row.authorId === actor.id || managesAll(actor.access);
     const myVote = votes.filter((v) => v.userId === actor.id).map((v) => v.optionId);
@@ -442,7 +443,7 @@ export class AnnouncementPolls implements OnModuleInit {
           id: option.id,
           label: option.label,
           votes: seesCounts ? chosen.length : null,
-          voters: seesNames ? chosen.map((v) => ({ id: v.userId, name: name(v.userId) })) : null,
+          voters: seesNames ? chosen.map((v) => person(v.userId)) : null,
         };
       }),
       voters: seesCounts ? new Set(votes.map((v) => v.userId)).size : null,

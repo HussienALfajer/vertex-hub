@@ -18,7 +18,7 @@ import {
 import { and, eq, gt, inArray, isNull, lt } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
-import { UserDirectory } from '../auth/index.js';
+import { personRef, UserDirectory } from '../auth/index.js';
 import { LeaveDirectory, LeaveWorkSources } from '../hr/index.js';
 
 type Executor = Database | Transaction;
@@ -109,7 +109,7 @@ export class ScheduleConflicts implements OnModuleInit {
           )
           .map(
             (item): ScheduleConflict => ({
-              user: { id: userId, name: people.get(userId)?.name ?? '' },
+              user: personRef(people, userId),
               kind: item.kind,
               id: item.id,
               title: item.title,

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { calendarDateSchema } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
+import { clientRefSchema, personSchema } from './images.js';
 import {
   pageQuerySchema,
   pageSchema,
@@ -121,7 +122,7 @@ export const milestoneSchema = z
     /** Pending with a due date before today (rule 10). */
     overdue: z.boolean(),
     doneAt: z.iso.datetime().nullable(),
-    doneBy: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    doneBy: personSchema.nullable(),
     tasks: taskCountsSchema,
     /** Present only for callers with money access. */
     money: z.object({ installmentMinor: z.number().int().nullable() }).optional(),
@@ -200,8 +201,10 @@ export const projectSchema = z
   .object({
     id: z.uuid(),
     name: z.string(),
-    client: z.object({ id: z.uuid(), name: z.string() }),
-    projectManager: z.object({ id: z.uuid(), name: z.string(), archived: z.boolean() }),
+    client: clientRefSchema,
+    /** The effective image (F01C rule 3): its own, else the client's logo; null for the initial. */
+    imageId: z.uuid().nullable(),
+    projectManager: personSchema.extend({ archived: z.boolean() }),
     departments: z.array(departmentCodeSchema),
     status: projectStatusSchema,
     startDate: calendarDateSchema,
@@ -237,6 +240,8 @@ export type ProjectPermissions = z.infer<typeof projectPermissionsSchema>;
 
 export const projectDetailSchema = projectSchema
   .extend({
+    /** Its own image (F01C); null when it shows the client's logo or its initial. */
+    ownImageId: z.uuid().nullable(),
     description: z.string().nullable(),
     /** Non-archived milestones, by position. */
     milestones: z.array(milestoneSchema),

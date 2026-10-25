@@ -34,7 +34,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
-import { ClientDirectory } from '../clients/index.js';
+import { ClientDirectory, clientRef } from '../clients/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
@@ -183,7 +183,7 @@ export class TemplatesService {
       steps,
       assignees: assignees.map((a) => ({
         department: a.department,
-        user: people.get(a.userId) ?? { id: a.userId, name: '', archived: true },
+        user: people.get(a.userId) ?? { id: a.userId, name: '', imageId: null, archived: true },
         valid: valid(a),
       })),
       warnings: assignees
@@ -192,7 +192,7 @@ export class TemplatesService {
       linkedRetainers: links.map((link) => ({
         id: link.id,
         name: link.name,
-        client: { id: link.clientId, name: clients.get(link.clientId)?.name ?? '' },
+        client: clientRef(clients, link.clientId),
       })),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -568,7 +568,7 @@ export class TemplatesService {
     );
     const person = (id: string | undefined) => {
       const user = id ? people.get(id) : undefined;
-      return user ? { id: user.id, name: user.name } : null;
+      return user ? { id: user.id, name: user.name, imageId: user.imageId } : null;
     };
     return changed.map((department) => ({
       department,

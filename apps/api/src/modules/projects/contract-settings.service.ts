@@ -209,7 +209,9 @@ export class ContractSettingsService {
       ),
       articles,
       updatedAt: row.updatedAt.toISOString(),
-      updatedBy: updatedBy ? { id: updatedBy.id, name: updatedBy.name } : null,
+      updatedBy: updatedBy
+        ? { id: updatedBy.id, name: updatedBy.name, imageId: updatedBy.imageId }
+        : null,
       canEdit: hasPermission(actor.access, 'catalog.manage'),
     };
   }

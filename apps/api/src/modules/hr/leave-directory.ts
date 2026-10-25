@@ -9,7 +9,7 @@ import type {
 import { type Database, hrRequests, type Transaction } from '@vertex-hub/db';
 import { and, asc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { HrScope, reaches } from './hr-scope.js';
 
 type Executor = Database | Transaction;
@@ -90,7 +90,7 @@ export class LeaveDirectory {
     ]);
     return leaves.map((leave) => ({
       requestId: leave.requestId,
-      user: { id: leave.userId, name: people.get(leave.userId)?.name ?? '' },
+      user: personRef(people, leave.userId),
       startsOn: leave.startsOn,
       endsOn: leave.endsOn,
       half: leave.half,

@@ -25,7 +25,7 @@ import { and, asc, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
-import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import {
   type BillingEngagement,
@@ -166,7 +166,7 @@ export class InvoiceBillingService {
     });
     const billing = await this.clients.billingDetails(client.id);
     return {
-      client: { id: client.id, name: client.name },
+      client: { id: client.id, name: client.name, imageId: client.imageId },
       billingName: billing?.name ?? client.name,
       billingAddress: billing?.address ?? null,
       currency: query.currency,
@@ -372,7 +372,7 @@ export class InvoiceBillingService {
       sypPerUsd: row.sypPerUsd,
       note: row.note,
       usdMinor: toUsdMinor(row.amountMinor, row.currency, row.sypPerUsd),
-      loggedBy: { id: row.loggedById, name: people.get(row.loggedById)?.name ?? '' },
+      loggedBy: personRef(people, row.loggedById),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }));
