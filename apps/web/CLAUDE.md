@@ -25,6 +25,6 @@ React 19 + Vite SPA, Arabic RTL first. Read `brand/identity.md` before visual wo
 
 ## Tests
 - Unit: `*.test.ts` next to the code (Vitest).
-- E2E (`e2e/`): the API is mocked in `e2e/fixtures.ts` with contract types. Every new screen gets RTL screenshots in both themes in `e2e/screens.spec.ts`.
+- E2E (`e2e/`): the API is mocked in `e2e/fixtures.ts` with contract types. Every new screen gets RTL screenshots in both themes in `e2e/screens.spec.ts`. A test that tours many screens sets `test.setTimeout(90_000)`, as the other tours do.
 
-Run: `pnpm --filter @vertex-hub/web test` · `pnpm test:e2e` (builds first) · `pnpm --filter @vertex-hub/web typecheck`.
+Run: `pnpm --filter @vertex-hub/web test` · `pnpm verify apps/web/e2e/<file>.spec.ts [--grep "<title>"]` (builds first; the whole E2E suite runs in CI) · `pnpm --filter @vertex-hub/web typecheck`.

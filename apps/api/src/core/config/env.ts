@@ -11,6 +11,8 @@ export const envSchema = z
     API_HOST: z.string().min(1).default('127.0.0.1'),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+    /** Connections the API's pool may open; the tests lower it so parallel workers fit the server. */
+    DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
     /** Public origin of the web app; the API is served under it at /api (nginx or the Vite proxy). */
     APP_URL: z.url({ protocol: /^https?$/ }).default('http://127.0.0.1:5173'),
     /** Works the pg-boss queues the worker schedules (ADR 0008). `false` in tests. */

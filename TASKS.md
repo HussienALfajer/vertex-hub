@@ -1,27 +1,31 @@
-# TASKS — F01C Profile photos and logos
+# TASKS — Test speed (chore/test-speed)
 
-Spec: `docs/specs/F01C-profile-photos-logos.md` (Approved 2026-10-25) · ADR 0040 (and 0013, 0014, 0018, 0019, 0028, 0036, 0037, 0039).
-Three PRs, each accepted by the owner before the next starts. One session per PR.
+Why and the measurements: report https://claude.ai/artifact/2XVXbE1ni1apsikkARkikz (2026-10-26). One PR.
 
-## PR A1 — images core: contracts, db, api
-- [x] contracts: `images.ts` (`IMAGE_SUBJECT_TYPES`, `IMAGE_SIZES`, `IMAGE_MAX_BYTES`, `IMAGE_MIN_SIDE`, `IMAGE_UPLOAD_SIDE`, accepted types, `setImageSchema`, `imageSchema`, `imagePath`); error codes `IMAGE_TYPE_NOT_ALLOWED`, `IMAGE_TOO_LARGE`, `IMAGE_TOO_SMALL`, `BRAND_FILE_NOT_FOUND` (and any missing `*_ARCHIVED`); audit actions `<user|client|project|retainer>.image_set` / `.image_removed`; notification types `profile_changed`, `client_logo_changed`, `project_image_changed`, `retainer_image_changed` (texts in `messages`); `userListQuerySchema.hasImage`, user list items and the session user gain `imageId`; unit tests; `ar.json` keys
-- [x] db (`/db-migration`): `images` (enums, checks, partial unique indexes, pending index); `image_id` on `users`, `clients`, `projects`, `retainers`; `TABLE_OWNERS`
-- [x] api: `files` `ImagesService` (set, remove, brand version check) and `GET /api/images/:id/:size` (pending `no-store`, ready `immutable`, 404 otherwise, `X-Accel-Redirect`); `files.preview` renders pending images (rule 10); `PUT`/`DELETE …/:id/image` on users, clients, projects, retainers with scopes, archived refusals, audit, notifications (rule 18); `profile_changed` on profile edits by another person (rule 19); `hasImage` filter; `test/images.test.ts`
-- [x] bridge: `openapi:export`, `api:generate`; web typecheck
-- [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-25), PR with auto-merge
+## Phase 1 — test configuration
+- [x] api Vitest: `isolate: false`, `DATABASE_POOL_MAX: '4'` (env var added to the api env schema and `DatabaseModule`)
+- [x] `TEST_WORKERS` from `packages/db/src/test-workers.ts` (env, else half the CPUs from 4 to 12), shared with `scripts/setup-local-db.mjs`
+- [x] the api global setup creates missing worker databases; advisory lock per suite (`holdTestDatabases`) so a second run waits
+- [x] Playwright `trace: 'on-first-retry'`; `test.setTimeout(90_000)` on the attendance and images tours
+- [x] measured: api suite 338 s → 69 s (12 workers), full E2E 11.1 min / 75 timeouts → 4.4 min / 0 after the tour timeouts
+- note: the approvals flake was already fixed in 865c9f9 (nothing to do)
 
-## PR A2 — references, greeting and PDFs: contracts, api, worker
-- [x] contracts: one shared `personSchema` and `clientRefSchema` with `imageId` replacing the duplicated ones; project and retainer references with the effective image (rule 3); the `image` string fields become `imageId`; `attendanceGreetingSchema.photo`; `clientLogoKey` on client-facing PDF payloads
-- [x] api: every reference builder fills `imageId` (projects and retainers fall back to the client's logo through the client directory); greeting photo as a data URL (rule 15); PDF payloads carry `clientLogoKey` (rule 14); tests
-- [x] worker: client block logo tile in each client-facing template, missing file logged; tests with and without the key
-- [x] bridge; `e2e/fixtures.ts` adapted to the new shapes
-- [x] checks, reviewer, acceptance (API at `/api/docs`, owner 2026-10-25), PR with auto-merge
-  - found: the audit screen's actor photo goes through `AuditActorPhotos`, which `auth` registers (`audit` cannot import `auth`); project and retainer details carry `ownImageId` for the A3 header
+## Phase 2 — workflow
+- [x] `scripts/verify.mjs` + `pnpm verify` (logs in `.verify/`, summary, lock, changed E2E specs, drift checks)
+- [x] `.claude/hooks/test-guard.mjs` (PreToolUse Bash) registered in `.claude/settings.json`; `pnpm verify` allowed
+- [x] rewrite `.claude/agents/checker.md` around `pnpm verify`
+- [x] `AGENTS.md`: commands table (verify, E2E row, db:setup-local note), "How to work", "Context economy", "Finishing a task" step 4 (+ CI failure handling in step 7); add `docs/testing.md` to "Source of truth"
+- [x] `CLAUDE.md` Delegation (checker, no edits during runs, Auto-fix after the PR)
+- [x] `.claude/skills/feature-slice/SKILL.md` gates (E2E layer = changed specs via `pnpm verify`; one verify with the reviewer, fix, verify once more); `db-migration` step 4
+- [x] `docs/workflow.md` (steps 3 and 5, layers table, habit 8); `apps/api/CLAUDE.md` Tests (stale "one at a time"); `apps/web/CLAUDE.md` Run line; `docs/architecture.md` lines 121–122
+- [x] new `docs/testing.md`: where each check runs, `pnpm verify`, rules and their enforcement, test databases, E2E policy, CI layout, local machine (Dev Drive/Defender, `max_connections`, stop `pnpm dev`), measurements
 
-## PR A3 — web and E2E
-- [x] `Avatar` takes `src` (white surface, initial while loading and on error); `imageSrc(imageId, size)` helper; `features/images/` dialog (choose, brand files tab, crop with fill/fit zoom, preview sizes, upload progress, errors) with crop-maths unit tests
-- [x] My account (photo, "Add your photo" card), team profile and list ("Without photo" filter), client, project and retainer headers; `imageId` passed to every avatar (spec Screens 6); entrance screen photo; offline cache-first for image routes
-- [x] audit screen: `imageId` and `brandVersionId` as reference fields (not shown as raw ids), `source` labelled for images
-- [x] E2E: `f01c.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`
-- [x] checks, reviewer, acceptance (spec steps 1–8, owner 2026-10-26), PR with auto-merge, `docs/ROADMAP.md`
-  - found: `Slider` added to `packages/ui` for the zoom; image routes cache-first in the service worker, erased with the offline cache on sign-out
+## Phase 3 — CI
+- [x] `.github/workflows/ci.yml`: drop the "worker databases" psql step (global setup creates them); split Tests into other packages + "API tests" shards 1/2 (`turbo run test --filter=@vertex-hub/api -- --shard=N/2`), add it to the `checks` gate needs
+- [x] remote cache wiring: `TURBO_TOKEN` (secret), `TURBO_TEAM`/`TURBO_API` (vars, default `https://vercel.com/api`), `remoteCache.signature` + `TURBO_REMOTE_CACHE_SIGNATURE_KEY`; verified locally that an empty token keeps turbo on the local cache; owner adds the secrets to turn it on
+- [x] fix the ci.yml comment "a merge to main replays its pull request's tasks" (GitHub cache scoping: main cannot read PR caches)
+
+## Finish
+- [x] `docs/ROADMAP.md` (Phase 0 item), `docs/architecture.md` environments
+- [x] `pnpm verify` green (3m 26s with a cold cache, 37 s unchanged); reviewer: five blocking findings fixed (OpenAPI drift fails the run, contracts changes trigger the migration check, the verify lock expires after 30 minutes, `process.env` is put back after each api test file, the TURBO_* secrets reach only the turbo jobs)
+- [x] PR with auto-merge; CI runs the new API shards. Owner, when convenient: Dev Drive or Defender exclusions, and the remote cache secrets (`docs/testing.md`)

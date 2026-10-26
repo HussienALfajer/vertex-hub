@@ -15,7 +15,7 @@ Schema change: **$ARGUMENTS**. Rules: `packages/db/CLAUDE.md` and ADR 0013 (Data
    - `SET NOT NULL`, or a new `NOT NULL` column without a default, on a table that has rows;
    - a removed or renamed enum value.
    Contract steps (drops and renames) ship in a later release, once no deployed code uses the old shape. Data backfills go in a custom migration (`pnpm --filter @vertex-hub/db exec drizzle-kit generate --custom`).
-4. **Test:** `pnpm --filter @vertex-hub/db test` (runs the migrations and `src/conventions.test.ts`), then the tests of every package that uses the tables. Use the `checker` subagent for these runs.
+4. **Test:** `pnpm verify packages/db/src/conventions.test.ts` (runs the migrations and the conventions test), then the test files of the packages that use the tables, with `pnpm verify <files>`.
 5. **Confirm no drift:** running `pnpm db:generate` again reports nothing to migrate.
 6. **Dev database:** `pnpm db:migrate` changes the owner's local data, so ask before running it.
 
