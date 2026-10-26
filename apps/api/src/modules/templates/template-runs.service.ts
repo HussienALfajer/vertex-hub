@@ -22,6 +22,7 @@ import {
   type TemplateRunPage,
   type TemplateRunPlan,
   type TemplateRunTrigger,
+  type TemplateStep,
 } from '@vertex-hub/contracts';
 import {
   type Database,
@@ -54,7 +55,13 @@ import {
   type QuoteRenewalApplied,
   QuoteRenewalHooks,
 } from '../projects/index.js';
-import { TaskGenerator, type TaskQueueEvent, TaskQueueHooks } from '../tasks/index.js';
+import {
+  TaskGenerator,
+  type TaskQueueEvent,
+  TaskQueueHooks,
+  TaskTemplateHooks,
+  type TaskTemplateUse,
+} from '../tasks/index.js';
 import type { NewProjectPlan } from './template-runner.js';
 import { type TemplateForRun, TemplatesService } from './templates.service.js';
 
@@ -96,12 +103,65 @@ export class TemplateRunsService implements OnModuleInit {
     private readonly notifications: NotificationCenter,
     private readonly queueHooks: TaskQueueHooks,
     private readonly holidays: HolidayCalendar,
+    private readonly taskTemplateHooks: TaskTemplateHooks,
   ) {}
 
   onModuleInit(): void {
     this.openedHooks.register((tx, event) => this.onCycleOpened(tx, event));
     this.renewalHooks.register((tx, event) => this.onQuoteRenewal(tx, event));
     this.queueHooks.register((tx, event) => this.onQueueLeft(tx, event));
+    this.taskTemplateHooks.register((tx, use) => this.onTaskTemplateUsed(tx, use));
+  }
+
+  /**
+   * F06B rule D2: a task created from a task template's draft records a manual run, without a
+   * project or a cycle, with the task on the root step and each subtask on the first unused
+   * sub-step of its title and department (else the root, once edited in the wizard). The tasks
+   * module notified the assignees, so the run sends no `tasks_generated`.
+   */
+  private async onTaskTemplateUsed(tx: Transaction, use: TaskTemplateUse): Promise<void> {
+    const template = await this.templates.forRun(tx, use.templateId);
+    if (!template || template.archivedAt) throw new NotFoundException();
+    if (template.kind !== 'task') {
+      throw new CodedException(
+        400,
+        'TEMPLATE_KIND_MISMATCH',
+        'The template is not a task template',
+      );
+    }
+    const [root, ...subSteps] = template.steps;
+    if (!root) throw new NotFoundException();
+    const runId = newId();
+    const run = {
+      templateId: template.id,
+      trigger: 'manual' as const,
+      startDate: businessDate(),
+      taskCount: 1 + use.subtasks.length,
+    };
+    await tx.insert(templateRuns).values({ id: runId, ...run, createdById: use.actor.id });
+    const unused = [...subSteps];
+    const stepOf = (subtask: TaskTemplateUse['subtasks'][number]) => {
+      const index = unused.findIndex(
+        (step) => step.title === subtask.title && step.department === subtask.department,
+      );
+      return index < 0 ? root.id : (unused.splice(index, 1)[0] as TemplateStep).id;
+    };
+    await tx.insert(templateRunTasks).values([
+      { runId, taskId: use.taskId, stepId: root.id, instance: null },
+      ...use.subtasks.map((subtask) => ({
+        runId,
+        taskId: subtask.id,
+        stepId: stepOf(subtask),
+        instance: null,
+      })),
+    ]);
+    await recordAudit(tx, {
+      actor: use.actor,
+      action: 'template_run.created',
+      entityType: 'template_run',
+      entityId: runId,
+      after: { ...run, template: template.name, taskId: use.taskId },
+    });
   }
 
   /** The plan a run would create; nothing is written. */

@@ -285,7 +285,7 @@ F06's status machine and rules stay. What changes is listed here.
    - criteria and checklist;
    - the held files and the questions with their attachments.
 
-   Every part is validated first, and one failure saves nothing (the error names the part). Notifications are sent after commit, as in F06.
+   Every part is validated first, and one failure saves nothing (the error names the part: a coded error without details of its own carries `details: { part: 'subtasks' | 'files' | 'questions', index }`; `ASSIGNEE_ON_LEAVE` keeps the leaves to confirm, and the request's one `acceptLeave` covers the task and its subtasks). Notifications are sent after commit, as in F06; subtasks created with their parent get `task_assigned` or `task_requested`, not `task_blocked` (settled at PR 3).
 3. **Files at creation.**
    - Files are dragged onto the wizard, pasted (a screenshot from the clipboard becomes `Screenshot <date time>.png`) or chosen.
    - Each is uploaded at once through `POST /api/files/uploads` (F10 rule 1) and held. The wizard shows its progress and lets it be removed.
@@ -359,7 +359,7 @@ Schemas live in `packages/contracts/src/tasks.ts` (and `templates.ts` for templa
 | `POST /api/tasks/:id/subtasks/reopen` | parent: `tasks.work` or manage scope | `{ items: [{ id, note }] }` (1–30) | `taskDetailSchema` (parent) | 403, 404, `INVALID_TRANSITION` (parent not in `revisions`, or a subtask not delivered) |
 | `PUT /api/tasks/:id/handover-note` | `tasks.work` (subtask) | `{ note }` | subtask detail | 403, 404, `INVALID_LINK` (not a subtask), `TASK_ARCHIVED` |
 | `POST /api/tasks/:id/criteria` · `PATCH …/criteria/:itemId` · `PUT …/criteria/order` · `POST …/criteria/:itemId/archive` | add, edit, order, archive: manage scope; tick (`done`): `tasks.work` or manage scope | as the checklist endpoints | criterion · list | 403, 404, `LIMIT_REACHED`, `INVALID_ORDER`, `TASK_ARCHIVED` |
-| `POST /api/tasks/readiness` | `tasks.request` | a draft: department, assigneeId, dueDate, dueTime, estimateMinutes, has brief, has brief fields, has references, needsClientApproval, `taskId?` (to leave itself out), `subtasks[]` (the same per subtask) | `{ warnings: [{ target (task or subtask index), code, data }] }` | — |
+| `POST /api/tasks/readiness` | `tasks.request` | a draft: department, assigneeId, dueDate, dueTime, estimateMinutes, `hasBrief`, `hasBriefFields`, `hasReferences`, `hasCriteria`, needsClientApproval, `taskId?` (to leave itself out), `subtasks[]` (the same per subtask) | `{ warnings: [{ subtaskIndex (null for the task), code, leaves? \| estimatedMinutes? and capacityMinutes? \| suggestedDate? }] }` | — |
 | `GET /api/tasks/:id/comments` (changed) | `tasks.read` | + `kind` (`question`), `status` | items + `kind`, `bodyDoc`, `attachments[]`, `question` (addressee, department, status, answeredBy, answeredAt, forwardedFrom), `replies[]` (for questions), `convertedTask` | 404 |
 | `POST /api/tasks/:id/comments` (changed) | `tasks.read` | `{ bodyDoc, questionId?, files[] }` | comment | 404, `INVALID_MENTION`, `TASK_ARCHIVED`, `QUESTION_NOT_FOUND`, `UPLOAD_NOT_FOUND`, `LIMIT_REACHED` |
 | `POST /api/tasks/:id/questions` | `tasks.read` | `{ bodyDoc, addressedUserId \| addressedDepartment, files[] }` | comment (question) | 404, `INVALID_ADDRESSEE`, `INVALID_MENTION`, `TASK_ARCHIVED`, `UPLOAD_NOT_FOUND`, `LIMIT_REACHED` |
@@ -371,14 +371,14 @@ Schemas live in `packages/contracts/src/tasks.ts` (and `templates.ts` for templa
 | `GET /api/tasks/workload` (changed) | `tasks.read` | as F06 | per person + `estimatedMinutes`, `unestimatedCount`, `capacityMinutes` | — |
 | `GET /api/tasks/board` (changed) | `tasks.read` | + `topLevel` | cards + `parent`, `progress`, `openQuestions` | — |
 | `GET /api/tasks/tree` | `tasks.read` | `projectId` or `retainerCycleId` | milestones (or the cycle) → tasks → subtasks, edges (`run`, `manual`), `bottleneckId` | 404 |
-| `POST /api/templates/from-task/:taskId` | assign scope on the task | `{ name, description?, keepAssignees }` | template | 403, 404, `NAME_TAKEN`, `INVALID_LINK` (a subtask) |
-| `POST /api/templates/:id/task-draft` | `templates.read` | `{ startDate? }` | the wizard's draft (create payload with dates, assignees the caller may set) | 404, `TEMPLATE_KIND` |
-| `PATCH /api/templates/:id` and step endpoints (changed) | `templates.manage` or the creator (Roles) | as F07, + the `task` kind's fields and `parentStepId` | template | F07's + `TEMPLATE_KIND` |
+| `POST /api/templates/from-task/:taskId` | assign scope on the task | `{ name, description?, keepAssignees }` | template | 403, 404, `TEMPLATE_NAME_TAKEN`, `INVALID_LINK` (a subtask) |
+| `POST /api/templates/:id/task-draft` | `templates.read` | `{ startDate? }` | the wizard's draft (create payload with dates, assignees the caller may set) | 404, `TEMPLATE_KIND_MISMATCH` |
+| `PATCH /api/templates/:id` and step endpoints (changed) | `templates.manage` or the creator (Roles) | as F07, + the `task` kind's fields and `parentStepId` | template | F07's (`TEMPLATE_KIND_MISMATCH` for a run of a `task` template) |
 
 Notes:
 - Routes owned by `tasks` call `files`' `FileItems` service to attach held uploads inside their transaction (F10 rule 2). The `task` owner policy answers for the `attachment` role.
 - `templates` reads tasks through a new export of `tasks` (`TaskTemplates.snapshot(taskId)`) and creates through the same service as the wizard's save. It never reads task tables.
-- New error codes: `SUBTASK_DEPTH`, `SUBTASKS_OPEN`, `SUBTASK_DUE_AFTER_PARENT`, `TASK_CLOSED`, `STAGE_NOT_EMPTY`, `CRITERIA_OPEN`, `INVALID_ADDRESSEE`, `QUESTION_NOT_FOUND`, `QUESTION_NO_REPLY`, `QUESTION_CLOSED`, `NOT_QUESTION_ASKER`, `TEMPLATE_KIND`.
+- New error codes: `SUBTASK_DEPTH`, `SUBTASKS_OPEN`, `SUBTASK_DUE_AFTER_PARENT`, `TASK_CLOSED`, `STAGE_NOT_EMPTY`, `CRITERIA_OPEN`, `INVALID_ADDRESSEE`, `QUESTION_NOT_FOUND`, `QUESTION_NO_REPLY`, `QUESTION_CLOSED`, `NOT_QUESTION_ASKER`. A template of the wrong kind answers F07's `TEMPLATE_KIND_MISMATCH` (settled at PR 3 instead of a new `TEMPLATE_KIND`).
 
 ## Screens
 All Arabic RTL with logical CSS, `packages/ui` components and tokens, every string through i18next (`tasks.*`, `templates.*`); dates in Asia/Damascus with Latin digits; loading, empty and error states on each.

@@ -3,6 +3,7 @@ import {
   averageOf,
   businessDate,
   DASHBOARD_LIMITS,
+  DEFAULT_ESTIMATE_MINUTES,
   type DepartmentCode,
   type DepartmentDashboard,
   deliveredOnTime,
@@ -169,19 +170,40 @@ export class TaskReports {
     };
   }
 
-  /** F06 Workload: each person's open, overdue and due-in-`week` tasks, in any department. */
+  /**
+   * F06 Workload: each person's open, overdue and due-in-`week` tasks, in any department, and
+   * the estimated minutes of those due in the week (F06B rule C8).
+   */
   async personCounts(
     userIds: readonly string[],
     week: { from: string; to: string },
     now: Date,
-  ): Promise<Map<string, { open: number; overdue: number; dueThisWeek: number }>> {
+  ): Promise<
+    Map<
+      string,
+      {
+        open: number;
+        overdue: number;
+        dueThisWeek: number;
+        estimatedMinutes: number;
+        unestimatedCount: number;
+      }
+    >
+  > {
     if (userIds.length === 0) return new Map();
+    const inWeek = sql`${tasks.dueDate} between ${week.from} and ${week.to}`;
     const rows = await this.db
       .select({
         assigneeId: tasks.assigneeId,
         open: count(),
         overdue: countWhere(overdueSql(now)),
-        dueThisWeek: countWhere(sql`${tasks.dueDate} between ${week.from} and ${week.to}`),
+        dueThisWeek: countWhere(inWeek),
+        // F06B rule C8: tasks without an estimate count the default.
+        estimatedMinutes:
+          sql<number>`coalesce(sum(coalesce(${tasks.estimateMinutes}, ${DEFAULT_ESTIMATE_MINUTES})) filter (where ${inWeek}), 0)`.mapWith(
+            Number,
+          ),
+        unestimatedCount: countWhere(sql`${inWeek} and ${tasks.estimateMinutes} is null`),
       })
       .from(tasks)
       .where(and(this.tasks.visibleSql(), openSql, inArray(tasks.assigneeId, [...userIds])))

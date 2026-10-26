@@ -43,6 +43,7 @@ export * from './retainer-cycles.js';
 export * from './retainers.js';
 export * from './rich-text.js';
 export * from './roles.js';
+export * from './task-briefs.js';
 export * from './tasks.js';
 export * from './templates.js';
 export * from './text.js';

@@ -18,6 +18,7 @@ import { type Database, taskComments, tasks } from '@vertex-hub/db';
 import { and, asc, count, eq, gte, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
+import { WorkCapacity } from '../hr/index.js';
 import { accessColumns } from './task-access.js';
 import { blockedSql } from './task-dependencies.js';
 import { managedDepartments, waitingQuestionsSql } from './task-questions.js';
@@ -42,6 +43,7 @@ export class TaskViewsService {
     private readonly users: UserDirectory,
     private readonly tasks: TasksService,
     private readonly reports: TaskReports,
+    private readonly capacity: WorkCapacity,
   ) {}
 
   /** Columns by status; `delivered` holds the last 14 days, `cancelled` is not shown. */
@@ -93,15 +95,19 @@ export class TaskViewsService {
     };
   }
 
-  /** Per person of the departments: overdue, due in the week and open; unassigned per department. */
+  /**
+   * Per person of the departments: overdue, due in the week and open, and the week's estimated
+   * hours against the capacity of their schedule (F06B rule C8); unassigned per department.
+   */
   async workload(actor: CurrentUserInfo, query: TaskWorkloadQuery): Promise<TaskWorkload> {
     const departments = query.department ?? defaultDepartments(actor);
     const week = weekOf(query.week ?? businessDate());
     const now = new Date();
     const people = await this.users.activeMembers(departments);
     const ids = people.map((person) => person.id);
-    const [byPerson, unassigned] = await Promise.all([
+    const [byPerson, capacity, unassigned] = await Promise.all([
       this.reports.personCounts(ids, week, now),
+      this.capacity.minutes(ids, week.from, week.to),
       this.db
         .select({ department: tasks.department, count: count() })
         .from(tasks)
@@ -127,6 +133,9 @@ export class TaskViewsService {
           overdue: row?.overdue ?? 0,
           dueThisWeek: row?.dueThisWeek ?? 0,
           open: row?.open ?? 0,
+          estimatedMinutes: row?.estimatedMinutes ?? 0,
+          unestimatedCount: row?.unestimatedCount ?? 0,
+          capacityMinutes: capacity.get(person.id) ?? null,
         };
       }),
       unassigned: departments.map((department) => ({

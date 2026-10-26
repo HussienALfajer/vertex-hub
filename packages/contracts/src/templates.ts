@@ -13,9 +13,18 @@ import { clientRefSchema, type PersonRef, personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, sortOrderSchema } from './lists.js';
 import { type DeliverableKind, deliverableKindSchema } from './retainers.js';
 import {
+  departmentBriefFields,
+  estimateMinutesSchema,
+  taskBriefFieldsSchema,
+} from './task-briefs.js';
+import {
   DEFAULT_REVISION_LIMIT,
+  SUBTASK_LIMITS,
+  subtaskRunModeSchema,
   TASK_LIMITS,
+  TASK_TEXT_MAX,
   type TaskPriority,
+  taskBriefDocSchema,
   taskPrioritySchema,
   taskStatusSchema,
   taskTitleSchema,
@@ -24,10 +33,12 @@ import { optionalText } from './text.js';
 
 /*
  * Work templates (spec F07, ADR 0017): an ordered set of task steps that generates a project's
- * tasks and milestones, or each month of a retainer.
+ * tasks and milestones, or each month of a retainer. A `task` template (F06B part D) is one root
+ * step, the task, and its sub-steps, the subtasks, run by a mode with the template's stages.
  */
 
-export const TEMPLATE_KINDS = ['project', 'retainer_cycle'] as const;
+/** `task`: one task with its subtasks, saved from a task and applied from the wizard (F06B). */
+export const TEMPLATE_KINDS = ['project', 'retainer_cycle', 'task'] as const;
 
 export const templateKindSchema = z.enum(TEMPLATE_KINDS).meta({ id: 'TemplateKind' });
 
@@ -53,6 +64,8 @@ export const TEMPLATE_LIMITS = {
   cycleDueDay: 27,
   /** Tasks one run creates at most (rule 14). */
   runTasks: 300,
+  /** Sub-steps of a `task` template (F06B). */
+  subSteps: SUBTASK_LIMITS.subtasks,
 } as const;
 
 // Inputs
@@ -69,8 +82,11 @@ const templateStepInputSchema = z.object({
   key: templateKeySchema,
   /** Project templates: the stage's key, or null for a step without a stage. */
   stageKey: templateKeySchema.nullable().default(null),
+  /** `task` templates: the root step's key on each sub-step; null on the root. */
+  parentKey: templateKeySchema.nullable().default(null),
   title: taskTitleSchema,
-  brief: optionalText(5000).default(null),
+  /** A task's brief, plain text (a `task` template keeps its document in `briefDoc`). */
+  brief: optionalText(TASK_TEXT_MAX.brief).default(null),
   department: departmentCodeSchema,
   /** Work day the task is due, from the run's start; null for repeated steps only. */
   dueDay: z.number().int().min(1).max(TEMPLATE_LIMITS.projectDueDay).nullable().default(null),
@@ -95,6 +111,11 @@ const templateStepInputSchema = z.object({
     .max(TEMPLATE_LIMITS.dependencies)
     .transform((keys) => [...new Set(keys)])
     .default([]),
+  /** `task` templates only (F06B rules C1, C6–C8). */
+  briefDoc: taskBriefDocSchema.nullable().default(null),
+  briefFields: taskBriefFieldsSchema.nullable().default(null),
+  estimateMinutes: estimateMinutesSchema.nullable().default(null),
+  criteria: z.array(z.string().trim().min(1).max(200)).max(TASK_LIMITS.criteria).default([]),
 });
 
 const templateAssigneeInputSchema = z.object({
@@ -105,9 +126,11 @@ const templateAssigneeInputSchema = z.object({
 const templateDocumentSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: optionalText(1000).default(null),
+  /** `task` templates: how the sub-steps run; null for the other kinds. */
+  runMode: subtaskRunModeSchema.nullable().default(null),
   /** Order is the position. */
   stages: z.array(templateStageInputSchema).max(TEMPLATE_LIMITS.stages).default([]),
-  /** Order is the position; at least one step (rule 3). */
+  /** Order is the position; at least one step (rule 3); a `task` template's root comes first. */
   steps: z.array(templateStepInputSchema).min(1).max(TEMPLATE_LIMITS.steps),
   /** Default assignee per department; a department without one defaults to its queue. */
   assignees: z.array(templateAssigneeInputSchema).default([]),
@@ -129,6 +152,22 @@ const repeatKey = (step: { repeatKind: DeliverableKind | null; repeatLabel: stri
 export function templateIssues(kind: TemplateKind, doc: TemplateDocument): TemplateIssue[] {
   const issues: TemplateIssue[] = [];
   const issue = (path: (string | number)[], message: string) => issues.push({ path, message });
+
+  if (kind === 'task') return [...issues, ...taskTemplateIssues(doc)];
+  if (doc.runMode !== null) issue(['runMode'], 'Only task templates have a run mode');
+  doc.steps.forEach((step, i) => {
+    if (
+      step.parentKey !== null ||
+      step.briefDoc !== null ||
+      step.briefFields !== null ||
+      step.estimateMinutes !== null ||
+      step.criteria.length > 0
+    )
+      issue(
+        ['steps', i],
+        'Only task templates have sub-steps, brief fields, estimates or criteria',
+      );
+  });
 
   const stageKeys = new Set<string>();
   const stageNames = new Set<string>();
@@ -191,6 +230,62 @@ export function templateIssues(kind: TemplateKind, doc: TemplateDocument): Templ
 }
 
 /**
+ * F06B part D: a `task` template is its root step first and sub-steps pointing to it, at most
+ * 30; stages only by stages, where each sub-step has one; no repeats or hand-made dependencies
+ * (the mode and the order make the run); the root is due no earlier than any sub-step; brief
+ * fields of each step's department.
+ */
+function taskTemplateIssues(doc: TemplateDocument): TemplateIssue[] {
+  const issues: TemplateIssue[] = [];
+  const issue = (path: (string | number)[], message: string) => issues.push({ path, message });
+  if (doc.runMode === null) issue(['runMode'], 'Required');
+  const byStages = doc.runMode === 'stages';
+  if (!byStages && doc.stages.length > 0) issue(['stages'], 'Stages go with the stages mode');
+  if (doc.stages.length > SUBTASK_LIMITS.stages) issue(['stages'], 'At most 10 stages');
+  const stageKeys = new Set<string>();
+  const stageNames = new Set<string>();
+  doc.stages.forEach((stage, i) => {
+    if (stageKeys.has(stage.key)) issue(['stages', i, 'key'], 'Duplicate key');
+    const name = stage.name.toLocaleLowerCase('ar');
+    if (stageNames.has(name)) issue(['stages', i, 'name'], 'Duplicate stage name');
+    stageKeys.add(stage.key);
+    stageNames.add(name);
+  });
+  const [root, ...subSteps] = doc.steps;
+  if (!root) return issues;
+  if (root.parentKey !== null) issue(['steps', 0, 'parentKey'], 'The first step is the task');
+  if (root.stageKey !== null) issue(['steps', 0, 'stageKey'], 'The task has no stage');
+  if (subSteps.length > TEMPLATE_LIMITS.subSteps)
+    issue(['steps'], `At most ${TEMPLATE_LIMITS.subSteps} subtasks`);
+  const keys = new Set<string>();
+  doc.steps.forEach((step, i) => {
+    const path = (field: string) => ['steps', i, field];
+    if (keys.has(step.key)) issue(path('key'), 'Duplicate key');
+    keys.add(step.key);
+    if (step.repeatKind !== null || step.repeatLabel !== null || step.spreadFromDay !== null)
+      issue(path('repeatKind'), 'Task templates repeat no steps');
+    if (step.dependsOn.length > 0) issue(path('dependsOn'), 'The run mode orders the subtasks');
+    if (step.dueDay === null) issue(path('dueDay'), 'Required');
+    if ('problem' in departmentBriefFields(step.department, step.briefFields))
+      issue(path('briefFields'), 'Not the brief fields of this department');
+    if (i === 0) return;
+    if (step.parentKey !== root.key) issue(path('parentKey'), 'A subtask of the task');
+    if (byStages ? step.stageKey === null || !stageKeys.has(step.stageKey) : step.stageKey !== null)
+      issue(path('stageKey'), byStages ? 'Choose a stage' : 'Stages apply only by stages');
+    if (step.dueDay !== null && root.dueDay !== null && step.dueDay > root.dueDay)
+      issue(path('dueDay'), 'A subtask is due no later than the task');
+  });
+  const used = new Set<DepartmentCode>(doc.steps.map((step) => step.department));
+  const assigned = new Set<DepartmentCode>();
+  doc.assignees.forEach((assignee, i) => {
+    if (!used.has(assignee.department) || assigned.has(assignee.department))
+      issue(['assignees', i, 'department'], 'Not a department of the steps, or repeated');
+    assigned.add(assignee.department);
+  });
+  return issues;
+}
+
+/**
  * A new template. The API checks what needs the database: the name is free
  * (`TEMPLATE_NAME_TAKEN`) and default assignees are members (`INVALID_ASSIGNEE`).
  */
@@ -228,9 +323,15 @@ export const templateStepSchema = z
   .object({
     id: z.uuid(),
     stageId: z.uuid().nullable(),
+    /** `task` templates: the root step on each sub-step. */
+    parentStepId: z.uuid().nullable(),
     position: z.number().int().min(1),
     title: z.string(),
     brief: z.string().nullable(),
+    briefDoc: taskBriefDocSchema.nullable(),
+    briefFields: taskBriefFieldsSchema.nullable(),
+    estimateMinutes: z.number().int().nullable(),
+    criteria: z.array(z.string()),
     department: departmentCodeSchema,
     dueDay: z.number().int().nullable(),
     priority: taskPrioritySchema,
@@ -268,6 +369,7 @@ export const templateDetailSchema = z
     name: z.string(),
     kind: templateKindSchema,
     description: z.string().nullable(),
+    runMode: subtaskRunModeSchema.nullable(),
     stages: z.array(templateStageSchema),
     steps: z.array(templateStepSchema),
     assignees: z.array(templateAssigneeSchema),
@@ -323,6 +425,29 @@ export const templatePageSchema = pageSchema(templateListItemSchema).meta({
 });
 
 export type TemplatePage = z.infer<typeof templatePageSchema>;
+
+// Task templates (F06B part D)
+
+/** Rule D1: "Save as template" on a top-level task. */
+export const templateFromTaskSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    description: optionalText(1000).default(null),
+    /** Keep the task's assignees as the defaults per department. */
+    keepAssignees: z.boolean().default(false),
+  })
+  .meta({ id: 'TemplateFromTask' });
+
+export type TemplateFromTask = z.infer<typeof templateFromTaskSchema>;
+
+export type TemplateFromTaskInput = z.input<typeof templateFromTaskSchema>;
+
+/** Rule D2: the start date of the draft's work days; today when left out. */
+export const taskTemplateDraftInputSchema = z
+  .object({ startDate: calendarDateSchema.optional() })
+  .meta({ id: 'TaskTemplateDraftInput' });
+
+export type TaskTemplateDraftInput = z.infer<typeof taskTemplateDraftInputSchema>;
 // Runs (rules 6–19)
 
 export const templateRunInputSchema = z

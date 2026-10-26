@@ -14,8 +14,10 @@ import {
   timeOfDaySchema,
   workDaysBetween,
 } from './dates.js';
-import { departmentCodeSchema } from './departments.js';
+import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { extraWorkBillingSchema } from './extra-work.js';
+import { fileItemNameSchema } from './files.js';
+import { assigneeLeaveSchema } from './hr.js';
 import { clientRefSchema, engagementRefSchema, personSchema } from './images.js';
 import {
   pageQuerySchema,
@@ -35,6 +37,12 @@ import {
   richTextPlain,
   richTextSchema,
 } from './rich-text.js';
+import {
+  departmentBriefFields,
+  estimateMinutesSchema,
+  type TaskBriefFields,
+  taskBriefFieldsSchema,
+} from './task-briefs.js';
 import { httpUrlSchema, optionalText } from './text.js';
 import {
   revisionDecisionSchema,
@@ -179,6 +187,13 @@ export const SUBTASK_LIMITS = {
   subtasks: 30,
   /** Non-archived stages of one parent. */
   stages: 10,
+} as const;
+
+/** What a task brings at creation (F06B rule C3 and part B); `LIMIT_REACHED` past them. */
+export const CREATE_LIMITS = {
+  /** Files of the task and its new subtasks. */
+  files: 20,
+  questions: 10,
 } as const;
 
 /** The estimate a subtask without one counts for when dates are suggested (F06B rule A5). */
@@ -563,6 +578,35 @@ export const createTaskLinkSchema = z
 
 export type CreateTaskLink = z.infer<typeof createTaskLinkSchema>;
 
+/** Held uploads (F10 rule 1) attached to a comment, a question or a reply (F06B rule B2). */
+const commentFilesSchema = z
+  .array(z.object({ uploadId: z.uuid() }))
+  .max(TASK_LIMITS.attachments)
+  .refine((files) => new Set(files.map((file) => file.uploadId)).size === files.length, {
+    message: 'An upload is listed once',
+  })
+  .default([]);
+
+/** Rule B1: a question to one person or one department. */
+export const taskQuestionInputSchema = z
+  .object({
+    bodyDoc: taskCommentDocSchema,
+    addressedUserId: z.uuid().optional(),
+    addressedDepartment: departmentCodeSchema.optional(),
+    files: commentFilesSchema,
+  })
+  .refine((input) => !input.addressedUserId !== !input.addressedDepartment, {
+    message: 'A question is addressed to one person or one department',
+    path: ['addressedUserId'],
+  })
+  .meta({ id: 'TaskQuestionInput' });
+
+export type TaskQuestionInput = z.infer<typeof taskQuestionInputSchema>;
+
+export type TaskQuestionInputValue = z.input<typeof taskQuestionInputSchema>;
+
+const stageNameSchema = z.string().trim().min(1).max(80);
+
 const taskFieldsSchema = z.object({
   title: taskTitleSchema,
   brief: optionalText(5000),
@@ -588,7 +632,78 @@ const taskFieldsSchema = z.object({
   requestedOn: calendarDateSchema,
   /** Client requests only; `out_of_scope` creates an extra work item (rule 11). */
   requestScope: requestScopeSchema,
+  /** F06B rule C7: the department's brief fields; checked against the department's kind. */
+  briefFields: taskBriefFieldsSchema.nullable(),
+  /** F06B rule C8: the estimate in minutes, a multiple of 30. */
+  estimateMinutes: estimateMinutesSchema.nullable(),
 });
+
+/** Rule C7 on an input: the brief fields belong to the department's kind. */
+function checkBriefFields(
+  input: { department: DepartmentCode; briefFields?: TaskBriefFields | null },
+  ctx: z.RefinementCtx,
+  path: (string | number)[] = [],
+): void {
+  const result = departmentBriefFields(input.department, input.briefFields);
+  if ('problem' in result)
+    ctx.addIssue({
+      code: 'custom',
+      path: [...path, 'briefFields', result.problem],
+      message: 'Not a brief field of this department',
+    });
+}
+
+/** F06B rule C3: the roles a file takes at creation. */
+export const CREATE_FILE_ROLES = ['reference', 'deliverable'] as const;
+
+/**
+ * F06B rule C3: a held upload (F10 rule 1) attached when the task is saved, as a reference (a
+ * moodboard) or as the first version of a deliverable.
+ */
+export const createTaskFileSchema = z
+  .object({
+    uploadId: z.uuid(),
+    role: z.enum(CREATE_FILE_ROLES).default('reference'),
+    /** The item's name; the upload's file name when left out. */
+    name: fileItemNameSchema.optional(),
+  })
+  .meta({ id: 'CreateTaskFile' });
+
+export type CreateTaskFile = z.infer<typeof createTaskFileSchema>;
+
+const criteriaInputSchema = z.array(checklistTextSchema).max(TASK_LIMITS.criteria).default([]);
+
+/**
+ * F06B rule C2: a subtask created with its parent. It takes the parent's client and engagement;
+ * `stageIndex` points into the parent's `stages` while it runs by stages, null otherwise.
+ */
+export const createTaskSubtaskSchema = z
+  .object({
+    title: taskTitleSchema,
+    brief: optionalText(5000).optional(),
+    briefDoc: taskBriefDocSchema.nullable().optional(),
+    briefFields: taskBriefFieldsSchema.nullable().default(null),
+    department: departmentCodeSchema,
+    /** Null leaves it in the department's queue. */
+    assigneeId: z.uuid().nullable().default(null),
+    dueDate: calendarDateSchema,
+    dueTime: timeOfDaySchema.nullable().optional(),
+    priority: taskPrioritySchema.default('normal'),
+    estimateMinutes: estimateMinutesSchema.nullable().default(null),
+    stageIndex: z
+      .number()
+      .int()
+      .min(0)
+      .max(SUBTASK_LIMITS.stages - 1)
+      .nullable()
+      .default(null),
+    checklist: z.array(checklistTextSchema).max(TASK_LIMITS.checklist).default([]),
+    criteria: criteriaInputSchema,
+    files: z.array(createTaskFileSchema).default([]),
+  })
+  .meta({ id: 'CreateTaskSubtask' });
+
+export type CreateTaskSubtask = z.infer<typeof createTaskSubtaskSchema>;
 
 type LinkFields = {
   clientId?: string | null;
@@ -633,6 +748,24 @@ export const createTaskSchema = taskFieldsSchema
     links: z.array(createTaskLinkSchema).default([]),
     /** F06B rule C1: the brief as rich text; when set, `brief` is written from it. */
     briefDoc: taskBriefDocSchema.nullable().optional(),
+    briefFields: taskBriefFieldsSchema.nullable().default(null),
+    estimateMinutes: estimateMinutesSchema.nullable().default(null),
+    /** F06B rule C6: acceptance criteria, ticked before review. */
+    criteria: criteriaInputSchema,
+    /** F06B rule A3: required with subtasks (sequential when left out), dropped without. */
+    runMode: subtaskRunModeSchema.optional(),
+    /** F06B: the stages, in order, while the task runs by stages. */
+    stages: z
+      .array(z.object({ name: stageNameSchema }))
+      .max(SUBTASK_LIMITS.stages)
+      .default([]),
+    subtasks: z.array(createTaskSubtaskSchema).max(SUBTASK_LIMITS.subtasks).default([]),
+    /** F06B rule C3: files of the task itself; a subtask's files go in its `files`. */
+    files: z.array(createTaskFileSchema).default([]),
+    /** F06B rule B1: questions asked with the task. */
+    questions: z.array(taskQuestionInputSchema).max(CREATE_LIMITS.questions).default([]),
+    /** F06B rule D2: the task template the draft came from; the run is recorded with the tasks. */
+    templateId: z.uuid().optional(),
   })
   .partial({ brief: true, dueTime: true, requestedByContactId: true, requestedOn: true })
   .extend({
@@ -659,12 +792,44 @@ export const createTaskSchema = taskFieldsSchema
         path: ['type'],
         message: 'Request fields belong to client requests only',
       });
+    checkBriefFields(task, ctx);
+    const byStages = task.runMode === 'stages' && task.subtasks.length > 0;
+    if (task.stages.length > 0 && !byStages)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['stages'],
+        message: 'Stages go with subtasks run by stages',
+      });
+    task.subtasks.forEach((subtask, index) => {
+      checkBriefFields(subtask, ctx, ['subtasks', index]);
+      const stage = subtask.stageIndex;
+      if (byStages ? stage === null || stage >= task.stages.length : stage !== null)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['subtasks', index, 'stageIndex'],
+          message: byStages ? 'Choose a stage of the task' : 'Stages apply only by stages',
+        });
+    });
+    const files = [...task.files, ...task.subtasks.flatMap((subtask) => subtask.files)];
+    if (files.length > CREATE_LIMITS.files)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['files'],
+        message: `At most ${CREATE_LIMITS.files} files at creation`,
+      });
+    const uploads = [
+      ...files.map((file) => file.uploadId),
+      ...task.questions.flatMap((question) => question.files.map((file) => file.uploadId)),
+    ];
+    if (new Set(uploads).size !== uploads.length)
+      ctx.addIssue({ code: 'custom', path: ['files'], message: 'An upload is listed once' });
   })
   .transform((task) => ({
     ...task,
     needsClientApproval: task.clientId ? (task.needsClientApproval ?? true) : false,
     requestScope:
       task.type === 'client_request' ? (task.requestScope ?? ('in_scope' as const)) : undefined,
+    runMode: task.subtasks.length > 0 ? (task.runMode ?? ('sequential' as const)) : undefined,
   }))
   .meta({ id: 'CreateTask' });
 
@@ -712,12 +877,17 @@ export const createSubtaskSchema = taskFieldsSchema
     stageId: z.uuid().nullable().optional(),
     acceptLeave: z.boolean().optional(),
     briefDoc: taskBriefDocSchema.nullable().optional(),
+    briefFields: taskBriefFieldsSchema.nullable().default(null),
+    estimateMinutes: estimateMinutesSchema.nullable().default(null),
+    criteria: criteriaInputSchema,
+    files: z.array(createTaskFileSchema).max(CREATE_LIMITS.files).default([]),
     /**
      * F06B rule B11: a question or comment of the parent or of one of its subtasks, turned into
      * this subtask; its attachments are copied as references.
      */
     fromCommentId: z.uuid().optional(),
   })
+  .superRefine((subtask, ctx) => checkBriefFields(subtask, ctx))
   .meta({ id: 'CreateSubtask' });
 
 export type CreateSubtask = z.infer<typeof createSubtaskSchema>;
@@ -743,8 +913,6 @@ export const subtaskRunModeInputSchema = z
   .meta({ id: 'SubtaskRunModeInput' });
 
 export type SubtaskRunModeInput = z.infer<typeof subtaskRunModeInputSchema>;
-
-const stageNameSchema = z.string().trim().min(1).max(80);
 
 /** A stage of a parent; `position` (1 = first) puts it among the others, last when left out. */
 export const createTaskStageSchema = z
@@ -925,6 +1093,8 @@ export const taskSchema = z
       total: z.number().int().min(0),
       inSubtasks: z.number().int().min(0),
     }),
+    /** F06B rule C8: the estimate in minutes; null without one. */
+    estimateMinutes: z.number().int().nullable(),
   })
   .meta({ id: 'Task' });
 
@@ -1137,6 +1307,8 @@ export const taskPermissionsSchema = z
     canEditCriteria: z.boolean(),
     /** Tick and untick acceptance criteria: the assignee, department managers, manage scope. */
     canTickCriteria: z.boolean(),
+    /** "Save as template": assign scope on a top-level task (F06B rule D1). */
+    canSaveTemplate: z.boolean(),
   })
   .meta({ id: 'TaskPermissions', description: 'What the caller may do, for the UI' });
 
@@ -1147,6 +1319,8 @@ export const taskDetailSchema = taskSchema
     brief: z.string().nullable(),
     /** The brief as rich text (F06B rule C1); null without a brief. */
     briefDoc: taskBriefDocSchema.nullable(),
+    /** The department's brief fields (F06B rule C7); null when none is filled. */
+    briefFields: taskBriefFieldsSchema.nullable(),
     needsClientApproval: z.boolean(),
     clientRequest: z
       .object({
@@ -1212,6 +1386,38 @@ export const taskDetailSchema = taskSchema
   .meta({ id: 'TaskDetail' });
 
 export type TaskDetail = z.infer<typeof taskDetailSchema>;
+
+/**
+ * F06B rule D2: a task template turned into the wizard's draft, as a create payload: dates from
+ * the start date in work days, default assignees only where the caller may assign.
+ */
+const draftItemSchema = z.object({
+  title: z.string(),
+  brief: z.string().nullable(),
+  briefDoc: taskBriefDocSchema.nullable(),
+  briefFields: taskBriefFieldsSchema.nullable(),
+  department: departmentCodeSchema,
+  /** A default assignee the caller may set and still a member; null for the queue. */
+  assigneeId: z.uuid().nullable(),
+  dueDate: calendarDateSchema,
+  priority: taskPrioritySchema,
+  estimateMinutes: z.number().int().nullable(),
+  checklist: z.array(z.string()),
+  criteria: z.array(z.string()),
+});
+
+export const taskTemplateDraftSchema = draftItemSchema
+  .extend({
+    templateId: z.uuid(),
+    needsClientApproval: z.boolean(),
+    revisionLimit: z.number().int().min(0),
+    runMode: subtaskRunModeSchema.nullable(),
+    stages: z.array(z.object({ name: z.string() })),
+    subtasks: z.array(draftItemSchema.extend({ stageIndex: z.number().int().min(0).nullable() })),
+  })
+  .meta({ id: 'TaskTemplateDraft' });
+
+export type TaskTemplateDraft = z.infer<typeof taskTemplateDraftSchema>;
 
 // Lists
 
@@ -1308,15 +1514,6 @@ export function commentExcerpt(body: string, nameOf: (userId: string) => string)
     : text;
 }
 
-/** Held uploads (F10 rule 1) attached to a comment, a question or a reply (F06B rule B2). */
-const commentFilesSchema = z
-  .array(z.object({ uploadId: z.uuid() }))
-  .max(TASK_LIMITS.attachments)
-  .refine((files) => new Set(files.map((file) => file.uploadId)).size === files.length, {
-    message: 'An upload is listed once',
-  })
-  .default([]);
-
 /** A comment, or a reply to the question `questionId` (F06B rule B3). */
 export const taskCommentInputSchema = z
   .object({
@@ -1336,24 +1533,6 @@ export const taskCommentUpdateSchema = z
   .meta({ id: 'TaskCommentUpdate' });
 
 export type TaskCommentUpdate = z.infer<typeof taskCommentUpdateSchema>;
-
-/** Rule B1: a question to one person or one department. */
-export const taskQuestionInputSchema = z
-  .object({
-    bodyDoc: taskCommentDocSchema,
-    addressedUserId: z.uuid().optional(),
-    addressedDepartment: departmentCodeSchema.optional(),
-    files: commentFilesSchema,
-  })
-  .refine((input) => !input.addressedUserId !== !input.addressedDepartment, {
-    message: 'A question is addressed to one person or one department',
-    path: ['addressedUserId'],
-  })
-  .meta({ id: 'TaskQuestionInput' });
-
-export type TaskQuestionInput = z.infer<typeof taskQuestionInputSchema>;
-
-export type TaskQuestionInputValue = z.input<typeof taskQuestionInputSchema>;
 
 /** Rule B5: a department question forwarded to one of its members. */
 export const forwardQuestionSchema = z.object({ userId: z.uuid() }).meta({ id: 'ForwardQuestion' });
@@ -1553,6 +1732,18 @@ export const taskWorkloadSchema = z
         overdue: z.number().int().min(0),
         dueThisWeek: z.number().int().min(0),
         open: z.number().int().min(0),
+        /**
+         * F06B rule C8: estimated minutes of the person's open tasks due in the week, counting
+         * `DEFAULT_ESTIMATE_MINUTES` for each task without an estimate.
+         */
+        estimatedMinutes: z.number().int().min(0),
+        /** Of those tasks, the ones without an estimate. */
+        unestimatedCount: z.number().int().min(0),
+        /**
+         * The work minutes of the person's F17 schedule in the week, after approved leave and
+         * holidays; null without an employee file (edge case 21).
+         */
+        capacityMinutes: z.number().int().min(0).nullable(),
       }),
     ),
     /** Open tasks nobody is assigned to, per shown department. */
@@ -1590,3 +1781,200 @@ export const myTaskSummarySchema = z
   .meta({ id: 'MyTaskSummary' });
 
 export type MyTaskSummary = z.infer<typeof myTaskSummarySchema>;
+
+// Readiness (F06B rule C5)
+
+export const READINESS_WARNINGS = [
+  'assignee_on_leave',
+  'assignee_overloaded',
+  'due_on_day_off',
+  'brief_missing',
+  'no_criteria',
+] as const;
+
+export const readinessWarningCodeSchema = z
+  .enum(READINESS_WARNINGS)
+  .meta({ id: 'ReadinessWarningCode' });
+
+export type ReadinessWarningCode = z.infer<typeof readinessWarningCodeSchema>;
+
+/** One task of a draft as the readiness check reads it. */
+const readinessItemSchema = z.object({
+  department: departmentCodeSchema,
+  assigneeId: z.uuid().nullable().default(null),
+  dueDate: calendarDateSchema,
+  dueTime: timeOfDaySchema.nullable().optional(),
+  estimateMinutes: estimateMinutesSchema.nullable().default(null),
+  hasBrief: z.boolean().default(false),
+  hasBriefFields: z.boolean().default(false),
+  hasReferences: z.boolean().default(false),
+  hasCriteria: z.boolean().default(false),
+});
+
+/**
+ * A draft before it is saved, or an existing task before it is assigned or re-dated (`taskId`
+ * leaves its own estimate out of the assignee's week). Subtasks never need client approval.
+ */
+export const taskReadinessInputSchema = readinessItemSchema
+  .extend({
+    needsClientApproval: z.boolean().default(false),
+    taskId: z.uuid().optional(),
+    subtasks: z.array(readinessItemSchema).max(SUBTASK_LIMITS.subtasks).default([]),
+  })
+  .meta({ id: 'TaskReadinessInput' });
+
+export type TaskReadinessInput = z.infer<typeof taskReadinessInputSchema>;
+
+export type TaskReadinessInputValue = z.input<typeof taskReadinessInputSchema>;
+
+/** A warning never blocks (v2-scope); `subtaskIndex` is null for the task itself. */
+export const readinessWarningSchema = z
+  .object({
+    subtaskIndex: z.number().int().min(0).nullable(),
+    code: readinessWarningCodeSchema,
+    /** `assignee_on_leave`: the approved leaves covering the due date. */
+    leaves: z.array(assigneeLeaveSchema).optional(),
+    /** `assignee_overloaded`: the week's estimated minutes with this task, and the capacity. */
+    estimatedMinutes: z.number().int().min(0).optional(),
+    capacityMinutes: z.number().int().min(0).optional(),
+    /** `due_on_day_off`: the next work day. */
+    suggestedDate: calendarDateSchema.optional(),
+  })
+  .meta({ id: 'ReadinessWarning' });
+
+export type ReadinessWarning = z.infer<typeof readinessWarningSchema>;
+
+export const taskReadinessSchema = z
+  .object({ warnings: z.array(readinessWarningSchema) })
+  .meta({ id: 'TaskReadiness' });
+
+export type TaskReadiness = z.infer<typeof taskReadinessSchema>;
+
+/**
+ * Rule C5, the checks that need no database: brief missing (no text, no field, no reference),
+ * and no acceptance criteria on a task that needs client approval (shown last).
+ */
+export function draftWarnings(input: TaskReadinessInput): ReadinessWarning[] {
+  const briefMissing = (item: z.infer<typeof readinessItemSchema>) =>
+    !item.hasBrief && !item.hasBriefFields && !item.hasReferences;
+  const warnings: ReadinessWarning[] = [];
+  if (briefMissing(input)) warnings.push({ subtaskIndex: null, code: 'brief_missing' });
+  input.subtasks.forEach((subtask, index) => {
+    if (briefMissing(subtask)) warnings.push({ subtaskIndex: index, code: 'brief_missing' });
+  });
+  if (input.needsClientApproval && !input.hasCriteria)
+    warnings.push({ subtaskIndex: null, code: 'no_criteria' });
+  return warnings;
+}
+
+// The tree (F06B rule D4)
+
+export const taskTreeQuerySchema = z
+  .object({ projectId: z.uuid().optional(), retainerCycleId: z.uuid().optional() })
+  .refine((query) => !query.projectId !== !query.retainerCycleId, {
+    message: 'A project or a retainer cycle',
+    path: ['projectId'],
+  });
+
+export type TaskTreeQuery = z.infer<typeof taskTreeQuerySchema>;
+
+const treeNodeSchema = taskSchema.pick({
+  id: true,
+  title: true,
+  department: true,
+  assignee: true,
+  status: true,
+  dueDate: true,
+  dueTime: true,
+  overdue: true,
+  blocked: true,
+  estimateMinutes: true,
+});
+
+export const taskTreeNodeSchema = treeNodeSchema
+  .extend({
+    runMode: subtaskRunModeSchema.nullable(),
+    /** Non-archived subtasks, by position. */
+    subtasks: z.array(treeNodeSchema),
+  })
+  .meta({ id: 'TaskTreeNode' });
+
+export type TaskTreeNode = z.infer<typeof taskTreeNodeSchema>;
+
+export const taskTreeSchema = z
+  .object({
+    /** Milestones by position, then tasks without one (`milestone` null); a cycle has one group. */
+    groups: z.array(
+      z.object({
+        milestone: namedSchema.nullable(),
+        tasks: z.array(taskTreeNodeSchema),
+      }),
+    ),
+    /** "Waits for" arrows from the tree's tasks; `dependsOnId` may be outside the tree. */
+    edges: z.array(
+      z.object({ taskId: z.uuid(), dependsOnId: z.uuid(), source: z.enum(DEPENDENCY_SOURCES) }),
+    ),
+    /** Tasks outside the tree that tree tasks wait for (edge case 11). */
+    outside: z.array(z.object({ id: z.uuid(), title: z.string(), status: taskStatusSchema })),
+    bottleneckId: z.uuid().nullable(),
+  })
+  .meta({ id: 'TaskTree' });
+
+export type TaskTree = z.infer<typeof taskTreeSchema>;
+
+/** A task as the bottleneck search reads it. */
+export interface BottleneckNode {
+  id: string;
+  open: boolean;
+  blocked: boolean;
+  dueDate: CalendarDate;
+  dueTime: TimeOfDay | null;
+  overdue: boolean;
+}
+
+/**
+ * Rule D4: the open, unblocked task on which the most open tasks wait, directly or through
+ * others. Ties go to the earliest due date (and time), then the overdue one. Null when nothing
+ * waits on an open task.
+ */
+export function bottleneck(
+  nodes: readonly BottleneckNode[],
+  edges: readonly { taskId: string; dependsOnId: string }[],
+): string | null {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const dependents = new Map<string, string[]>();
+  for (const edge of edges) {
+    dependents.set(edge.dependsOnId, [...(dependents.get(edge.dependsOnId) ?? []), edge.taskId]);
+  }
+  const waiting = (id: string): number => {
+    const seen = new Set<string>([id]);
+    const queue = [id];
+    let open = 0;
+    while (queue.length > 0) {
+      for (const next of dependents.get(queue.shift() as string) ?? []) {
+        if (seen.has(next)) continue;
+        seen.add(next);
+        queue.push(next);
+        if (byId.get(next)?.open) open += 1;
+      }
+    }
+    return open;
+  };
+  let best: { node: BottleneckNode; count: number } | null = null;
+  for (const node of nodes) {
+    if (!node.open || node.blocked) continue;
+    const count = waiting(node.id);
+    if (count === 0) continue;
+    if (!best || count > best.count) {
+      best = { node, count };
+      continue;
+    }
+    if (count < best.count) continue;
+    const due = `${node.dueDate} ${node.dueTime ?? '24:00'}`;
+    const bestDue = `${best.node.dueDate} ${best.node.dueTime ?? '24:00'}`;
+    if (due < bestDue || (due === bestDue && node.overdue && !best.node.overdue)) {
+      best = { node, count };
+    }
+  }
+  return best?.node.id ?? null;
+}

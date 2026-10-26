@@ -12,15 +12,18 @@ import {
   businessDate,
   type CalendarDate,
   type CreateTask,
+  departmentBriefFields,
   type Following,
   isTaskFinished,
   isTaskOverdue,
+  keepsBriefFields,
   permissionScopes,
   richTextFromPlain,
   SUBTASK_LIMITS,
   type Subtask,
   TASK_LIMITS,
   type Task,
+  type TaskBriefFields,
   type TaskDetail,
   type TaskListQuery,
   type TaskPage,
@@ -127,6 +130,24 @@ const LINK_FIELDS = [
   'retainerCycleId',
   'cycleLineId',
 ] as const;
+
+/**
+ * What `createIn` writes: a create without the parts F06B creates around the task (stages,
+ * subtasks, files, questions, the template run), which `TaskCreation` handles.
+ */
+export type TaskInsert = Omit<
+  CreateTask,
+  | 'stages'
+  | 'subtasks'
+  | 'files'
+  | 'questions'
+  | 'templateId'
+  | 'runMode'
+  | 'criteria'
+  | 'briefFields'
+  | 'estimateMinutes'
+> &
+  Partial<Pick<CreateTask, 'runMode' | 'criteria' | 'briefFields' | 'estimateMinutes'>>;
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
 
@@ -282,6 +303,7 @@ export class TasksService {
       this.db
         .select({
           briefDoc: tasks.briefDoc,
+          briefFields: tasks.briefFields,
           createdAt: tasks.createdAt,
           updatedAt: tasks.updatedAt,
           deliveredAt: tasks.deliveredAt,
@@ -335,6 +357,7 @@ export class TasksService {
       briefDoc:
         (row.briefDoc as TaskDetail['briefDoc']) ??
         (task.brief ? richTextFromPlain(task.brief) : null),
+      briefFields: (row.briefFields as TaskBriefFields | null) ?? null,
       needsClientApproval: task.needsClientApproval,
       clientRequest:
         task.type === 'client_request' && task.requestedOn && task.requestScope
@@ -414,13 +437,6 @@ export class TasksService {
     };
   }
 
-  async create(actor: CurrentUserInfo, input: CreateTask): Promise<TaskDetail> {
-    const id = await this.db.transaction((tx) =>
-      this.createIn(tx, actor, input, { checkLeave: true }),
-    );
-    return this.detail(actor, id);
-  }
-
   /**
    * Creates the task in the caller's transaction and returns its id. `postId` links it from the
    * start to the post it was requested from (F08 rule 9, through `PostTasks`). `onBehalf` creates
@@ -434,7 +450,7 @@ export class TasksService {
   async createIn(
     tx: Transaction,
     actor: CurrentUserInfo,
-    input: CreateTask,
+    input: TaskInsert,
     options: {
       postId?: string;
       onBehalf?: boolean;
@@ -480,8 +496,17 @@ export class TasksService {
     if (input.dueDate < businessDate()) {
       throw new CodedException(400, 'INVALID_DATES', 'The due date is in the past');
     }
-    if (input.checklist.length > TASK_LIMITS.checklist || input.links.length > TASK_LIMITS.links) {
-      throw new CodedException(409, 'LIMIT_REACHED', 'Too many checklist items or links');
+    const criteria = input.criteria ?? [];
+    if (
+      input.checklist.length > TASK_LIMITS.checklist ||
+      input.links.length > TASK_LIMITS.links ||
+      criteria.length > TASK_LIMITS.criteria
+    ) {
+      throw new CodedException(409, 'LIMIT_REACHED', 'Too many checklist items, criteria or links');
+    }
+    const briefFields = departmentBriefFields(input.department, input.briefFields);
+    if ('problem' in briefFields) {
+      throw new BadRequestException('The brief fields do not belong to the department');
     }
     const dependsOn = await assertValidDependencies(
       tx,
@@ -521,6 +546,9 @@ export class TasksService {
       needsClientApproval: input.needsClientApproval,
       revisionLimit: input.revisionLimit,
       ...request,
+      ...(briefFields.value && { briefFields: briefFields.value }),
+      ...(input.estimateMinutes && { estimateMinutes: input.estimateMinutes }),
+      ...(input.runMode && { runMode: input.runMode }),
     };
     const subtask = options.parent
       ? {
@@ -550,6 +578,16 @@ export class TasksService {
       await tx.insert(taskChecklistItems).values(
         input.checklist.map((text, index) => ({
           taskId: created.id,
+          text,
+          position: index + 1,
+        })),
+      );
+    }
+    if (criteria.length > 0) {
+      await tx.insert(taskChecklistItems).values(
+        criteria.map((text, index) => ({
+          taskId: created.id,
+          kind: 'criterion' as const,
           text,
           position: index + 1,
         })),
@@ -586,6 +624,7 @@ export class TasksService {
         ...(extraWorkItemId && { extraWorkItemId }),
         ...(dependsOn.length > 0 && { dependsOn }),
         ...(input.checklist.length > 0 && { checklist: input.checklist }),
+        ...(criteria.length > 0 && { criteria }),
         // Links may carry share tokens: the audit keeps the label and the site only.
         ...(input.links.length > 0 && {
           links: input.links.map((link) => ({
@@ -804,6 +843,17 @@ export class TasksService {
       }
 
       const brief = briefColumns(input);
+      // Rule C7: the fields follow the department's kind; another kind clears them.
+      const storedFields = await this.storedBriefFields(tx, id);
+      const briefFields =
+        input.briefFields !== undefined
+          ? departmentBriefFields(department, input.briefFields)
+          : departmentGiven && !keepsBriefFields(task.department, department)
+            ? { value: null }
+            : { value: storedFields };
+      if ('problem' in briefFields) {
+        throw new BadRequestException('The brief fields do not belong to the department');
+      }
       const basics = changedFields(
         {
           title: task.title,
@@ -817,6 +867,8 @@ export class TasksService {
           revisionLimit: task.revisionLimit,
           requestedOn: task.requestedOn,
           requestedByContactId: task.requestedByContactId,
+          briefFields: storedFields,
+          estimateMinutes: task.estimateMinutes,
           ...pickLinks(task),
         },
         {
@@ -830,6 +882,8 @@ export class TasksService {
           revisionLimit: input.revisionLimit,
           requestedOn: input.requestedOn,
           requestedByContactId: input.requestedByContactId,
+          briefFields: briefFields.value,
+          estimateMinutes: input.estimateMinutes,
           ...links,
         },
       );
@@ -1382,6 +1436,7 @@ export class TasksService {
         })(),
         progress: progress.get(row.id) ?? null,
         openQuestions: questions.get(row.id) ?? { total: 0, inSubtasks: 0 },
+        estimateMinutes: row.estimateMinutes,
         readOnly:
           !!row.archivedAt ||
           !!client?.archived ||
@@ -1497,6 +1552,14 @@ export class TasksService {
       entry(row.taskId).inSubtasks += row.value;
     }
     return counts;
+  }
+
+  private async storedBriefFields(tx: Transaction, id: string): Promise<TaskBriefFields | null> {
+    const [row] = await tx
+      .select({ briefFields: tasks.briefFields })
+      .from(tasks)
+      .where(eq(tasks.id, id));
+    return (row?.briefFields as TaskBriefFields | null) ?? null;
   }
 
   private async storedBriefDoc(tx: Transaction, id: string): Promise<unknown> {

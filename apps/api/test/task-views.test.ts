@@ -125,13 +125,18 @@ describe('task views: board, workload, My tasks', () => {
     expect(after.week).toEqual(week);
     expect(after.departments).toEqual(['design']);
     const row = after.people.find((p) => p.user.id === person.id);
+    // The overdue task is due before this week only when today is not the week's first day.
+    const dueThisWeek = addDays(today, -1) < week.from ? 1 : 2;
     expect(row).toEqual({
       user: { id: person.id, name: person.name, imageId: null },
       departments: ['design'],
       overdue: 1,
-      // The overdue task is due before this week only when today is not the week's first day.
-      dueThisWeek: addDays(today, -1) < week.from ? 1 : 2,
+      dueThisWeek,
       open: 3,
+      // F06B rule C8: two hours for each task without an estimate; no employee file, no capacity.
+      estimatedMinutes: dueThisWeek * 120,
+      unestimatedCount: dueThisWeek,
+      capacityMinutes: null,
     });
     const unassigned = (w: typeof after) =>
       w.unassigned.find((u) => u.department === 'design')?.count ?? 0;

@@ -290,6 +290,11 @@ const step = (fields: Partial<TemplateStep> & Pick<TemplateStep, 'id' | 'title'>
     repeatLabel: null,
     spreadFromDay: null,
     dependsOn: [],
+    parentStepId: null,
+    briefDoc: null,
+    briefFields: null,
+    estimateMinutes: null,
+    criteria: [],
     ...fields,
   }) satisfies TemplateStep;
 
@@ -608,5 +613,85 @@ describe('template run input', () => {
         ],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('task templates (F06B part D)', () => {
+  type StepInput = CreateTemplateInput['steps'][number];
+  const root: StepInput = {
+    key: 'root',
+    title: 'Campaign',
+    department: 'marketing',
+    dueDay: 10,
+    estimateMinutes: 240,
+  };
+  const copy: StepInput = {
+    key: 'copy',
+    parentKey: 'root',
+    stageKey: 's1',
+    title: 'Copy',
+    department: 'content_management',
+    dueDay: 4,
+    criteria: ['Approved tone'],
+  };
+  const design: StepInput = {
+    key: 'design',
+    parentKey: 'root',
+    stageKey: 's2',
+    title: 'Design',
+    department: 'design',
+    dueDay: 9,
+    briefFields: { sizes: ['1080 × 1350'] },
+  };
+  const taskTemplate: CreateTemplateInput = {
+    name: 'Campaign',
+    kind: 'task',
+    runMode: 'stages',
+    stages: [
+      { key: 's1', name: 'Copy' },
+      { key: 's2', name: 'Design' },
+    ],
+    steps: [root, copy, design],
+  };
+  const withSteps = (...steps: StepInput[]) => paths({ ...taskTemplate, steps });
+
+  it('accepts the root first and its sub-steps by stages', () => {
+    expect(paths(taskTemplate)).toEqual([]);
+  });
+
+  it('needs a run mode, one root and sub-steps pointing to it', () => {
+    expect(paths({ ...taskTemplate, runMode: null })).toContain('runMode');
+    expect(withSteps(copy, root, design)).toContain('steps.0.parentKey');
+    expect(withSteps(root, { ...copy, parentKey: null }, design)).toContain('steps.1.parentKey');
+  });
+
+  it('puts each sub-step in a stage by stages, and none otherwise', () => {
+    expect(withSteps(root, { ...copy, stageKey: null }, design)).toContain('steps.1.stageKey');
+    expect(paths({ ...taskTemplate, runMode: 'sequential' })).toEqual(
+      expect.arrayContaining(['stages', 'steps.1.stageKey', 'steps.2.stageKey']),
+    );
+  });
+
+  it('keeps sub-steps due no later than the root, without repeats or dependencies', () => {
+    expect(withSteps(root, copy, { ...design, dueDay: 11 })).toContain('steps.2.dueDay');
+    expect(withSteps(root, copy, { ...design, dependsOn: ['copy'] })).toContain(
+      'steps.2.dependsOn',
+    );
+  });
+
+  it('checks brief fields against the department and holds 30 sub-steps', () => {
+    expect(withSteps(root, copy, { ...design, briefFields: { goal: 'x' } })).toContain(
+      'steps.2.briefFields',
+    );
+    const subSteps = Array.from({ length: 31 }, (_, i) => ({ ...copy, key: `k${i}` }));
+    expect(withSteps(root, ...subSteps)).toContain('steps');
+  });
+
+  it('keeps run modes, sub-steps and task fields out of the other kinds', () => {
+    expect(paths({ ...projectTemplate, runMode: 'parallel' })).toContain('runMode');
+    const steps = projectTemplate.steps.map((step, i) =>
+      i === 0 ? { ...step, estimateMinutes: 60 } : step,
+    );
+    expect(paths({ ...projectTemplate, steps })).toContain('steps.0');
   });
 });

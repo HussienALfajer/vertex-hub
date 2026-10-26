@@ -10,14 +10,20 @@ import {
   Query,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiForbiddenResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
   type CreateTemplate,
   createTemplateSchema,
+  type TaskTemplateDraft,
+  type TaskTemplateDraftInput,
   type TemplateDetail,
+  type TemplateFromTask,
   type TemplateListQuery,
   type TemplatePage,
+  taskTemplateDraftInputSchema,
+  taskTemplateDraftSchema,
   templateDetailSchema,
+  templateFromTaskSchema,
   templateListQuerySchema,
   templatePageSchema,
   type UpdateTemplate,
@@ -71,8 +77,44 @@ export class TemplatesController {
     return this.templates.create(actor, input);
   }
 
+  @Post('from-task/:taskId')
+  @RequirePermissions('tasks.manage')
+  @SerializeOptions({ schema: templateDetailSchema })
+  @ApiCreatedResponse({
+    description:
+      'A task template saved from a top-level task with its run mode, stages and subtasks (F06B rule D1); needs assign scope on the task',
+    standardSchema: templateDetailSchema,
+  })
+  fromTask(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+    @Body({ schema: templateFromTaskSchema }) input: TemplateFromTask,
+  ): Promise<TemplateDetail> {
+    return this.templates.fromTask(actor, taskId, input);
+  }
+
+  @Post(':id/task-draft')
+  @HttpCode(200)
+  @RequirePermissions('templates.read')
+  @SerializeOptions({ schema: taskTemplateDraftSchema })
+  @ApiOkResponse({
+    description:
+      "A task template as the creation wizard's draft, dated from the start date in work days (F06B rule D2)",
+    standardSchema: taskTemplateDraftSchema,
+  })
+  taskDraft(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: taskTemplateDraftInputSchema }) input: TaskTemplateDraftInput,
+  ): Promise<TaskTemplateDraft> {
+    return this.templates.taskDraft(actor, id, input);
+  }
+
   @Put(':id')
-  @RequirePermissions('templates.manage')
+  @RequirePermissions('templates.read')
+  @ApiForbiddenResponse({
+    description: '`templates.manage`, or the creator of a task template with assign scope in it',
+  })
   @SerializeOptions({ schema: templateDetailSchema })
   @ApiOkResponse({
     description: 'The template after replacing its document; a `key` equal to an id keeps that row',
@@ -88,7 +130,10 @@ export class TemplatesController {
 
   @Post(':id/archive')
   @HttpCode(200)
-  @RequirePermissions('templates.manage')
+  @RequirePermissions('templates.read')
+  @ApiForbiddenResponse({
+    description: '`templates.manage`, or the creator of a task template with assign scope in it',
+  })
   @SerializeOptions({ schema: templateDetailSchema })
   @ApiOkResponse({ description: 'The archived template', standardSchema: templateDetailSchema })
   archive(
@@ -100,7 +145,10 @@ export class TemplatesController {
 
   @Post(':id/restore')
   @HttpCode(200)
-  @RequirePermissions('templates.manage')
+  @RequirePermissions('templates.read')
+  @ApiForbiddenResponse({
+    description: '`templates.manage`, or the creator of a task template with assign scope in it',
+  })
   @SerializeOptions({ schema: templateDetailSchema })
   @ApiOkResponse({ description: 'The restored template', standardSchema: templateDetailSchema })
   restore(

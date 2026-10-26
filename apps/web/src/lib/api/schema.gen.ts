@@ -2004,6 +2004,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskViewsController_checkReadiness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaskViewsController_tree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks/board": {
         parameters: {
             query?: never;
@@ -4446,6 +4478,38 @@ export interface paths {
         get: operations["TemplatesController_detail"];
         put: operations["TemplatesController_update"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/from-task/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TemplatesController_fromTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/templates/{id}/task-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TemplatesController_taskDraft"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17065,6 +17129,146 @@ export interface components {
             /** Format: date */
             annexDate: string;
         };
+        TaskReadinessInput: {
+            department: components["schemas"]["DepartmentCode"];
+            /**
+             * Format: uuid
+             * @default null
+             */
+            assigneeId: string | null;
+            /** Format: date */
+            dueDate: string;
+            dueTime?: string | null;
+            /** @default null */
+            estimateMinutes: number | null;
+            /** @default false */
+            hasBrief: boolean;
+            /** @default false */
+            hasBriefFields: boolean;
+            /** @default false */
+            hasReferences: boolean;
+            /** @default false */
+            hasCriteria: boolean;
+            /** @default false */
+            needsClientApproval: boolean;
+            /** Format: uuid */
+            taskId?: string;
+            /** @default [] */
+            subtasks: {
+                department: components["schemas"]["DepartmentCode"];
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                assigneeId: string | null;
+                /** Format: date */
+                dueDate: string;
+                dueTime?: string | null;
+                /** @default null */
+                estimateMinutes: number | null;
+                /** @default false */
+                hasBrief: boolean;
+                /** @default false */
+                hasBriefFields: boolean;
+                /** @default false */
+                hasReferences: boolean;
+                /** @default false */
+                hasCriteria: boolean;
+            }[];
+        };
+        TaskReadiness: {
+            warnings: components["schemas"]["ReadinessWarning"][];
+        };
+        ReadinessWarning: {
+            subtaskIndex: number | null;
+            code: components["schemas"]["ReadinessWarningCode"];
+            leaves?: components["schemas"]["AssigneeLeave"][];
+            estimatedMinutes?: number;
+            capacityMinutes?: number;
+            /** Format: date */
+            suggestedDate?: string;
+        };
+        /** @enum {string} */
+        ReadinessWarningCode: "assignee_on_leave" | "assignee_overloaded" | "due_on_day_off" | "brief_missing" | "no_criteria";
+        AssigneeLeave: {
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            endsOn: string;
+        };
+        TaskTree: {
+            groups: {
+                milestone: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                } | null;
+                tasks: components["schemas"]["TaskTreeNode"][];
+            }[];
+            edges: {
+                /** Format: uuid */
+                taskId: string;
+                /** Format: uuid */
+                dependsOnId: string;
+                /** @enum {string} */
+                source: "manual" | "run";
+            }[];
+            outside: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+                status: components["schemas"]["TaskStatus"];
+            }[];
+            /** Format: uuid */
+            bottleneckId: string | null;
+        };
+        TaskTreeNode: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** Format: uuid */
+                imageId: string | null;
+                archived: boolean;
+                inDepartment: boolean;
+            } | null;
+            status: components["schemas"]["TaskStatus"];
+            /** Format: date */
+            dueDate: string;
+            dueTime: string | null;
+            overdue: boolean;
+            blocked: boolean;
+            estimateMinutes: number | null;
+            runMode: components["schemas"]["SubtaskRunMode"] | null;
+            subtasks: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+                department: components["schemas"]["DepartmentCode"];
+                assignee: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /** Format: uuid */
+                    imageId: string | null;
+                    archived: boolean;
+                    inDepartment: boolean;
+                } | null;
+                status: components["schemas"]["TaskStatus"];
+                /** Format: date */
+                dueDate: string;
+                dueTime: string | null;
+                overdue: boolean;
+                blocked: boolean;
+                estimateMinutes: number | null;
+            }[];
+        };
+        /** @enum {string} */
+        SubtaskRunMode: "sequential" | "parallel" | "stages";
         TaskBoard: {
             departments: components["schemas"]["DepartmentCode"][];
             columns: {
@@ -17142,6 +17346,7 @@ export interface components {
                 total: number;
                 inSubtasks: number;
             };
+            estimateMinutes: number | null;
         };
         /** @enum {string} */
         TaskType: "work" | "client_request";
@@ -17170,6 +17375,9 @@ export interface components {
                 overdue: number;
                 dueThisWeek: number;
                 open: number;
+                estimatedMinutes: number;
+                unestimatedCount: number;
+                capacityMinutes: number | null;
             }[];
             unassigned: {
                 department: components["schemas"]["DepartmentCode"];
@@ -17272,8 +17480,10 @@ export interface components {
                 total: number;
                 inSubtasks: number;
             };
+            estimateMinutes: number | null;
             brief: string | null;
             briefDoc: components["schemas"]["TaskBriefDoc"] | null;
+            briefFields: components["schemas"]["TaskBriefFields"] | null;
             needsClientApproval: boolean;
             clientRequest: {
                 contact: {
@@ -17455,6 +17665,29 @@ export interface components {
                 } | components["schemas"]["__schema0"])[];
             }[];
         };
+        TaskBriefFields: {
+            sizes?: string[];
+            colors?: string[];
+            references?: string[];
+            length?: string;
+            /** @enum {string} */
+            aspectRatio?: "16:9" | "9:16" | "1:1" | "4:5" | "other";
+            music?: string;
+            /** Format: uri */
+            link?: string;
+            /** @enum {string} */
+            environment?: "production" | "staging" | "development";
+            platforms?: components["schemas"]["PostPlatform"][];
+            tone?: string;
+            goal?: string;
+            audience?: string;
+            budget?: {
+                amountMinor: number;
+                currency: components["schemas"]["Currency"];
+            };
+        };
+        /** @enum {string} */
+        PostPlatform: "instagram" | "facebook" | "tiktok" | "x" | "linkedin" | "youtube" | "snapchat" | "google_business";
         /** @enum {string} */
         RequestScope: "in_scope" | "out_of_scope";
         TaskDependency: {
@@ -17561,8 +17794,6 @@ export interface components {
         ResponseChannel: "link" | "manual";
         /** @enum {string} */
         ApprovalRequestState: "open" | "expired" | "completed" | "revoked";
-        /** @enum {string} */
-        SubtaskRunMode: "sequential" | "parallel" | "stages";
         TaskStage: {
             /** Format: uuid */
             id: string;
@@ -17652,6 +17883,7 @@ export interface components {
                 total: number;
                 inSubtasks: number;
             };
+            estimateMinutes: number | null;
             position: number;
             /** Format: uuid */
             stageId: string | null;
@@ -17682,6 +17914,7 @@ export interface components {
             canWriteHandover: boolean;
             canEditCriteria: boolean;
             canTickCriteria: boolean;
+            canSaveTemplate: boolean;
         };
         CreateTask: {
             title: string;
@@ -17730,6 +17963,10 @@ export interface components {
             /** Format: date */
             requestedOn?: string;
             requestScope?: components["schemas"]["RequestScope"];
+            /** @default null */
+            briefFields: components["schemas"]["TaskBriefFields"] | null;
+            /** @default null */
+            estimateMinutes: number | null;
             /** @default work */
             type: components["schemas"]["TaskType"];
             dependsOn?: string[];
@@ -17737,11 +17974,217 @@ export interface components {
             checklist: string[];
             links?: components["schemas"]["CreateTaskLink"][];
             briefDoc?: components["schemas"]["TaskBriefDoc"] | null;
+            /** @default [] */
+            criteria: string[];
+            runMode?: components["schemas"]["SubtaskRunMode"];
+            /** @default [] */
+            stages: {
+                name: string;
+            }[];
+            subtasks?: components["schemas"]["CreateTaskSubtask"][];
+            /** @default [] */
+            files: components["schemas"]["CreateTaskFile"][];
+            /** @default [] */
+            questions: components["schemas"]["TaskQuestionInput"][];
+            /** Format: uuid */
+            templateId?: string;
             acceptLeave?: boolean;
         };
         CreateTaskLink: {
             url: string;
             label?: string | null;
+        };
+        CreateTaskSubtask: {
+            title: string;
+            brief?: string | null;
+            briefDoc?: components["schemas"]["TaskBriefDoc"] | null;
+            /** @default null */
+            briefFields: components["schemas"]["TaskBriefFields"] | null;
+            department: components["schemas"]["DepartmentCode"];
+            /**
+             * Format: uuid
+             * @default null
+             */
+            assigneeId: string | null;
+            /** Format: date */
+            dueDate: string;
+            dueTime?: string | null;
+            /** @default normal */
+            priority: components["schemas"]["TaskPriority"];
+            /** @default null */
+            estimateMinutes: number | null;
+            /** @default null */
+            stageIndex: number | null;
+            /** @default [] */
+            checklist: string[];
+            /** @default [] */
+            criteria: string[];
+            /** @default [] */
+            files: components["schemas"]["CreateTaskFile"][];
+        };
+        CreateTaskFile: {
+            /** Format: uuid */
+            uploadId: string;
+            /**
+             * @default reference
+             * @enum {string}
+             */
+            role: "reference" | "deliverable";
+            name?: string;
+        };
+        TaskQuestionInput: {
+            bodyDoc: components["schemas"]["TaskCommentDoc"];
+            /** Format: uuid */
+            addressedUserId?: string;
+            addressedDepartment?: components["schemas"]["DepartmentCode"];
+            /** @default [] */
+            files: {
+                /** Format: uuid */
+                uploadId: string;
+            }[];
+        };
+        TaskCommentDoc: {
+            /** @enum {string} */
+            type: "doc";
+            content: ({
+                /** @enum {string} */
+                type: "paragraph";
+                content?: ({
+                    /** @enum {string} */
+                    type: "text";
+                    text: string;
+                    marks?: ({
+                        /** @enum {string} */
+                        type: "bold";
+                    } | {
+                        /** @enum {string} */
+                        type: "italic";
+                    } | {
+                        /** @enum {string} */
+                        type: "link";
+                        attrs: {
+                            /** Format: uri */
+                            href: string;
+                        };
+                    })[];
+                } | {
+                    /** @enum {string} */
+                    type: "mention";
+                    attrs: {
+                        /** Format: uuid */
+                        userId: string;
+                    };
+                })[];
+            } | {
+                /** @enum {string} */
+                type: "heading";
+                attrs: {
+                    /** @enum {number} */
+                    level: 3;
+                };
+                content?: ({
+                    /** @enum {string} */
+                    type: "text";
+                    text: string;
+                    marks?: ({
+                        /** @enum {string} */
+                        type: "bold";
+                    } | {
+                        /** @enum {string} */
+                        type: "italic";
+                    } | {
+                        /** @enum {string} */
+                        type: "link";
+                        attrs: {
+                            /** Format: uri */
+                            href: string;
+                        };
+                    })[];
+                } | {
+                    /** @enum {string} */
+                    type: "mention";
+                    attrs: {
+                        /** Format: uuid */
+                        userId: string;
+                    };
+                })[];
+            } | components["schemas"]["__schema0"])[];
+        };
+        __schema1: {
+            /** @enum {string} */
+            type: "bulletList";
+            content: {
+                /** @enum {string} */
+                type: "listItem";
+                content: ({
+                    /** @enum {string} */
+                    type: "paragraph";
+                    content?: ({
+                        /** @enum {string} */
+                        type: "text";
+                        text: string;
+                        marks?: ({
+                            /** @enum {string} */
+                            type: "bold";
+                        } | {
+                            /** @enum {string} */
+                            type: "italic";
+                        } | {
+                            /** @enum {string} */
+                            type: "link";
+                            attrs: {
+                                href: string;
+                            };
+                        })[];
+                    } | {
+                        /** @enum {string} */
+                        type: "mention";
+                        attrs: {
+                            /** Format: uuid */
+                            userId: string;
+                        };
+                    })[];
+                } | components["schemas"]["__schema1"])[];
+            }[];
+        } | {
+            /** @enum {string} */
+            type: "orderedList";
+            attrs?: {
+                start?: number;
+            };
+            content: {
+                /** @enum {string} */
+                type: "listItem";
+                content: ({
+                    /** @enum {string} */
+                    type: "paragraph";
+                    content?: ({
+                        /** @enum {string} */
+                        type: "text";
+                        text: string;
+                        marks?: ({
+                            /** @enum {string} */
+                            type: "bold";
+                        } | {
+                            /** @enum {string} */
+                            type: "italic";
+                        } | {
+                            /** @enum {string} */
+                            type: "link";
+                            attrs: {
+                                href: string;
+                            };
+                        })[];
+                    } | {
+                        /** @enum {string} */
+                        type: "mention";
+                        attrs: {
+                            /** Format: uuid */
+                            userId: string;
+                        };
+                    })[];
+                } | components["schemas"]["__schema1"])[];
+            }[];
         };
         UpdateTask: {
             title?: string;
@@ -17770,6 +18213,8 @@ export interface components {
             /** Format: date */
             requestedOn?: string;
             requestScope?: components["schemas"]["RequestScope"];
+            briefFields?: components["schemas"]["TaskBriefFields"] | null;
+            estimateMinutes?: number | null;
             acceptLeave?: boolean;
             moveSubtasks?: boolean;
             briefDoc?: components["schemas"]["TaskBriefDoc"] | null;
@@ -17869,73 +18314,6 @@ export interface components {
             canConvert: boolean;
             question: components["schemas"]["TaskQuestionState"] | null;
             replies: components["schemas"]["TaskReply"][];
-        };
-        TaskCommentDoc: {
-            /** @enum {string} */
-            type: "doc";
-            content: ({
-                /** @enum {string} */
-                type: "paragraph";
-                content?: ({
-                    /** @enum {string} */
-                    type: "text";
-                    text: string;
-                    marks?: ({
-                        /** @enum {string} */
-                        type: "bold";
-                    } | {
-                        /** @enum {string} */
-                        type: "italic";
-                    } | {
-                        /** @enum {string} */
-                        type: "link";
-                        attrs: {
-                            /** Format: uri */
-                            href: string;
-                        };
-                    })[];
-                } | {
-                    /** @enum {string} */
-                    type: "mention";
-                    attrs: {
-                        /** Format: uuid */
-                        userId: string;
-                    };
-                })[];
-            } | {
-                /** @enum {string} */
-                type: "heading";
-                attrs: {
-                    /** @enum {number} */
-                    level: 3;
-                };
-                content?: ({
-                    /** @enum {string} */
-                    type: "text";
-                    text: string;
-                    marks?: ({
-                        /** @enum {string} */
-                        type: "bold";
-                    } | {
-                        /** @enum {string} */
-                        type: "italic";
-                    } | {
-                        /** @enum {string} */
-                        type: "link";
-                        attrs: {
-                            /** Format: uri */
-                            href: string;
-                        };
-                    })[];
-                } | {
-                    /** @enum {string} */
-                    type: "mention";
-                    attrs: {
-                        /** Format: uuid */
-                        userId: string;
-                    };
-                })[];
-            } | components["schemas"]["__schema0"])[];
         };
         TaskAttachment: {
             /** Format: uuid */
@@ -18072,17 +18450,6 @@ export interface components {
                 status: components["schemas"]["TaskStatus"];
             };
         };
-        TaskQuestionInput: {
-            bodyDoc: components["schemas"]["TaskCommentDoc"];
-            /** Format: uuid */
-            addressedUserId?: string;
-            addressedDepartment?: components["schemas"]["DepartmentCode"];
-            /** @default [] */
-            files: {
-                /** Format: uuid */
-                uploadId: string;
-            }[];
-        };
         ForwardQuestion: {
             /** Format: uuid */
             userId: string;
@@ -18108,6 +18475,14 @@ export interface components {
             stageId?: string | null;
             acceptLeave?: boolean;
             briefDoc?: components["schemas"]["TaskBriefDoc"] | null;
+            /** @default null */
+            briefFields: components["schemas"]["TaskBriefFields"] | null;
+            /** @default null */
+            estimateMinutes: number | null;
+            /** @default [] */
+            criteria: string[];
+            /** @default [] */
+            files: components["schemas"]["CreateTaskFile"][];
             /** Format: uuid */
             fromCommentId?: string;
         };
@@ -19024,8 +19399,6 @@ export interface components {
             name: string;
         };
         /** @enum {string} */
-        PostPlatform: "instagram" | "facebook" | "tiktok" | "x" | "linkedin" | "youtube" | "snapchat" | "google_business";
-        /** @enum {string} */
         PostType: "post" | "reel" | "story" | "carousel";
         ContentCalendar: {
             /** Format: date */
@@ -19375,6 +19748,7 @@ export interface components {
                 total: number;
                 inSubtasks: number;
             };
+            estimateMinutes: number | null;
             inPublishCycle: boolean;
         };
         CreatePostTask: {
@@ -20447,7 +20821,7 @@ export interface components {
             archived: boolean;
         };
         /** @enum {string} */
-        TemplateKind: "project" | "retainer_cycle";
+        TemplateKind: "project" | "retainer_cycle" | "task";
         CreateCatalogService: {
             name: string;
             description?: string | null;
@@ -20574,6 +20948,7 @@ export interface components {
             name: string;
             kind: components["schemas"]["TemplateKind"];
             description: string | null;
+            runMode: components["schemas"]["SubtaskRunMode"] | null;
             stages: components["schemas"]["TemplateStage"][];
             steps: components["schemas"]["TemplateStep"][];
             assignees: components["schemas"]["TemplateAssignee"][];
@@ -20607,9 +20982,15 @@ export interface components {
             id: string;
             /** Format: uuid */
             stageId: string | null;
+            /** Format: uuid */
+            parentStepId: string | null;
             position: number;
             title: string;
             brief: string | null;
+            briefDoc: components["schemas"]["TaskBriefDoc"] | null;
+            briefFields: components["schemas"]["TaskBriefFields"] | null;
+            estimateMinutes: number | null;
+            criteria: string[];
             department: components["schemas"]["DepartmentCode"];
             dueDay: number | null;
             priority: components["schemas"]["TaskPriority"];
@@ -20640,6 +21021,8 @@ export interface components {
         CreateTemplate: {
             name: string;
             description?: string | null;
+            /** @default null */
+            runMode: components["schemas"]["SubtaskRunMode"] | null;
             /** @default [] */
             stages: {
                 key: string;
@@ -20649,6 +21032,8 @@ export interface components {
                 key: string;
                 /** @default null */
                 stageKey: string | null;
+                /** @default null */
+                parentKey: string | null;
                 title: string;
                 brief?: string | null;
                 department: components["schemas"]["DepartmentCode"];
@@ -20668,6 +21053,14 @@ export interface components {
                 /** @default null */
                 spreadFromDay: number | null;
                 dependsOn?: string[];
+                /** @default null */
+                briefDoc: components["schemas"]["TaskBriefDoc"] | null;
+                /** @default null */
+                briefFields: components["schemas"]["TaskBriefFields"] | null;
+                /** @default null */
+                estimateMinutes: number | null;
+                /** @default [] */
+                criteria: string[];
             }[];
             /** @default [] */
             assignees: {
@@ -20677,9 +21070,60 @@ export interface components {
             }[];
             kind: components["schemas"]["TemplateKind"];
         };
+        TemplateFromTask: {
+            name: string;
+            description?: string | null;
+            /** @default false */
+            keepAssignees: boolean;
+        };
+        TaskTemplateDraftInput: {
+            /** Format: date */
+            startDate?: string;
+        };
+        TaskTemplateDraft: {
+            title: string;
+            brief: string | null;
+            briefDoc: components["schemas"]["TaskBriefDoc"] | null;
+            briefFields: components["schemas"]["TaskBriefFields"] | null;
+            department: components["schemas"]["DepartmentCode"];
+            /** Format: uuid */
+            assigneeId: string | null;
+            /** Format: date */
+            dueDate: string;
+            priority: components["schemas"]["TaskPriority"];
+            estimateMinutes: number | null;
+            checklist: string[];
+            criteria: string[];
+            /** Format: uuid */
+            templateId: string;
+            needsClientApproval: boolean;
+            revisionLimit: number;
+            runMode: components["schemas"]["SubtaskRunMode"] | null;
+            stages: {
+                name: string;
+            }[];
+            subtasks: {
+                title: string;
+                brief: string | null;
+                briefDoc: components["schemas"]["TaskBriefDoc"] | null;
+                briefFields: components["schemas"]["TaskBriefFields"] | null;
+                department: components["schemas"]["DepartmentCode"];
+                /** Format: uuid */
+                assigneeId: string | null;
+                /** Format: date */
+                dueDate: string;
+                priority: components["schemas"]["TaskPriority"];
+                estimateMinutes: number | null;
+                checklist: string[];
+                criteria: string[];
+                stageIndex: number | null;
+            }[];
+        };
         UpdateTemplate: {
             name: string;
             description?: string | null;
+            /** @default null */
+            runMode: components["schemas"]["SubtaskRunMode"] | null;
             /** @default [] */
             stages: {
                 key: string;
@@ -20689,6 +21133,8 @@ export interface components {
                 key: string;
                 /** @default null */
                 stageKey: string | null;
+                /** @default null */
+                parentKey: string | null;
                 title: string;
                 brief?: string | null;
                 department: components["schemas"]["DepartmentCode"];
@@ -20708,6 +21154,14 @@ export interface components {
                 /** @default null */
                 spreadFromDay: number | null;
                 dependsOn?: string[];
+                /** @default null */
+                briefDoc: components["schemas"]["TaskBriefDoc"] | null;
+                /** @default null */
+                briefFields: components["schemas"]["TaskBriefFields"] | null;
+                /** @default null */
+                estimateMinutes: number | null;
+                /** @default [] */
+                criteria: string[];
             }[];
             /** @default [] */
             assignees: {
@@ -21833,6 +22287,7 @@ export interface components {
                 total: number;
                 inSubtasks: number;
             };
+            estimateMinutes: number | null;
             snapshot: {
                 files: number;
                 hasText: boolean;
@@ -27860,6 +28315,60 @@ export interface operations {
             };
         };
     };
+    TaskViewsController_checkReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskReadinessInput"];
+            };
+        };
+        responses: {
+            /** @description Warnings for a draft and each of its subtasks before saving, assigning or re-dating (F06B rule C5); they never block */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskReadiness"];
+                };
+            };
+        };
+    };
+    TaskViewsController_tree: {
+        parameters: {
+            query?: {
+                projectId?: string;
+                retainerCycleId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A project's or a retainer cycle's tasks by milestone with their subtasks, the dependencies and the bottleneck (F06B rule D4) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTree"];
+                };
+            };
+            /** @description No such project or retainer cycle */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     TaskViewsController_board: {
         parameters: {
             query?: {
@@ -27897,7 +28406,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Open, overdue and due-this-week counts per person of the departments */
+            /** @description Open, overdue and due-this-week counts per person of the departments, with estimated hours against capacity */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -27992,7 +28501,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The new task: unassigned or assigned to oneself for anyone; any assignee with assign scope; client requests with client scope */
+            /** @description The new task: unassigned or assigned to oneself for anyone; any assignee with assign scope; client requests with client scope. With its stages, subtasks (each checked as its own create), criteria, files and questions in one transaction (F06B rule C2) */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -32647,6 +33156,65 @@ export interface operations {
                     "application/json": components["schemas"]["TemplateDetail"];
                 };
             };
+            /** @description `templates.manage`, or the creator of a task template with assign scope in it */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_fromTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateFromTask"];
+            };
+        };
+        responses: {
+            /** @description A task template saved from a top-level task with its run mode, stages and subtasks (F06B rule D1); needs assign scope on the task */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateDetail"];
+                };
+            };
+        };
+    };
+    TemplatesController_taskDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskTemplateDraftInput"];
+            };
+        };
+        responses: {
+            /** @description A task template as the creation wizard's draft, dated from the start date in work days (F06B rule D2) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTemplateDraft"];
+                };
+            };
         };
     };
     TemplatesController_archive: {
@@ -32669,6 +33237,13 @@ export interface operations {
                     "application/json": components["schemas"]["TemplateDetail"];
                 };
             };
+            /** @description `templates.manage`, or the creator of a task template with assign scope in it */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     TemplatesController_restore: {
@@ -32690,6 +33265,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TemplateDetail"];
                 };
+            };
+            /** @description `templates.manage`, or the creator of a task template with assign scope in it */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -12,3 +12,4 @@ export { HrModule } from './hr.module.js';
 export { HrDailyService } from './hr-daily.service.js';
 export { type ApprovedLeave, LeaveDirectory } from './leave-directory.js';
 export { type LeaveWorkSource, LeaveWorkSources } from './leave-work-sources.js';
+export { WorkCapacity } from './work-capacity.js';

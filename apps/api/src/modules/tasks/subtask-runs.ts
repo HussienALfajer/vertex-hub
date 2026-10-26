@@ -96,12 +96,15 @@ export class SubtaskRuns {
    * order contradicts a manual dependency between the subtasks. `blockedBefore` (from
    * `blockedNow`, read before the caller changed a subtask's status) compares with the state
    * before that change, so a subtask freed by a cancel or an archive opens (edge case 3).
+   * `quiet` writes the run of subtasks created with their parent (rule C2), who heard of their
+   * assignment and neither wait again nor open.
    */
   async sync(
     tx: Transaction,
     parentId: string,
     actorId: string | null,
     blockedBefore?: ReadonlySet<string>,
+    options: { quiet?: boolean } = {},
   ): Promise<void> {
     const [parent] = await tx
       .select({ runMode: tasks.runMode })
@@ -146,7 +149,9 @@ export class SubtaskRuns {
 
     const watched = subtasks.filter(isWatched);
     const watchedIds = watched.map((subtask) => subtask.id);
-    const before = blockedBefore ?? (await blockedIds(watchedIds, tx));
+    const before = options.quiet
+      ? new Set<string>()
+      : (blockedBefore ?? (await blockedIds(watchedIds, tx)));
     if (removed.length > 0) {
       await tx
         .delete(taskDependencies)
@@ -175,6 +180,7 @@ export class SubtaskRuns {
         }
       }
     }
+    if (options.quiet) return;
     const blockedAfter = await blockedIds(watchedIds, tx);
 
     const notices: Notice[] = [];
@@ -205,6 +211,29 @@ export class SubtaskRuns {
       }
     }
     await this.notices.send(tx, notices);
+  }
+
+  /** A stage of the parent at `position`, audited (`task_stage.created`). */
+  async insertStage(
+    tx: Transaction,
+    actor: AuditActor,
+    parentId: string,
+    name: string,
+    position: number,
+  ): Promise<string> {
+    const [created] = await tx
+      .insert(taskStages)
+      .values({ taskId: parentId, name, position })
+      .returning({ id: taskStages.id });
+    if (!created) throw new Error('Stage insert returned no row');
+    await recordAudit(tx, {
+      actor,
+      action: 'task_stage.created',
+      entityType: 'task_stage',
+      entityId: created.id,
+      after: { taskId: parentId, name, position },
+    });
+    return created.id;
   }
 
   /** Rule A4: the parent's non-archived subtasks numbered 1, 2, 3… in their order. */

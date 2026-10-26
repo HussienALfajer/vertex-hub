@@ -72,6 +72,7 @@ export const accessColumns = {
   stageId: tasks.stageId,
   runMode: tasks.runMode,
   handoverNote: tasks.handoverNote,
+  estimateMinutes: tasks.estimateMinutes,
   archivedAt: tasks.archivedAt,
 };
 
@@ -108,6 +109,7 @@ export interface TaskRow {
   stageId: string | null;
   runMode: SubtaskRunMode | null;
   handoverNote: string | null;
+  estimateMinutes: number | null;
   archivedAt: Date | null;
 }
 
@@ -428,6 +430,7 @@ export function taskPermissions(
       canWriteHandover: open && !!task.parentId && rights.work,
       canEditCriteria: !readOnly && editsCriteria(rights),
       canTickCriteria: !readOnly && ticksCriteria(rights),
+      canSaveTemplate: !task.parentId && rights.assign,
     },
     allowedTransitions,
   };

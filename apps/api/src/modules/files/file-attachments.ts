@@ -33,8 +33,9 @@ export interface TaskThreadTarget {
 /**
  * F06B rule B2: the files of a task's thread. The author's held uploads (F10 rule 1) become
  * `attachment` items of the task tied to a comment, a question or a reply, single versions like
- * references; rule B11 copies them as references of the subtask a question was turned into. They
- * follow the task's file access, and the `tasks` module calls this inside its transaction.
+ * references; rule B11 copies them as references of the subtask a question was turned into; rule
+ * C3 attaches the files chosen in the creation wizard as references or deliverables. They follow
+ * the task's file access, and the `tasks` module calls this inside its transaction.
  */
 @Injectable()
 export class FileAttachments {
@@ -55,14 +56,7 @@ export class FileAttachments {
   ): Promise<boolean> {
     let preview = false;
     for (const uploadId of uploadIds) {
-      const [upload] = await tx
-        .delete(fileUploads)
-        .where(and(eq(fileUploads.id, uploadId), eq(fileUploads.userId, actor.id)))
-        .returning();
-      if (!upload) throw new CodedException(400, 'UPLOAD_NOT_FOUND', 'Upload the file again');
-      const previewable =
-        isPreviewableMimeType(upload.mimeType) && upload.sizeBytes <= FILE_PREVIEW_MAX_BYTES;
-      preview ||= previewable;
+      const upload = await this.takeUpload(tx, actor, uploadId);
       const itemId = await this.insertItem(tx, actor, {
         ownerType: 'task',
         taskId: target.taskId,
@@ -71,20 +65,79 @@ export class FileAttachments {
         taskCommentId: target.commentId,
         name: documentName(upload.originalName),
       });
-      await tx.insert(fileVersions).values({
-        fileItemId: itemId,
-        number: 1,
-        kind: 'upload',
-        storageKey: upload.storageKey,
-        originalName: upload.originalName,
-        mimeType: upload.mimeType,
-        sizeBytes: upload.sizeBytes,
-        sha256: upload.sha256,
-        width: upload.width,
-        height: upload.height,
-        previewStatus: previewable ? 'pending' : 'none',
-        uploadedById: actor.id,
+      preview = (await this.insertUploadVersion(tx, actor, itemId, upload)) || preview;
+    }
+    return preview;
+  }
+
+  /** An upload of the actor, used once (F10 rule 2). */
+  private async takeUpload(tx: Transaction, actor: CurrentUserInfo, uploadId: string) {
+    const [upload] = await tx
+      .delete(fileUploads)
+      .where(and(eq(fileUploads.id, uploadId), eq(fileUploads.userId, actor.id)))
+      .returning();
+    if (!upload) throw new CodedException(400, 'UPLOAD_NOT_FOUND', 'Upload the file again');
+    return upload;
+  }
+
+  /** The item's first version from an upload; returns whether its preview waits. */
+  private async insertUploadVersion(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    itemId: string,
+    upload: typeof fileUploads.$inferSelect,
+  ): Promise<boolean> {
+    const previewable =
+      isPreviewableMimeType(upload.mimeType) && upload.sizeBytes <= FILE_PREVIEW_MAX_BYTES;
+    await tx.insert(fileVersions).values({
+      fileItemId: itemId,
+      number: 1,
+      kind: 'upload',
+      storageKey: upload.storageKey,
+      originalName: upload.originalName,
+      mimeType: upload.mimeType,
+      sizeBytes: upload.sizeBytes,
+      sha256: upload.sha256,
+      width: upload.width,
+      height: upload.height,
+      previewStatus: previewable ? 'pending' : 'none',
+      uploadedById: actor.id,
+    });
+    return previewable;
+  }
+
+  /**
+   * F06B rule C3: the actor's held uploads attached to a new task as references or as the first
+   * version of a deliverable (`FILE_NAME_TAKEN` for two deliverables of one name). Returns
+   * whether a preview waits: call `queuePreviews` once the transaction committed.
+   */
+  async attachToTask(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    target: { taskId: string; clientId: string | null },
+    files: readonly { uploadId: string; role: 'reference' | 'deliverable'; name?: string }[],
+  ): Promise<boolean> {
+    let preview = false;
+    const deliverables = new Set<string>();
+    for (const file of files) {
+      const upload = await this.takeUpload(tx, actor, file.uploadId);
+      const name = file.name ?? documentName(upload.originalName);
+      if (file.role === 'deliverable') {
+        const key = name.toLocaleLowerCase('ar');
+        if (deliverables.has(key)) {
+          throw new CodedException(409, 'FILE_NAME_TAKEN', 'Two deliverables share a name');
+        }
+        deliverables.add(key);
+      }
+      const itemId = await this.insertItem(tx, actor, {
+        ownerType: 'task',
+        taskId: target.taskId,
+        clientId: target.clientId,
+        role: file.role,
+        taskCommentId: null,
+        name,
       });
+      preview = (await this.insertUploadVersion(tx, actor, itemId, upload)) || preview;
     }
     return preview;
   }
@@ -212,6 +265,7 @@ export class FileAttachments {
       entityId: item.id,
       after: {
         ...auditRefs(item),
+        role: item.role,
         name: item.name,
         number: 1,
         ...(item.taskCommentId && { taskCommentId: item.taskCommentId }),

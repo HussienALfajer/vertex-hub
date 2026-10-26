@@ -40,6 +40,7 @@ import { LeaveJobs } from './leave-jobs.js';
 import { LeaveLedger } from './leave-ledger.js';
 import { LeaveWorkSources } from './leave-work-sources.js';
 import { SalaryChangesService } from './salary-changes.service.js';
+import { WorkCapacity } from './work-capacity.js';
 import { WorkSchedulesService } from './work-schedules.service.js';
 
 /**
@@ -51,7 +52,8 @@ import { WorkSchedulesService } from './work-schedules.service.js';
  * work-day input for `templates` and `content` (rule B1); leave and permission requests, the
  * balance ledger and its daily steps (rules B4–B18). Exports `LeaveDirectory` (approved leave for
  * the `calendar` and `tasks` modules, rules B16 and B17) and the `LeaveWorkSources` registry they
- * fill with an employee's work (rule B14), so `hr` imports neither. Registers the `hr_request`
+ * fill with an employee's work (rule B14), so `hr` imports neither; exports `WorkCapacity`, the
+ * schedule minutes after leave and holidays, for the task readiness check and Workload (F06B). Registers the `hr_request`
  * owner policy in `files` (rule B13). Part C: attendance passkeys (WebAuthn, ADR 0039), entrance
  * screens and their stream, punches and the days computed from them (rules C1–C16, C20); exports
  * the `AttendanceShoots` registry `calendar` fills for shoot check-ins (rule C13), and the
@@ -88,6 +90,7 @@ import { WorkSchedulesService } from './work-schedules.service.js';
     LeaveBalancesService,
     LeaveJobs,
     LeaveDirectory,
+    WorkCapacity,
     LeaveWorkSources,
     HrRequestFileOwner,
     AttendanceWebAuthn,
@@ -107,6 +110,7 @@ import { WorkSchedulesService } from './work-schedules.service.js';
   exports: [
     HolidayCalendar,
     LeaveDirectory,
+    WorkCapacity,
     LeaveWorkSources,
     AttendanceShoots,
     AttendanceFieldWork,

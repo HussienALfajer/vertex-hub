@@ -1,11 +1,13 @@
 import { TEMPLATE_KINDS, TEMPLATE_RUN_TRIGGERS } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -20,7 +22,7 @@ import { deliverableKindEnum } from './deliverables.js';
 import { departmentCodeEnum } from './department-codes.js';
 import { projects } from './projects.js';
 import { retainerCycleLines, retainerCycles, retainers } from './retainers.js';
-import { taskPriorityEnum, tasks } from './tasks.js';
+import { subtaskRunModeEnum, taskPriorityEnum, tasks } from './tasks.js';
 
 /*
  * Work templates and their runs (F07, ADR 0017), owned by the api `templates` module. Stages,
@@ -39,6 +41,8 @@ export const workTemplates = pgTable(
     name: text('name').notNull(),
     kind: templateKindEnum('kind').notNull(),
     description: text('description'),
+    /** `task` templates only (F06B part D): how the sub-steps run. */
+    runMode: subtaskRunModeEnum('run_mode'),
     /** Null for the seed templates. */
     createdById: uuid('created_by_id').references(() => users.id),
     ...timestamps(),
@@ -50,10 +54,18 @@ export const workTemplates = pgTable(
       .where(sql`${table.archivedAt} is null`),
     index('work_templates_kind_idx').on(table.kind),
     index('work_templates_created_by_id_idx').on(table.createdById),
+    // The kind is compared as text: the enum value is added in the same migration.
+    check(
+      'work_templates_run_mode_check',
+      sql`(${table.kind}::text = 'task') = (${table.runMode} is not null)`,
+    ),
   ],
 );
 
-/** A stage of a project template; it becomes a project milestone when applied. */
+/**
+ * A stage of a project template, which becomes a project milestone when applied, or of a `task`
+ * template, which becomes a stage of the task (F06B).
+ */
 export const workTemplateStages = pgTable(
   'work_template_stages',
   {
@@ -74,8 +86,10 @@ export const workTemplateSteps = pgTable(
     templateId: uuid('template_id')
       .notNull()
       .references(() => workTemplates.id),
-    /** Project templates only; null = a task without a milestone. */
+    /** Project templates: null = a task without a milestone; `task` templates: sub-steps by stages. */
     stageId: uuid('stage_id').references(() => workTemplateStages.id),
+    /** `task` templates: the root step, on each sub-step (F06B part D). */
+    parentStepId: uuid('parent_step_id').references((): AnyPgColumn => workTemplateSteps.id),
     position: integer('position').notNull(),
     title: text('title').notNull(),
     brief: text('brief'),
@@ -90,10 +104,21 @@ export const workTemplateSteps = pgTable(
     repeatKind: deliverableKindEnum('repeat_kind'),
     repeatLabel: text('repeat_label'),
     spreadFromDay: integer('spread_from_day'),
+    /** `task` templates only (F06B rules C1, C6–C8). */
+    briefDoc: jsonb('brief_doc'),
+    briefFields: jsonb('brief_fields'),
+    estimateMinutes: integer('estimate_minutes'),
+    criteria: text('criteria').array().notNull().default(sql`'{}'::text[]`),
   },
   (table) => [
     index('work_template_steps_template_id_idx').on(table.templateId, table.position),
     index('work_template_steps_stage_id_idx').on(table.stageId),
+    index('work_template_steps_parent_step_id_idx').on(table.parentStepId),
+    check(
+      'work_template_steps_estimate_check',
+      sql`${table.estimateMinutes} between 30 and 12000 and ${table.estimateMinutes} % 30 = 0`,
+    ),
+    check('work_template_steps_criteria_check', sql`cardinality(${table.criteria}) <= 15`),
     check('work_template_steps_revision_limit_check', sql`${table.revisionLimit} between 0 and 20`),
     check(
       'work_template_steps_timing_check',
@@ -196,9 +221,11 @@ export const templateRuns = pgTable(
       .where(
         sql`${table.trigger} in ('manual', 'cycle_opened') and ${table.retainerCycleId} is not null`,
       ),
+    // A `task` template's run (F06B rule D2) is manual and has neither a project nor a cycle.
     check(
       'template_runs_target_check',
-      sql`(${table.projectId} is null) <> (${table.retainerCycleId} is null)
+      sql`((${table.projectId} is null) <> (${table.retainerCycleId} is null)
+          or (${table.trigger} = 'manual' and ${table.projectId} is null))
         and (${table.cycleLineId} is not null) = (${table.trigger} = 'missing_tasks')
         and (${table.trigger} <> 'cycle_opened' or ${table.retainerCycleId} is not null)
         and (${table.trigger} <> 'missing_tasks' or ${table.retainerCycleId} is not null)`,
