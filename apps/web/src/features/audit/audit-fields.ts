@@ -46,6 +46,9 @@ const REFERENCE_FIELDS = new Set([
   // F01C: the image itself shows on the record; the brand logo version it was cut from.
   'imageId',
   'brandVersionId',
+  // F06B: a subtask's parent and stage.
+  'parentId',
+  'stageId',
 ]);
 
 /** The fields an entry shows: the changed ones, without links and references to other records. */

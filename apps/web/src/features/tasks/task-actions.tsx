@@ -112,6 +112,7 @@ export const MOVE_ICONS: Record<TaskMove, LucideIcon> = {
   resume: PlayIcon,
   resubmit: SendIcon,
   deliver: PackageCheckIcon,
+  approve_subtask: PackageCheckIcon,
   reopen_client: MessageSquareReplyIcon,
   reopen_internal: RotateCcwIcon,
   cancel: BanIcon,

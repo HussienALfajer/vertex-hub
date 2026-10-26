@@ -42,14 +42,22 @@ export const TASK_ACTION_TYPES = [
   'task_overdue_escalated',
   'task_over_limit_pending',
   'task_due_shortly',
+  'subtask_turn',
+  'subtask_handover',
+  'subtasks_all_finished',
+  'subtask_holding_next',
 ] as const satisfies readonly NotificationType[];
 
-/** The reminders of a task's due date: done when it is finished, void when it is re-dated. */
+/**
+ * The reminders of a task's due date: done when it is finished, void when it is re-dated. An
+ * overdue subtask holding the next one (F06B rule A14) is one of them.
+ */
 export const TASK_DUE_TYPES = [
   'task_due_soon',
   'task_overdue',
   'task_overdue_escalated',
   'task_due_shortly',
+  'subtask_holding_next',
 ] as const satisfies readonly NotificationType[];
 
 const inStage = (task: TaskResolutionState, stage: ReviewStage) =>
@@ -77,9 +85,16 @@ export function taskResolutions(
         ]
       : [];
   if (!before.assigneeId && after.assigneeId) done.push('task_requested');
-  if (before.status === 'new' && after.status !== 'new') done.push('task_assigned');
+  // F06B rule A6: an opened subtask is done with once it starts.
+  if (before.status === 'new' && after.status !== 'new') {
+    done.push('task_assigned', 'subtask_turn', 'subtask_handover');
+  }
   if (inStage(before, 'internal') && !inStage(after, 'internal')) {
     done.push('task_review_requested');
+  }
+  // F06B rule A9: the parent went to review after its subtasks.
+  if (!inStage(before, 'internal') && inStage(after, 'internal')) {
+    done.push('subtasks_all_finished');
   }
   if (inStage(before, 'medical') && !inStage(after, 'medical')) {
     done.push('task_medical_review_requested');

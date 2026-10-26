@@ -12,8 +12,10 @@ import {
   type CalendarDate,
   type CreateTask,
   type Following,
+  isTaskFinished,
   isTaskOverdue,
   permissionScopes,
+  type Subtask,
   TASK_LIMITS,
   type Task,
   type TaskDetail,
@@ -63,16 +65,19 @@ import { type Notice, RecordFollowers } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
+import { SubtaskRuns } from './subtask-runs.js';
 import {
   accessColumns,
   actorOf,
   assertTaskWritable,
   belongsTo,
+  dueAfter,
   hasAssignScope,
   hasClientScope,
   holdsAll,
   inClosedProject,
   ownsOpenRequest,
+  parentsOf,
   readableTask,
   type TaskAccess,
   type TaskRow,
@@ -129,6 +134,7 @@ export class TasksService {
     private readonly guards: TaskGuards,
     private readonly followers: RecordFollowers,
     private readonly leave: LeaveDirectory,
+    private readonly runs: SubtaskRuns,
   ) {}
 
   /** F16 rule B12: whether the actor follows a task they may read. */
@@ -190,8 +196,12 @@ export class TasksService {
     if (query.dueFrom) filters.push(gte(tasks.dueDate, query.dueFrom));
     if (query.dueTo) filters.push(lte(tasks.dueDate, query.dueTo));
     if (query.createdBy === 'me') filters.push(eq(tasks.createdById, actor.id));
-    if (query.reviewer === 'me') filters.push(this.manageScopeSql(actor));
+    if (query.reviewer === 'me') filters.push(this.reviewScopeSql(actor));
     if (query.reviewStage) filters.push(eq(tasks.reviewStage, query.reviewStage));
+    if (query.parentId) filters.push(eq(tasks.parentId, query.parentId));
+    if (query.topLevel !== undefined) {
+      filters.push(query.topLevel ? isNull(tasks.parentId) : isNotNull(tasks.parentId));
+    }
     const where = and(...filters);
 
     const sortColumn = {
@@ -233,6 +243,8 @@ export class TasksService {
       fileCounts,
       review,
       pending,
+      stages,
+      subtasks,
     ] = await Promise.all([
       this.present([task], this.db, now),
       dependenciesOf(id, this.db),
@@ -265,6 +277,8 @@ export class TasksService {
       this.files.taskFileCounts(id, this.db),
       this.reviews.detail(task),
       this.reviewHooks.pending([id], this.db),
+      task.parentId ? [] : this.runs.stages(this.db, id),
+      task.parentId ? [] : this.subtaskItems(this.db, id, now),
     ]);
     const pendingApproval = pending.get(id) ?? null;
     const row = extras[0];
@@ -354,6 +368,13 @@ export class TasksService {
           createdAt: r.createdAt.toISOString(),
         };
       }),
+      parent: task.parent
+        ? { id: task.parent.id, title: task.parent.title, status: task.parent.status }
+        : null,
+      runMode: task.runMode,
+      stages,
+      subtasks,
+      handoverNote: task.handoverNote,
       createdBy: task.createdById ? person(task.createdById) : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -385,7 +406,8 @@ export class TasksService {
    * the assignee (F11 rules 3 and 12, through `ShootTasks`). `inheritsLinks` takes the links as
    * copied from an existing task, so a closed cycle or a done milestone is kept (F11 edge case 6).
    * `checkLeave` warns of the assignee's leave on the due date (F17 rule B17); template runs and
-   * automatic assignments leave it out.
+   * automatic assignments leave it out. `parent` creates a subtask (F06B), followed by the
+   * parent's assignee (F16 rule B12).
    */
   async createIn(
     tx: Transaction,
@@ -396,6 +418,13 @@ export class TasksService {
       onBehalf?: boolean;
       inheritsLinks?: boolean;
       checkLeave?: boolean;
+      /** F06B rule A2: a subtask of this parent, at this place; the caller checked the parent. */
+      parent?: {
+        id: string;
+        position: number;
+        stageId: string | null;
+        assigneeId: string | null;
+      };
     } = {},
   ): Promise<string> {
     const postId = options.postId ?? null;
@@ -470,10 +499,18 @@ export class TasksService {
       revisionLimit: input.revisionLimit,
       ...request,
     };
+    const subtask = options.parent
+      ? {
+          parentId: options.parent.id,
+          position: options.parent.position,
+          stageId: options.parent.stageId,
+        }
+      : null;
     const [created] = await tx
       .insert(tasks)
       .values({
         ...values,
+        ...subtask,
         createdById: actor.id,
         ...(postId && { postId, postLinkedAt: new Date() }),
       })
@@ -520,6 +557,7 @@ export class TasksService {
       entityId: created.id,
       after: {
         ...values,
+        ...subtask,
         ...(postId && { postId }),
         ...(extraWorkItemId && { extraWorkItemId }),
         ...(dependsOn.length > 0 && { dependsOn }),
@@ -554,8 +592,13 @@ export class TasksService {
             actor.id,
           ),
     ]);
-    // F16 rule B12: the creator and the assignee follow the task.
-    await this.notices.follow(tx, created.id, [actor.id, input.assigneeId ?? null]);
+    // F16 rule B12: the creator and the assignee follow the task, and the parent's assignee each
+    // of its subtasks (F06B).
+    await this.notices.follow(tx, created.id, [
+      actor.id,
+      input.assigneeId ?? null,
+      options.parent?.assigneeId ?? null,
+    ]);
     return created.id;
   }
 
@@ -585,6 +628,49 @@ export class TasksService {
         input.requestedByContactId !== undefined;
       if (requestFields && task.type !== 'client_request') {
         throw new BadRequestException('Request fields belong to client requests only');
+      }
+
+      // F06B rule A1: a subtask takes its links from its parent and never goes to the client.
+      if (
+        task.parentId &&
+        (LINK_FIELDS.some((field) => input[field] !== undefined && input[field] !== task[field]) ||
+          input.needsClientApproval)
+      ) {
+        throw new CodedException(
+          400,
+          'INVALID_LINK',
+          'A subtask takes its client and engagement from its parent, without client approval',
+        );
+      }
+      // Rule A5: a subtask is due no later than its parent.
+      const due = {
+        dueDate: input.dueDate ?? task.dueDate,
+        dueTime: input.dueTime !== undefined ? input.dueTime : task.dueTime,
+      };
+      if (task.parent && dueAfter(due, task.parent)) {
+        throw new CodedException(400, 'INVALID_DATES', 'A subtask is due no later than its parent');
+      }
+      const lateSubtasks =
+        !task.parentId && (input.dueDate !== undefined || input.dueTime !== undefined)
+          ? (await this.runs.subtasksOf(tx, id)).filter(
+              (subtask) =>
+                !subtask.archivedAt &&
+                subtask.status !== 'delivered' &&
+                subtask.status !== 'cancelled' &&
+                dueAfter(subtask, due),
+            )
+          : [];
+      if (lateSubtasks.length > 0 && !input.moveSubtasks) {
+        throw new CodedException(
+          409,
+          'SUBTASK_DUE_AFTER_PARENT',
+          'Subtasks are due after the new date: move them with the parent or re-date them first',
+          lateSubtasks.map((subtask) => ({
+            id: subtask.id,
+            title: subtask.title,
+            dueDate: subtask.dueDate,
+          })),
+        );
       }
 
       // Links: the stored ones merged with the update (rule 7).
@@ -624,7 +710,11 @@ export class TasksService {
           if (links.clientId && !client) throw new NotFoundException();
         }
         await this.assertLinks(tx, links, client, pickLinks(task));
-        if (links.clientId !== task.clientId) await assertSameClientLinks(tx, id, links.clientId);
+        if (links.clientId !== task.clientId) {
+          // F06B rule A1: the subtasks move with their parent.
+          const subtaskIds = (await this.runs.subtasksOf(tx, id)).map((subtask) => subtask.id);
+          await assertSameClientLinks(tx, [id, ...subtaskIds], links.clientId);
+        }
       }
       // Assigning needs assign scope over the task as it will be, not only as it is.
       if (assigneeGiven && input.assigneeId && !hasAssignScope(actor, { department, client })) {
@@ -815,34 +905,133 @@ export class TasksService {
         await this.auditAcceptedLeave(tx, actor, id, assigneeId, dueDate, acceptedLeave);
       }
       await this.notifyUpdate(tx, actor, task, basics);
+      if (linksChange) await this.moveSubtaskLinks(tx, actor, id, links);
+      for (const subtask of lateSubtasks) {
+        await this.moveSubtaskDue(tx, actor, subtask.id, due);
+      }
     });
     return this.detail(actor, id);
+  }
+
+  /** F06B rule A1: the parent's client and engagement, and their files' client, follow it. */
+  private async moveSubtaskLinks(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    parentId: string,
+    links: Links,
+  ): Promise<void> {
+    const subtasks = await tx
+      .select(accessColumns)
+      .from(tasks)
+      .where(eq(tasks.parentId, parentId))
+      .orderBy(asc(tasks.id))
+      .for('update');
+    const moved = { ...links, milestoneId: null, cycleLineId: null };
+    for (const subtask of subtasks) {
+      const change = changedFields(pickLinks(subtask), moved);
+      if (!change) continue;
+      await tx.update(tasks).set(moved).where(eq(tasks.id, subtask.id));
+      if (subtask.clientId !== moved.clientId) {
+        await this.files.moveTaskClient(tx, subtask.id, moved.clientId);
+      }
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'task.updated',
+        entityType: 'task',
+        entityId: subtask.id,
+        before: change.before,
+        after: { ...change.after, parentId },
+      });
+    }
+  }
+
+  /** F06B rule A5: a subtask brought to its parent's new due date (`moveSubtasks`). */
+  private async moveSubtaskDue(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    subtaskId: string,
+    due: { dueDate: CalendarDate; dueTime: string | null },
+  ): Promise<void> {
+    const [before] = await tx
+      .select(accessColumns)
+      .from(tasks)
+      .where(eq(tasks.id, subtaskId))
+      .for('update');
+    if (!before) return;
+    const dueTime = toTimeOfDay(due.dueTime);
+    await tx.update(tasks).set({ dueDate: due.dueDate, dueTime }).where(eq(tasks.id, subtaskId));
+    const change = changedFields(
+      { dueDate: before.dueDate, dueTime: toTimeOfDay(before.dueTime) },
+      { dueDate: due.dueDate, dueTime },
+    );
+    if (change) {
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'task.updated',
+        entityType: 'task',
+        entityId: subtaskId,
+        before: change.before,
+        after: { ...change.after, parentId: before.parentId },
+      });
+    }
+    const after = await this.notices.load(tx, subtaskId);
+    await this.notices.sendChange(tx, before, actor.id, [
+      this.notices.notice(after, 'task_changed', [after.assigneeId], actor.id, {
+        change: 'due',
+        from: { dueDate: before.dueDate, dueTime: toTimeOfDay(before.dueTime) },
+        to: { dueDate: after.dueDate, dueTime },
+      }),
+    ]);
   }
 
   async archive(actor: CurrentUserInfo, id: string): Promise<TaskDetail> {
     if (!holdsAll(actor, 'tasks.manage')) throw new ForbiddenException();
     await this.db.transaction(async (tx) => {
+      // Archiving a subtask rewrites its parent's run (F06B rule A3).
+      await lockDependencyGraph(tx);
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       if (task.archivedAt) {
         throw new CodedException(409, 'TASK_ARCHIVED', 'The task is already archived');
       }
+      // F06B rule A11: a parent's subtasks are archived with it, at the same instant, so restore
+      // knows which to bring back.
+      const subtasks = task.parentId
+        ? []
+        : await tx
+            .select(accessColumns)
+            .from(tasks)
+            .where(and(eq(tasks.parentId, id), isNull(tasks.archivedAt)))
+            .orderBy(asc(tasks.id))
+            .for('update');
+      const ids = [id, ...subtasks.map((subtask) => subtask.id)];
       // F11 rule 9: a scheduled shoot holds its task.
-      await this.guards.assertFree(tx, [id]);
-      await tx.update(tasks).set({ archivedAt: new Date() }).where(eq(tasks.id, id));
-      await this.auditArchive(tx, actor, 'task.archived', id, true);
+      await this.guards.assertFree(tx, ids);
+      await tx.update(tasks).set({ archivedAt: new Date() }).where(inArray(tasks.id, ids));
+      for (const archivedId of ids) {
+        await this.auditArchive(tx, actor, 'task.archived', archivedId, true);
+      }
       // F09 rule 17: an archived task is no longer with the client.
       if (task.status === 'awaiting_client') {
         await this.reviewHooks.left(tx, { taskId: id, actor: actorOf(actor), response: null });
       }
       // F08 rule 8: an archived task leaves its post.
       await unlinkRemovedTask(tx, this.postHooks, task, 'archived', actorOf(actor));
-      await this.notices.sendChange(tx, task, actor.id, [
-        this.notices.notice(task, 'task_changed', [task.assigneeId], actor.id, {
+      if (task.parentId) await this.runs.sync(tx, task.parentId, actor.id);
+      const archivedNotice = (archived: NoticeTask) =>
+        this.notices.notice(archived, 'task_changed', [archived.assigneeId], actor.id, {
           change: 'archived',
           from: null,
           to: null,
-        }),
-        ...(blocksDependents(task) ? await this.notices.openedDependents(tx, [id], actor.id) : []),
+        });
+      for (const subtask of subtasks) {
+        await this.notices.sendChange(tx, subtask, actor.id, [
+          archivedNotice(await this.notices.load(tx, subtask.id)),
+        ]);
+      }
+      const blocking = [task, ...subtasks].filter(blocksDependents).map((t) => t.id);
+      await this.notices.sendChange(tx, task, actor.id, [
+        archivedNotice(task),
+        ...(blocking.length > 0 ? await this.notices.openedDependents(tx, blocking, actor.id) : []),
       ]);
     });
     return this.detail(actor, id);
@@ -853,37 +1042,59 @@ export class TasksService {
     await this.db.transaction(async (tx) => {
       // Taken before the row lock: restoring open work waits for user archiving (rule 6).
       await lockAccessChanges(tx);
+      await lockDependencyGraph(tx);
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       if (!task.archivedAt) {
         throw new CodedException(409, 'TASK_NOT_ARCHIVED', 'The task is not archived');
+      }
+      if (task.parent?.archivedAt) {
+        throw new CodedException(409, 'TASK_ARCHIVED', 'Restore the parent task first');
       }
       const open = task.status !== 'delivered' && task.status !== 'cancelled';
       if (open && inClosedProject(task)) {
         throw new CodedException(409, 'PROJECT_CLOSED', 'Reopen the project first');
       }
-      // An archived assignee cannot take the work back: it returns to the department queue.
-      const unassign =
-        open && !!task.assigneeId && !(await this.users.activeUser(task.assigneeId, tx));
-      await tx
-        .update(tasks)
-        .set({ archivedAt: null, ...(unassign && { assigneeId: null }) })
-        .where(eq(tasks.id, id));
-      await this.auditArchive(tx, actor, 'task.restored', id, false);
-      if (unassign && task.assigneeId) {
-        const people = await this.users.summaries([task.assigneeId], tx);
-        await recordAudit(tx, {
-          actor: actorOf(actor),
-          action: 'task.assigned',
-          entityType: 'task',
-          entityId: id,
-          before: {
-            assignee: { id: task.assigneeId, name: people.get(task.assigneeId)?.name ?? '' },
-          },
-          after: { assignee: null },
-        });
+      // F06B rule A11: the subtasks archived with the parent come back with it.
+      const subtasks = task.parentId
+        ? []
+        : await tx
+            .select(accessColumns)
+            .from(tasks)
+            .where(and(eq(tasks.parentId, id), eq(tasks.archivedAt, task.archivedAt)))
+            .orderBy(asc(tasks.id))
+            .for('update');
+      for (const restored of [task, ...subtasks]) {
+        await this.restoreOne(tx, actor, restored);
       }
+      if (task.parentId) await this.runs.sync(tx, task.parentId, actor.id);
     });
     return this.detail(actor, id);
+  }
+
+  /** Restores one locked task; an archived assignee cannot take open work back (rule 6). */
+  private async restoreOne(tx: Transaction, actor: CurrentUserInfo, task: TaskRow): Promise<void> {
+    const open = task.status !== 'delivered' && task.status !== 'cancelled';
+    // An archived assignee cannot take the work back: it returns to the department queue.
+    const unassign =
+      open && !!task.assigneeId && !(await this.users.activeUser(task.assigneeId, tx));
+    await tx
+      .update(tasks)
+      .set({ archivedAt: null, ...(unassign && { assigneeId: null }) })
+      .where(eq(tasks.id, task.id));
+    await this.auditArchive(tx, actor, 'task.restored', task.id, false);
+    if (unassign && task.assigneeId) {
+      const people = await this.users.summaries([task.assigneeId], tx);
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'task.assigned',
+        entityType: 'task',
+        entityId: task.id,
+        before: {
+          assignee: { id: task.assigneeId, name: people.get(task.assigneeId)?.name ?? '' },
+        },
+        after: { assignee: null },
+      });
+    }
   }
 
   /**
@@ -970,6 +1181,19 @@ export class TasksService {
   }
 
   /**
+   * SQL over a row of `tasks`: the actor may review it: under their manage scope, or a subtask of
+   * a parent they are assigned, not their own (F06B rule A7).
+   */
+  reviewScopeSql(actor: CurrentUserInfo): SQL {
+    return or(
+      this.manageScopeSql(actor),
+      sql`(${tasks.parentId} is not null and ${tasks.assigneeId} is distinct from ${actor.id}
+        and exists (select 1 from ${tasks} as parent
+          where parent.id = "tasks"."parent_id" and parent.assignee_id = ${actor.id}))`,
+    ) as SQL;
+  }
+
+  /**
    * SQL over a row of `tasks`: under the actor's manage scope (`tasks.manage` under any scope), so
    * they may review it.
    */
@@ -1011,6 +1235,8 @@ export class TasksService {
       blocked,
       checklist,
       revisions,
+      parents,
+      progress,
     ] = await Promise.all([
       this.users.summaries(assignees, executor),
       this.users.memberships(assignees, executor),
@@ -1022,6 +1248,11 @@ export class TasksService {
       blockedIds(ids, executor),
       this.checklistCounts(ids, executor),
       this.revisionCounts(ids, executor),
+      parentsOf(executor, rows),
+      this.subtaskCounts(
+        rows.filter((row) => !row.parentId).map((row) => row.id),
+        executor,
+      ),
     ]);
     return rows.map((row) => {
       const assignee = row.assigneeId ? people.get(row.assigneeId) : undefined;
@@ -1068,11 +1299,88 @@ export class TasksService {
         revisions: { clientCount: revision?.clientCount ?? 0, limit: row.revisionLimit },
         overLimitPending: revision?.overLimitPending ?? false,
         postId: row.postId,
+        parent: (() => {
+          const parent = row.parentId ? parents.get(row.parentId) : undefined;
+          return parent ? { id: parent.id, title: parent.title } : null;
+        })(),
+        progress: progress.get(row.id) ?? null,
         readOnly:
           !!row.archivedAt ||
           !!client?.archived ||
           !!project?.archived ||
           !!cycle?.retainerArchived,
+      };
+    });
+  }
+
+  /** Rule A9: each parent's delivered subtasks against its live ones; parents without any are left out. */
+  private async subtaskCounts(ids: string[], executor: Executor) {
+    if (ids.length === 0) return new Map<string, { delivered: number; total: number }>();
+    const rows = await executor
+      .select({
+        parentId: tasks.parentId,
+        total: count(),
+        delivered: sql<number>`count(*) filter (where ${tasks.status} = 'delivered')`.mapWith(
+          Number,
+        ),
+      })
+      .from(tasks)
+      .where(
+        and(
+          inArray(tasks.parentId, ids),
+          isNull(tasks.archivedAt),
+          sql`${tasks.status} <> 'cancelled'`,
+        ),
+      )
+      .groupBy(tasks.parentId);
+    return new Map(
+      rows.flatMap((row) =>
+        row.parentId
+          ? [[row.parentId, { delivered: row.delivered, total: row.total }] as const]
+          : [],
+      ),
+    );
+  }
+
+  /**
+   * F06B: a parent's non-archived subtasks by position, with their stage, handover note and the
+   * unfinished tasks each waits on now.
+   */
+  async subtaskItems(executor: Executor, parentId: string, now: Date): Promise<Subtask[]> {
+    const rows = await executor
+      .select(accessColumns)
+      .from(tasks)
+      .where(and(eq(tasks.parentId, parentId), isNull(tasks.archivedAt)))
+      .orderBy(asc(tasks.position), asc(tasks.id));
+    if (rows.length === 0) return [];
+    const ids = rows.map((row) => row.id);
+    const [items, waits] = await Promise.all([
+      this.present(rows, executor, now),
+      executor
+        .select({
+          taskId: taskDependencies.taskId,
+          id: tasks.id,
+          title: tasks.title,
+          status: tasks.status,
+        })
+        .from(taskDependencies)
+        .innerJoin(tasks, eq(tasks.id, taskDependencies.dependsOnId))
+        .where(and(inArray(taskDependencies.taskId, ids), isNull(tasks.archivedAt)))
+        .orderBy(asc(tasks.position), asc(tasks.title)),
+    ]);
+    return items.map(({ readOnly: _, ...item }, index) => {
+      const row = rows[index] as TaskRow;
+      return {
+        ...item,
+        position: row.position ?? index + 1,
+        stageId: row.stageId,
+        waitingOn: waits
+          .filter(
+            (wait) =>
+              wait.taskId === row.id && wait.status !== 'cancelled' && !isTaskFinished(wait.status),
+          )
+          .map((wait) => ({ id: wait.id, title: wait.title })),
+        handoverNote: row.handoverNote,
       };
     });
   }

@@ -87,6 +87,9 @@ describe('notification catalog', () => {
         'client_logo_changed',
         'project_image_changed',
         'retainer_image_changed',
+        // F06B.
+        'subtask_stage_finished',
+        'task_blocked',
         // F17 part B.
         'holiday_changed',
         'hr_request_decided',
@@ -637,6 +640,11 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       'attendance_check_out_missing',
       'shoot_check_in_missing',
       'kiosk_offline',
+      // F06B.
+      'subtask_turn',
+      'subtask_handover',
+      'subtasks_all_finished',
+      'subtask_holding_next',
     ]);
   });
 
@@ -709,6 +717,7 @@ describe('escalation (F16 rule B11)', () => {
         'quote_approval_requested',
         'retainer_amendment_pending',
         'shoot_not_closed',
+        'subtask_holding_next',
         'task_awaiting_client',
         'task_medical_review_requested',
         'task_overdue_escalated',

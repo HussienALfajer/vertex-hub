@@ -181,6 +181,13 @@ export const NOTIFICATION_TYPES = [
   'client_logo_changed',
   'project_image_changed',
   'retainer_image_changed',
+  // F06B part A.
+  'subtask_turn',
+  'subtask_handover',
+  'subtask_stage_finished',
+  'subtasks_all_finished',
+  'subtask_holding_next',
+  'task_blocked',
   // F16: the followers' status notices come last, after every other notice of the change.
   'task_progressed',
   'post_progressed',
@@ -432,6 +439,15 @@ const CATALOG: Record<
   client_logo_changed: { category: 'clients_projects', subject: 'client', mutable: true },
   project_image_changed: { category: 'clients_projects', subject: 'project', mutable: true },
   retainer_image_changed: { category: 'clients_projects', subject: 'retainer', mutable: true },
+  /** F06B: a subtask opens; its subject is the subtask. */
+  subtask_turn: { category: 'tasks', subject: 'task', mutable: false },
+  subtask_handover: { category: 'tasks', subject: 'task', mutable: false },
+  /** F06B: about the parent. */
+  subtask_stage_finished: { category: 'tasks', subject: 'task', mutable: true },
+  subtasks_all_finished: { category: 'tasks', subject: 'task', mutable: false },
+  /** F06B rule A14: about the overdue subtask. */
+  subtask_holding_next: { category: 'tasks', subject: 'task', mutable: false },
+  task_blocked: { category: 'tasks', subject: 'task', mutable: true },
 };
 
 /*
@@ -627,6 +643,13 @@ const CHANNELS: Record<NotificationType, Channels> = {
   client_logo_changed: informational,
   project_image_changed: informational,
   retainer_image_changed: informational,
+  subtask_turn: important(),
+  subtask_handover: important(),
+  subtask_stage_finished: normal(),
+  subtasks_all_finished: important(),
+  /** Normal for the waiting subtask's assignee (`notificationPriority`). */
+  subtask_holding_next: important(),
+  task_blocked: informational,
 };
 
 /*
@@ -880,6 +903,15 @@ const ENGINE: Record<NotificationType, Engine> = {
   client_logo_changed: mergedDaily,
   project_image_changed: mergedDaily,
   retainer_image_changed: mergedDaily,
+  subtask_turn: action(),
+  subtask_handover: action(),
+  subtask_stage_finished: mergedDaily,
+  subtasks_all_finished: action(),
+  /** "For your information" for the waiting subtask's assignee (`notificationBox`). */
+  subtask_holding_next: action({
+    escalation: [{ step: 2, after: { workDays: 1 }, target: { to: 'managers' } }],
+  }),
+  task_blocked: mergedDaily,
 };
 
 /**
@@ -943,9 +975,18 @@ const taskSnapshotSchema = z.object({
   department: departmentCodeSchema,
   client: nameSchema.nullable(),
   project: nameSchema.nullable(),
+  /** F06B: the parent's title when the task is a subtask; missing on older notices. */
+  parent: nameSchema.nullable().optional(),
 });
 
 const taskData = z.object({ task: taskSnapshotSchema });
+
+/** A delivered subtask as a handover names it (F06B rule A12). */
+const handoverSnapshotSchema = z.object({
+  title: nameSchema,
+  by: nameSchema.nullable(),
+  note: z.string().nullable(),
+});
 
 const commentData = taskData.extend({
   excerpt: z.string().max(NOTIFICATION_EXCERPT_MAX),
@@ -1473,6 +1514,27 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     client: nameSchema,
     removed: z.boolean(),
   }),
+  /** F06B rule A12: `previous` is the subtask before it, with its handover note. */
+  subtask_turn: taskData.extend({
+    parent: nameSchema,
+    previous: handoverSnapshotSchema.nullable(),
+  }),
+  /** F06B rule A12: the stage that finished, with what it handed over. */
+  subtask_handover: taskData.extend({
+    parent: nameSchema,
+    stage: nameSchema,
+    handover: z.array(handoverSnapshotSchema).max(30),
+  }),
+  /** The task is the parent. */
+  subtask_stage_finished: taskData.extend({ stage: nameSchema }),
+  subtasks_all_finished: taskData,
+  /** The task is the overdue subtask; `forParent`: sent to the parent's assignee, else informational. */
+  subtask_holding_next: taskData.extend({
+    parent: nameSchema,
+    waiting: nameSchema,
+    forParent: z.boolean(),
+  }),
+  task_blocked: taskData,
 } satisfies Record<NotificationType, z.ZodType>;
 
 export type NotificationData<Type extends NotificationType> = z.infer<
@@ -1486,21 +1548,25 @@ export type NotificationContent = {
 
 /**
  * The priority a notification snapshots (spec F16, "Notification types"): the type's, except the
- * final `retainer_behind` reminder (critical) and the managers' `tasks_generated` (important).
+ * final `retainer_behind` reminder (critical), the managers' `tasks_generated` (important) and the
+ * waiting subtask's `subtask_holding_next` (normal).
  */
 export function notificationPriority(content: NotificationContent): NotificationPriority {
   if (content.type === 'retainer_behind' && content.data.final) return 'critical';
   if (content.type === 'tasks_generated' && content.data.unassigned) return 'important';
+  if (content.type === 'subtask_holding_next' && !content.data.forParent) return 'normal';
   if (content.type === 'announcement') return content.data.priority;
   return NOTIFICATION_CATALOG[content.type].priority;
 }
 
 /**
  * The type a notification snapshots its box from (spec F16, "Notification types"): the type's,
- * except the managers' `tasks_generated`, which waits on them.
+ * except the managers' `tasks_generated`, which waits on them, and the waiting subtask's
+ * `subtask_holding_next`, which only informs.
  */
 export function notificationBox(content: NotificationContent): NotificationBox {
   if (content.type === 'tasks_generated' && content.data.unassigned) return 'action';
+  if (content.type === 'subtask_holding_next' && !content.data.forParent) return 'info';
   if (content.type === 'announcement' && content.data.requiresAck) return 'action';
   return NOTIFICATION_CATALOG[content.type].box;
 }
@@ -1979,6 +2045,8 @@ export const NOTIFICATION_REMINDER_KINDS = [
   /** F17 rule C21: once per attendance day each. */
   'attendance_check_in',
   'attendance_check_out',
+  /** F06B rule A14: once per overdue subtask and due date. */
+  'subtask_holding_next',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

@@ -264,6 +264,12 @@ export const ERROR_CODES = [
   'MONTH_NOT_ENDED',
   'MONTH_HAS_PENDING',
   'NOT_CLOSED',
+  // F06B part A.
+  'SUBTASK_DEPTH',
+  'SUBTASKS_OPEN',
+  'SUBTASK_DUE_AFTER_PARENT',
+  'TASK_CLOSED',
+  'STAGE_NOT_EMPTY',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

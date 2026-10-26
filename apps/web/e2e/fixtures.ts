@@ -5369,6 +5369,8 @@ function taskRoutes({
         !!task.clientId &&
         (holds('tasks.manage', 'all') || (holds('tasks.manage', 'own_clients') && ownClient)),
       creator: holds('tasks.request', 'all') && task.createdById === me().user.id,
+      // The mocks hold no subtasks yet (F06B).
+      parentReviewer: false,
     };
   };
   const reviewStage = (task: TaskRecord) => task.reviewStage;
@@ -5414,6 +5416,7 @@ function taskRoutes({
             hasClient: !!task.clientId,
             needsClientApproval: task.needsClientApproval,
             blocked: blocked(task),
+            subtask: false,
           },
           rights(task),
         );
@@ -5440,6 +5443,13 @@ function taskRoutes({
       canCancel: allowed(task).includes('cancelled'),
       canReopen: live && r.manage,
       canArchive: holds('tasks.manage', 'all'),
+      canManageSubtasks:
+        live &&
+        task.status !== 'delivered' &&
+        task.status !== 'cancelled' &&
+        (r.manage || task.assigneeId === me().user.id),
+      canReopenSubtasks: live && task.status === 'revisions' && (r.work || r.manage),
+      canWriteHandover: false,
     };
   };
 
@@ -5502,6 +5512,8 @@ function taskRoutes({
       revisions: { clientCount: clientCount(task), limit: task.revisionLimit },
       overLimitPending: task.revisions.some((r) => r.overLimit && r.decision === null),
       postId: task.postId,
+      parent: null,
+      progress: null,
     };
   };
   const dependencyOf = (task: TaskRecord) => ({
@@ -5511,6 +5523,7 @@ function taskRoutes({
     status: task.status,
     finished: isTaskFinished(task.status),
     archived: task.archived,
+    source: 'manual' as const,
   });
   const detail = (task: TaskRecord): TaskDetail => ({
     ...summary(task),
@@ -5572,6 +5585,11 @@ function taskRoutes({
       author: r.authorId ? person(r.authorId) : null,
       createdAt: r.createdAt,
     })),
+    parent: null,
+    runMode: null,
+    stages: [],
+    subtasks: [],
+    handoverNote: null,
     createdBy: person(task.createdById),
     createdAt: task.createdAt,
     updatedAt: task.createdAt,

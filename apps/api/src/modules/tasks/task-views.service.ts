@@ -55,6 +55,7 @@ export class TaskViewsService {
       filters.push(eq(tasks.assigneeId, query.assigneeId === 'me' ? actor.id : query.assigneeId));
     }
     if (query.clientId) filters.push(eq(tasks.clientId, query.clientId));
+    if (query.topLevel) filters.push(isNull(tasks.parentId));
     const since = new Date(now.getTime() - BOARD_LIMITS.deliveredDays * DAY_MS);
     const columns = await Promise.all(
       BOARD_STATUSES.map(async (status) => {
@@ -174,7 +175,7 @@ export class TaskViewsService {
           and(
             this.tasks.visibleSql(),
             eq(tasks.status, 'internal_review'),
-            this.tasks.manageScopeSql(actor),
+            this.tasks.reviewScopeSql(actor),
           ),
         ),
       managed.length === 0

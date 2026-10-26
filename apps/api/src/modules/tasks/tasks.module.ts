@@ -10,6 +10,7 @@ import { OverLimitReminders } from './over-limit-reminders.js';
 import { PostTaskHooks } from './post-task-hooks.js';
 import { PostTasks } from './post-tasks.js';
 import { ShootTasks } from './shoot-tasks.js';
+import { SubtaskRuns } from './subtask-runs.js';
 import { TaskApprovals } from './task-approvals.js';
 import { TaskCommentsController } from './task-comments.controller.js';
 import { TaskCommentsService } from './task-comments.service.js';
@@ -28,6 +29,8 @@ import { TaskReports } from './task-reports.js';
 import { TaskReviewsController } from './task-reviews.controller.js';
 import { TaskReviews } from './task-reviews.js';
 import { TaskReviewsService } from './task-reviews.service.js';
+import { TaskSubtasksController } from './task-subtasks.controller.js';
+import { TaskSubtasksService } from './task-subtasks.service.js';
 import { TaskViewsController } from './task-views.controller.js';
 import { TaskViewsService } from './task-views.service.js';
 import { TaskWorkflowService } from './task-workflow.service.js';
@@ -50,7 +53,8 @@ import { TasksService } from './tasks.service.js';
  * `TaskGuards` registry for the `calendar` module (F11, ADR 0022), which it never imports, and
  * `TaskLinks` (task summaries) for the `campaigns` module (F12), and `TaskReports` for `reports` (F15).
  * Warns of an assignee's approved leave through `hr`'s `LeaveDirectory` and feeds open tasks into
- * its `LeaveWorkSources` (F17 rules B14 and B17).
+ * its `LeaveWorkSources` (F17 rules B14 and B17). Owns subtasks, their stages and run (F06B,
+ * ADR 0041).
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule, HrModule],
@@ -61,6 +65,7 @@ import { TasksService } from './tasks.service.js';
     TaskReviewsController,
     TaskPartsController,
     TaskCommentsController,
+    TaskSubtasksController,
   ],
   providers: [
     TasksService,
@@ -86,6 +91,8 @@ import { TasksService } from './tasks.service.js';
     TaskLinks,
     TaskReports,
     TaskQueueHooks,
+    SubtaskRuns,
+    TaskSubtasksService,
   ],
   exports: [
     TaskGenerator,

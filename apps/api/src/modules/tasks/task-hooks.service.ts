@@ -100,7 +100,10 @@ export class TaskHooksService implements OnModuleInit {
     });
   }
 
-  /** `total`: non-archived, non-cancelled tasks; `delivered`, `ready`: those delivered, approved. */
+  /**
+   * `total`: non-archived, non-cancelled tasks; `delivered`, `ready`: those delivered, approved.
+   * Subtasks never count: their parent does (F06B rule A9).
+   */
   private async counts(
     column: PgColumn,
     ids: string[],
@@ -116,7 +119,14 @@ export class TaskHooksService implements OnModuleInit {
         ready: sql<number>`count(*) filter (where ${tasks.status} = 'approved')`.mapWith(Number),
       })
       .from(tasks)
-      .where(and(inArray(column, ids), isNull(tasks.archivedAt), ne(tasks.status, 'cancelled')))
+      .where(
+        and(
+          inArray(column, ids),
+          isNull(tasks.archivedAt),
+          isNull(tasks.parentId),
+          ne(tasks.status, 'cancelled'),
+        ),
+      )
       .groupBy(column);
     return new Map(
       rows.map((row) => [

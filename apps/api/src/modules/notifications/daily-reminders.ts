@@ -117,7 +117,7 @@ export class DailyReminders implements OnModuleInit {
     tx: Transaction,
     key: ReminderKey,
     today: CalendarDate,
-    notice: Notice,
+    notice: Notice | readonly Notice[],
   ): Promise<boolean> {
     const inserted = await tx
       .insert(notificationReminders)

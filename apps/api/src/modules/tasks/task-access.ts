@@ -8,13 +8,14 @@ import {
   permissionScopes,
   type RequestScope,
   type ReviewStage,
+  type SubtaskRunMode,
   type TaskPermissions,
   type TaskRights,
   type TaskStatus,
   type TaskType,
 } from '@vertex-hub/contracts';
 import { type Database, type Transaction, tasks } from '@vertex-hub/db';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { CodedException } from '../../core/errors/index.js';
 import type { AuditActor } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
@@ -66,6 +67,11 @@ export const accessColumns = {
   postId: tasks.postId,
   createdById: tasks.createdById,
   startedAt: tasks.startedAt,
+  parentId: tasks.parentId,
+  position: tasks.position,
+  stageId: tasks.stageId,
+  runMode: tasks.runMode,
+  handoverNote: tasks.handoverNote,
   archivedAt: tasks.archivedAt,
 };
 
@@ -97,14 +103,69 @@ export interface TaskRow {
   postId: string | null;
   createdById: string | null;
   startedAt: Date | null;
+  parentId: string | null;
+  position: number | null;
+  stageId: string | null;
+  runMode: SubtaskRunMode | null;
+  handoverNote: string | null;
   archivedAt: Date | null;
 }
 
-/** A task with the records that decide access: its client, project and retainer cycle. */
+/** The parent of a subtask, as access, the workflow and notices read it (F06B). */
+export interface ParentRef {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  department: DepartmentCode;
+  assigneeId: string | null;
+  runMode: SubtaskRunMode | null;
+  dueDate: string;
+  dueTime: string | null;
+  archivedAt: Date | null;
+}
+
+const parentColumns = {
+  id: tasks.id,
+  title: tasks.title,
+  status: tasks.status,
+  department: tasks.department,
+  assigneeId: tasks.assigneeId,
+  runMode: tasks.runMode,
+  dueDate: tasks.dueDate,
+  dueTime: tasks.dueTime,
+  archivedAt: tasks.archivedAt,
+};
+
+/**
+ * F06B rule A5: whether a due date and time fall after another; a date without a time ends with
+ * the day.
+ */
+export const dueAfter = (
+  a: { dueDate: string; dueTime: string | null },
+  b: { dueDate: string; dueTime: string | null },
+): boolean =>
+  a.dueDate > b.dueDate ||
+  (a.dueDate === b.dueDate &&
+    b.dueTime !== null &&
+    (a.dueTime === null || a.dueTime.slice(0, 5) > b.dueTime.slice(0, 5)));
+
+/** The parents of `rows`' subtasks, by id. */
+export async function parentsOf(
+  executor: Database | Transaction,
+  rows: readonly { parentId: string | null }[],
+): Promise<Map<string, ParentRef>> {
+  const ids = [...new Set(rows.flatMap((row) => (row.parentId ? [row.parentId] : [])))];
+  if (ids.length === 0) return new Map();
+  const parents = await executor.select(parentColumns).from(tasks).where(inArray(tasks.id, ids));
+  return new Map(parents.map((parent) => [parent.id, parent]));
+}
+
+/** A task with the records that decide access: its client, project, retainer cycle and parent. */
 export interface TaskAccess extends TaskRow {
   client: ClientSummary | null;
   project: ProjectLink | null;
   cycle: CycleLink | null;
+  parent: ParentRef | null;
 }
 
 /** Rule 17: archived, or its client, project or retainer is archived. */
@@ -128,16 +189,18 @@ export async function readableTask(
   const query = executor.select(accessColumns).from(tasks).where(eq(tasks.id, id));
   const [row] = options.forUpdate ? await query.for('update') : await query;
   if (!row || !holdsAll(actor, 'tasks.read')) throw new NotFoundException();
-  const [client, projects, cycles] = await Promise.all([
+  const [client, projects, cycles, parents] = await Promise.all([
     row.clientId ? directories.clients.summary(row.clientId, executor) : null,
     directories.engagements.projects(row.projectId ? [row.projectId] : [], executor),
     directories.engagements.cycles(row.retainerCycleId ? [row.retainerCycleId] : [], executor),
+    parentsOf(executor, [row]),
   ]);
   const task: TaskAccess = {
     ...row,
     client,
     project: (row.projectId && projects.get(row.projectId)) || null,
     cycle: (row.retainerCycleId && cycles.get(row.retainerCycleId)) || null,
+    parent: (row.parentId && parents.get(row.parentId)) || null,
   };
   if (isReadOnly(task) && !holdsAll(actor, 'tasks.manage')) throw new NotFoundException();
   return task;
@@ -201,7 +264,37 @@ export function taskRights(actor: CurrentUserInfo, task: TaskAccess): TaskRights
     assign,
     client: hasClientScope(actor, task.client),
     creator: hasPermission(actor.access, 'tasks.request') && task.createdById === actor.id,
+    // F06B rule A7: the parent's assignee reviews its subtasks, except their own.
+    parentReviewer:
+      !!task.parent?.assigneeId &&
+      task.parent.assigneeId === actor.id &&
+      task.assigneeId !== actor.id,
   };
+}
+
+/**
+ * F06B, Roles: manage scope on the parent, or being its assignee, gives the subtask rights over
+ * a top-level task (add, reorder, cancel, stages, run mode, convert).
+ */
+export const managesSubtasks = (actor: CurrentUserInfo, parent: TaskAccess): boolean =>
+  !parent.parentId &&
+  (taskRights(actor, parent).manage || (!!parent.assigneeId && parent.assigneeId === actor.id));
+
+/** Rule A10: the parent's `tasks.work` holders (its assignee, its department managers) or manage scope. */
+export const reopensSubtasks = (actor: CurrentUserInfo, parent: TaskAccess): boolean => {
+  const rights = taskRights(actor, parent);
+  return !parent.parentId && (rights.work || rights.manage);
+};
+
+/** A parent takes no new subtasks, order or mode once delivered, cancelled or archived. */
+export function assertParentOpen(parent: TaskAccess): void {
+  if (parent.parentId) {
+    throw new CodedException(409, 'SUBTASK_DEPTH', 'A subtask has no subtasks');
+  }
+  assertTaskWritable(parent);
+  if (parent.status === 'delivered' || parent.status === 'cancelled') {
+    throw new CodedException(409, 'TASK_CLOSED', 'The task is delivered or cancelled');
+  }
 }
 
 /**
@@ -223,6 +316,7 @@ export const taskState = (task: TaskAccess, blocked: boolean) => ({
   hasClient: !!task.clientId,
   needsClientApproval: task.needsClientApproval,
   blocked,
+  subtask: !!task.parentId,
 });
 
 /** F09 rule 4: holders of `approvals.review_medical`, never the task's assignee. */
@@ -268,12 +362,13 @@ export function taskPermissions(
       : allowedTaskTransitions(taskState(task, blocked), rights).filter(
           (to) => !isRefusedOnLinkedTask(task, to),
         );
+  const open = !readOnly && !closed;
   return {
     permissions: {
       canEdit: !readOnly && (rights.manage || ownsOpenRequest(rights, task)),
       canAssign: !readOnly && rights.assign,
       canWork: !readOnly && rights.work,
-      canReview: !readOnly && rights.manage,
+      canReview: !readOnly && (rights.manage || rights.parentReviewer),
       canRecordClientResponse: !readOnly && rights.client && !!task.clientId && !task.postId,
       canDecideRevision: !readOnly && rights.client,
       canMedicalReview:
@@ -285,6 +380,9 @@ export function taskPermissions(
       canCancel: allowedTransitions.includes('cancelled'),
       canReopen: !readOnly && closed && allowedTransitions.length > 0,
       canArchive: holdsAll(actor, 'tasks.manage'),
+      canManageSubtasks: open && managesSubtasks(actor, task),
+      canReopenSubtasks: !readOnly && task.status === 'revisions' && reopensSubtasks(actor, task),
+      canWriteHandover: open && !!task.parentId && rights.work,
     },
     allowedTransitions,
   };

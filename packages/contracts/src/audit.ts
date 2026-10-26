@@ -294,6 +294,15 @@ export const AUDIT_ACTIONS = [
   'attendance_punch.rejected',
   'attendance_month.closed',
   'attendance_month.reopened',
+  // F06B part A.
+  'task.run_mode_changed',
+  'task.subtasks_reordered',
+  'task.subtasks_reopened',
+  'task.handover_noted',
+  'task_stage.created',
+  'task_stage.updated',
+  'task_stage.archived',
+  'task_stage.finished',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });
@@ -366,6 +375,8 @@ export const AUDIT_ENTITY_TYPES = [
   'attendance_item',
   'attendance_punch',
   'attendance_month',
+  /** F06B: a stage of a parent task. */
+  'task_stage',
 ] as const;
 
 export const auditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES).meta({ id: 'AuditEntityType' });

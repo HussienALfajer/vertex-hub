@@ -1,7 +1,9 @@
 import {
+  DEPENDENCY_SOURCES,
   REQUEST_SCOPES,
   REVISION_DECISIONS,
   REVISION_SOURCES,
+  SUBTASK_RUN_MODES,
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
@@ -42,7 +44,9 @@ import {
  * Tasks of every department (F06, ADR 0016), owned by the api `tasks` module. Dates without a
  * time are calendar days in Asia/Damascus, read and written as `YYYY-MM-DD`; `due_time` is a time
  * of day there. Review stages, review snapshots and client responses are F09 (ADR 0020); their
- * enums are in `reviews.ts`. A task may produce the media of a post (F08, ADR 0021).
+ * enums are in `reviews.ts`. A task may produce the media of a post (F08, ADR 0021). A task may
+ * hold subtasks, one level deep, run by the parent's run mode through `run` dependencies (F06B,
+ * ADR 0041).
  */
 
 export const taskTypeEnum = pgEnum('task_type', TASK_TYPES);
@@ -56,6 +60,10 @@ export const requestScopeEnum = pgEnum('request_scope', REQUEST_SCOPES);
 export const revisionSourceEnum = pgEnum('revision_source', REVISION_SOURCES);
 
 export const revisionDecisionEnum = pgEnum('revision_decision', REVISION_DECISIONS);
+
+export const subtaskRunModeEnum = pgEnum('subtask_run_mode', SUBTASK_RUN_MODES);
+
+export const dependencySourceEnum = pgEnum('dependency_source', DEPENDENCY_SOURCES);
 
 export const tasks = pgTable(
   'tasks',
@@ -101,10 +109,22 @@ export const tasks = pgTable(
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     cancelReason: text('cancel_reason'),
+    /** F06B: the parent of a subtask; set at creation and never changed. */
+    parentId: uuid('parent_id').references((): AnyPgColumn => tasks.id),
+    /** Subtasks only: order among the parent's non-archived subtasks, dense from 1. */
+    position: integer('position'),
+    /** Subtasks only: required while the parent runs by stages, null otherwise. */
+    stageId: uuid('stage_id').references((): AnyPgColumn => taskStages.id),
+    /** Top-level tasks only: how the subtasks run; set once the task has a subtask. */
+    runMode: subtaskRunModeEnum('run_mode'),
+    /** Subtasks only: the note handed over to the next ones (rule A12). */
+    handoverNote: text('handover_note'),
     ...timestamps(),
     archivedAt: archivedAt(),
   },
   (table) => [
+    index('tasks_parent_id_idx').on(table.parentId, table.position),
+    index('tasks_stage_id_idx').on(table.stageId),
     index('tasks_department_idx').on(table.department),
     index('tasks_assignee_id_idx').on(table.assigneeId, table.status, table.dueDate),
     index('tasks_status_idx').on(table.status),
@@ -154,10 +174,43 @@ export const tasks = pgTable(
       'tasks_cancel_check',
       sql`(${table.status} = 'cancelled') = (${table.cancelledAt} is not null and ${table.cancelReason} is not null)`,
     ),
+    // F06B: a subtask never goes to the client nor counts on milestones, lines or posts.
+    check(
+      'tasks_subtask_check',
+      sql`case when ${table.parentId} is not null
+        then ${table.parentId} <> ${table.id} and ${table.position} >= 1 and ${table.runMode} is null
+          and ${table.milestoneId} is null and ${table.cycleLineId} is null and ${table.postId} is null
+          and ${table.type} = 'work' and not ${table.needsClientApproval}
+        else ${table.position} is null and ${table.stageId} is null and ${table.handoverNote} is null end`,
+    ),
+    check('tasks_handover_note_check', sql`char_length(${table.handoverNote}) between 1 and 2000`),
   ],
 );
 
-/** A task waiting on another (rule 3); a link, removed by deleting the row. */
+/** The stages of a parent run by stages (F06B rule A3); archived = removed, only when empty. */
+export const taskStages = pgTable(
+  'task_stages',
+  {
+    id: id(),
+    taskId: uuid('task_id')
+      .notNull()
+      .references((): AnyPgColumn => tasks.id),
+    name: text('name').notNull(),
+    /** Order within the parent, dense from 1 among non-archived stages. */
+    position: integer('position').notNull(),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('task_stages_task_id_idx').on(table.taskId, table.position),
+    check('task_stages_name_check', sql`char_length(${table.name}) between 1 and 80`),
+  ],
+);
+
+/**
+ * A task waiting on another (rule 3); a link, removed by deleting the row. `run` rows are the
+ * system's (F06B), and a manual dependency the run also implies stays `manual`.
+ */
 export const taskDependencies = pgTable(
   'task_dependencies',
   {
@@ -170,6 +223,8 @@ export const taskDependencies = pgTable(
     /** Null for tasks the system created (an automatic template run, F07). */
     createdById: uuid('created_by_id').references(() => users.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /** `run`: written by the system from the parent's run mode and order (F06B rule A3). */
+    source: dependencySourceEnum('source').notNull().default('manual'),
   },
   (table) => [
     primaryKey({ columns: [table.taskId, table.dependsOnId] }),

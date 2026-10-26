@@ -9,8 +9,10 @@ import {
   businessInstant,
   type CalendarDate,
   calendarDateSchema,
+  type HolidayRange,
   type TimeOfDay,
   timeOfDaySchema,
+  workDaysBetween,
 } from './dates.js';
 import { departmentCodeSchema } from './departments.js';
 import { extraWorkBillingSchema } from './extra-work.js';
@@ -35,7 +37,8 @@ import {
 /*
  * The task engine (spec F06, ADR 0016): one workflow for every department, requests between
  * departments, dependencies and client revisions counted against a limit. Review snapshots, the
- * medical review stage and client responses are spec F09 (ADR 0020).
+ * medical review stage and client responses are spec F09 (ADR 0020). Subtasks, their run modes
+ * and stages are spec F06B (ADR 0041).
  */
 
 export const TASK_TYPES = ['work', 'client_request'] as const;
@@ -118,6 +121,32 @@ export const TASK_LIMITS = {
 
 export const DEFAULT_REVISION_LIMIT = 2;
 
+/** How a parent runs its subtasks (F06B rule A3): one after another, all at once, or by stages. */
+export const SUBTASK_RUN_MODES = ['sequential', 'parallel', 'stages'] as const;
+
+export const subtaskRunModeSchema = z.enum(SUBTASK_RUN_MODES).meta({ id: 'SubtaskRunMode' });
+
+export type SubtaskRunMode = z.infer<typeof subtaskRunModeSchema>;
+
+/**
+ * Where a dependency comes from: set by hand (F06 rule 3), or written by the system from the
+ * parent's run mode and order (`run`, F06B rule A3), never edited by hand.
+ */
+export const DEPENDENCY_SOURCES = ['manual', 'run'] as const;
+
+export type DependencySource = (typeof DEPENDENCY_SOURCES)[number];
+
+/** Limits of a parent (F06B); the API answers `LIMIT_REACHED` past them. */
+export const SUBTASK_LIMITS = {
+  /** Non-cancelled subtasks of one parent. */
+  subtasks: 30,
+  /** Non-archived stages of one parent. */
+  stages: 10,
+} as const;
+
+/** The estimate a subtask without one counts for when dates are suggested (F06B rule A5). */
+export const DEFAULT_ESTIMATE_MINUTES = 120;
+
 /** An over-limit revision without a decision is reminded on this work day after it (spec P2A rule 8). */
 export const OVER_LIMIT_REMINDER_WORK_DAYS = 2;
 
@@ -136,6 +165,7 @@ export type TaskMove =
   | 'resume'
   | 'resubmit'
   | 'deliver'
+  | 'approve_subtask'
   | 'reopen_client'
   | 'reopen_internal'
   | 'cancel'
@@ -168,6 +198,9 @@ export function taskMove(from: TaskStatus, to: TaskStatus): TaskMove | null {
       return 'resubmit';
     case 'approved>delivered':
       return 'deliver';
+    // F06B rule A7: approving a subtask delivers it to its parent.
+    case 'internal_review>delivered':
+      return 'approve_subtask';
     case 'delivered>revisions':
       return 'reopen_client';
     case 'delivered>in_progress':
@@ -209,7 +242,8 @@ export function revisionSourceOf(move: TaskMove): RevisionSource | null {
 /**
  * What the caller may do on one task, worked out by the API from their scopes (spec F06,
  * "Scopes on tasks"): `work` is `tasks.work`, `manage` is manage scope, `assign` is assign scope,
- * `client` is client scope, `creator` is being the task's creator.
+ * `client` is client scope, `creator` is being the task's creator. `parentReviewer`: the task is a
+ * subtask and the caller is its parent's assignee but not its own (F06B rule A7).
  */
 export type TaskRights = {
   work: boolean;
@@ -217,6 +251,7 @@ export type TaskRights = {
   assign: boolean;
   client: boolean;
   creator: boolean;
+  parentReviewer: boolean;
 };
 
 /** The parts of a task the workflow looks at. */
@@ -228,14 +263,18 @@ export type TaskState = {
   hasClient: boolean;
   needsClientApproval: boolean;
   blocked: boolean;
+  /** A subtask: reviewed by its parent's assignee too, delivered on approval, never with the client. */
+  subtask: boolean;
 };
 
 /**
  * Whether the caller may make this move on the task (rules 1, 2, 3, 8, 13; archived excluded).
  * In the medical stage (F09 rule 4) manage scope may only return or cancel: the pass belongs to
- * the medical reviewers, through their own route.
+ * the medical reviewers, through their own route. A subtask (F06B rule A7) is approved straight
+ * to delivered, by manage scope or its parent's assignee, and never goes to the client.
  */
 export function canMakeTaskMove(task: TaskState, move: TaskMove, rights: TaskRights): boolean {
+  const reviews = rights.manage || (task.subtask && rights.parentReviewer);
   switch (move) {
     case 'start':
       // A blocked task starts only with an override by assign scope (rule 3, actions table).
@@ -245,17 +284,26 @@ export function canMakeTaskMove(task: TaskState, move: TaskMove, rights: TaskRig
     case 'resubmit':
       return rights.work;
     case 'return':
-      return rights.manage;
+      return reviews;
     case 'send_to_client':
-      return rights.manage && task.needsClientApproval && task.reviewStage !== 'medical';
+      return (
+        rights.manage && !task.subtask && task.needsClientApproval && task.reviewStage !== 'medical'
+      );
     case 'approve':
-      return rights.manage && !task.needsClientApproval && task.reviewStage !== 'medical';
+      return (
+        rights.manage &&
+        !task.subtask &&
+        !task.needsClientApproval &&
+        task.reviewStage !== 'medical'
+      );
+    case 'approve_subtask':
+      return task.subtask && reviews;
     case 'withdraw':
       return rights.manage;
     case 'client_approved':
     case 'client_changes':
     case 'reopen_client':
-      return rights.client && task.hasClient;
+      return rights.client && task.hasClient && !task.subtask;
     case 'deliver':
       return rights.work || rights.client;
     case 'reopen_internal':
@@ -323,6 +371,98 @@ export function isTaskOverdue(
   if (!isTaskOpen(task.status)) return false;
   if (task.dueTime) return now.getTime() > businessInstant(task.dueDate, task.dueTime).getTime();
   return businessDate(now) > task.dueDate;
+}
+
+// Subtasks (F06B part A)
+
+/** A live subtask as the run sees it; `stagePosition` is its stage's position in `stages` mode. */
+export type RunSubtask = { id: string; position: number; stagePosition: number | null };
+
+/**
+ * Rule A3: the `run` dependencies the mode and the order imply, as task → the task it waits on.
+ * The caller passes the live subtasks only (neither cancelled nor archived), so a sequence skips
+ * them; in `stages` mode a stage without live subtasks is skipped too (edge case 5).
+ */
+export function runDependencies(
+  mode: SubtaskRunMode,
+  subtasks: readonly RunSubtask[],
+): { taskId: string; dependsOnId: string }[] {
+  const ordered = [...subtasks].sort((a, b) => a.position - b.position);
+  if (mode === 'parallel') return [];
+  if (mode === 'sequential') {
+    return ordered.slice(1).map((subtask, index) => ({
+      taskId: subtask.id,
+      dependsOnId: (ordered[index] as RunSubtask).id,
+    }));
+  }
+  const stages = new Map<number, RunSubtask[]>();
+  for (const subtask of ordered) {
+    const stage = subtask.stagePosition ?? 0;
+    stages.set(stage, [...(stages.get(stage) ?? []), subtask]);
+  }
+  const groups = [...stages.entries()].sort(([a], [b]) => a - b).map(([, group]) => group);
+  return groups.slice(1).flatMap((group, index) =>
+    group.flatMap((subtask) =>
+      (groups[index] as RunSubtask[]).map((before) => ({
+        taskId: subtask.id,
+        dependsOnId: before.id,
+      })),
+    ),
+  );
+}
+
+/**
+ * Rule A5: suggested due dates, one per subtask in the order given. The work days from `from` to
+ * the parent's due date (Fridays and `holidays` skipped) are shared in proportion to each
+ * estimate (`DEFAULT_ESTIMATE_MINUTES` without one): one after another when sequential, one date
+ * per stage (by its longest subtask) in stages, and the parent's due date minus one work day when
+ * parallel. Without a work day in the range, every date is the parent's.
+ */
+export function suggestSubtaskDates(input: {
+  mode: SubtaskRunMode;
+  from: CalendarDate;
+  parentDueDate: CalendarDate;
+  holidays?: readonly HolidayRange[];
+  subtasks: readonly { estimateMinutes: number | null; stageIndex?: number | null }[];
+}): CalendarDate[] {
+  const days = workDaysBetween(input.from, input.parentDueDate, input.holidays);
+  const last = days[days.length - 1];
+  if (!last) return input.subtasks.map(() => input.parentDueDate);
+  if (input.mode === 'parallel') {
+    const before = days.filter((day) => day < input.parentDueDate);
+    return input.subtasks.map(() => before[before.length - 1] ?? last);
+  }
+  const weight = (subtask: { estimateMinutes: number | null }) =>
+    subtask.estimateMinutes ?? DEFAULT_ESTIMATE_MINUTES;
+  // Sequential: each subtask is a step of its own; stages: a step per stage, by its longest.
+  const stepOf = input.subtasks.map((subtask, index) =>
+    input.mode === 'stages' ? (subtask.stageIndex ?? 0) : index,
+  );
+  const steps = [...new Set(stepOf)].sort((a, b) => a - b);
+  const weights = steps.map((step) =>
+    Math.max(...input.subtasks.filter((_, index) => stepOf[index] === step).map(weight)),
+  );
+  const total = weights.reduce((sum, value) => sum + value, 0);
+  let done = 0;
+  const dateOfStep = new Map<number, CalendarDate>();
+  steps.forEach((step, index) => {
+    done += weights[index] as number;
+    const at = Math.min(days.length, Math.max(1, Math.ceil((done / total) * days.length)));
+    dateOfStep.set(step, days[at - 1] as CalendarDate);
+  });
+  return stepOf.map((step) => dateOfStep.get(step) ?? last);
+}
+
+/** Rule A9: delivered subtasks against the non-cancelled, non-archived ones. */
+export function subtaskProgress(subtasks: readonly { status: TaskStatus; archived: boolean }[]): {
+  delivered: number;
+  total: number;
+} {
+  const live = subtasks.filter((s) => !s.archived && s.status !== 'cancelled');
+  return {
+    delivered: live.filter((s) => s.status === 'delivered').length,
+    total: live.length,
+  };
 }
 
 // Inputs
@@ -451,15 +591,97 @@ export type CreateTaskInput = z.input<typeof createTaskSchema>;
  * checklist and links have their own endpoints. `assigneeId` and `department` need assign scope,
  * `requestScope` client scope. The API checks the links against the stored ones. `acceptLeave`
  * (F17 rule B17) keeps an assignee or a due date that falls on the assignee's leave.
+ * `moveSubtasks` (F06B rule A5) brings the subtasks due after a parent's new due date to it.
  */
 export const updateTaskSchema = taskFieldsSchema
   .partial()
-  .extend({ acceptLeave: z.boolean().optional() })
+  .extend({ acceptLeave: z.boolean().optional(), moveSubtasks: z.boolean().optional() })
   .meta({ id: 'UpdateTask' });
 
 export type UpdateTask = z.infer<typeof updateTaskSchema>;
 
 export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
+
+/**
+ * F06B rule A2: a subtask added to an open parent. It takes the parent's client and engagement;
+ * `stageId` is required while the parent runs by stages, and `position` (1 = first) puts it among
+ * the others, last when left out. An assignee needs assign scope for the department, or is the
+ * caller in their own department; without one it waits in the department's queue.
+ */
+export const createSubtaskSchema = taskFieldsSchema
+  .pick({ title: true, department: true, priority: true, dueDate: true })
+  .extend({
+    brief: optionalText(5000).optional(),
+    assigneeId: z.uuid().nullable().default(null),
+    priority: taskPrioritySchema.default('normal'),
+    dueTime: timeOfDaySchema.nullable().optional(),
+    checklist: z.array(checklistTextSchema).default([]),
+    position: z.number().int().min(1).optional(),
+    stageId: z.uuid().nullable().optional(),
+    acceptLeave: z.boolean().optional(),
+  })
+  .meta({ id: 'CreateSubtask' });
+
+export type CreateSubtask = z.infer<typeof createSubtaskSchema>;
+
+export type CreateSubtaskInput = z.input<typeof createSubtaskSchema>;
+
+/**
+ * Rule A4: every non-archived subtask once, in the new order, each with its stage (null unless
+ * the parent runs by stages); `INVALID_ORDER` otherwise.
+ */
+export const subtaskOrderSchema = z
+  .object({
+    items: z
+      .array(z.object({ id: z.uuid(), stageId: z.uuid().nullable() }))
+      .max(SUBTASK_LIMITS.subtasks * 2),
+  })
+  .meta({ id: 'SubtaskOrder' });
+
+export type SubtaskOrder = z.infer<typeof subtaskOrderSchema>;
+
+export const subtaskRunModeInputSchema = z
+  .object({ runMode: subtaskRunModeSchema })
+  .meta({ id: 'SubtaskRunModeInput' });
+
+export type SubtaskRunModeInput = z.infer<typeof subtaskRunModeInputSchema>;
+
+const stageNameSchema = z.string().trim().min(1).max(80);
+
+/** A stage of a parent; `position` (1 = first) puts it among the others, last when left out. */
+export const createTaskStageSchema = z
+  .object({ name: stageNameSchema, position: z.number().int().min(1).optional() })
+  .meta({ id: 'CreateTaskStage' });
+
+export type CreateTaskStage = z.infer<typeof createTaskStageSchema>;
+
+export const updateTaskStageSchema = z
+  .object({ name: stageNameSchema.optional(), position: z.number().int().min(1).optional() })
+  .meta({ id: 'UpdateTaskStage' });
+
+export type UpdateTaskStage = z.infer<typeof updateTaskStageSchema>;
+
+/** Rule A10: delivered subtasks reopened while the parent is in revisions, each with a note. */
+export const reopenSubtasksSchema = z
+  .object({
+    items: z
+      .array(z.object({ id: z.uuid(), note: z.string().trim().min(1).max(2000) }))
+      .min(1)
+      .max(SUBTASK_LIMITS.subtasks)
+      .refine((items) => new Set(items.map((item) => item.id)).size === items.length, {
+        message: 'A subtask is listed once',
+      }),
+  })
+  .meta({ id: 'ReopenSubtasks' });
+
+export type ReopenSubtasks = z.infer<typeof reopenSubtasksSchema>;
+
+/** Rule A12: the note a subtask hands over to the next ones; blank clears it. */
+export const handoverNoteInputSchema = z
+  .object({ note: optionalText(2000) })
+  .meta({ id: 'HandoverNoteInput' });
+
+export type HandoverNoteInput = z.infer<typeof handoverNoteInputSchema>;
 
 /**
  * A move to `status`. `note` is required by the moves of `taskMoveNeedsNote` (what must change,
@@ -591,6 +813,12 @@ export const taskSchema = z
     overLimitPending: z.boolean(),
     /** The post this task produces media for (F08): the client approves the post, not the task. */
     postId: z.uuid().nullable(),
+    /** The parent of a subtask (F06B rule A13); null on a top-level task. */
+    parent: z.object({ id: z.uuid(), title: z.string() }).nullable(),
+    /** A parent's delivered subtasks against its live ones (rule A9); null without subtasks. */
+    progress: z
+      .object({ delivered: z.number().int().min(0), total: z.number().int().min(0) })
+      .nullable(),
   })
   .meta({ id: 'Task' });
 
@@ -605,6 +833,8 @@ export const taskDependencySchema = z
     finished: z.boolean(),
     /** Archived or cancelled dependencies no longer block and are shown struck through. */
     archived: z.boolean(),
+    /** `run`: written from the parent's run mode and order (F06B), never edited by hand. */
+    source: z.enum(DEPENDENCY_SOURCES),
   })
   .meta({ id: 'TaskDependency' });
 
@@ -720,6 +950,60 @@ export const pendingApprovalSchema = z.object({
   expiresAt: z.iso.datetime(),
 });
 
+/** A final deliverable of a subtask, as a handover lists it (F06B rule A12). */
+const handoverFileSchema = z.object({ fileItemId: z.uuid(), name: z.string() });
+
+/** One delivered subtask in a handover: who did it, their note and their finals. */
+export const handoverEntrySchema = z
+  .object({
+    id: z.uuid(),
+    title: z.string(),
+    assignee: personSchema.nullable(),
+    note: z.string().nullable(),
+    finals: z.array(handoverFileSchema),
+  })
+  .meta({ id: 'HandoverEntry' });
+
+export type HandoverEntry = z.infer<typeof handoverEntrySchema>;
+
+/** A stage of a parent; `handover` lists its delivered subtasks once it is finished (rule A12). */
+export const taskStageSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    position: z.number().int().min(1),
+    /** Every non-cancelled subtask of it is delivered, and it has at least one. */
+    finished: z.boolean(),
+    handover: z.array(handoverEntrySchema).nullable(),
+  })
+  .meta({ id: 'TaskStage' });
+
+export type TaskStage = z.infer<typeof taskStageSchema>;
+
+/** A subtask in its parent's Subtasks section. */
+export const subtaskSchema = taskSchema
+  .extend({
+    position: z.number().int().min(1),
+    stageId: z.uuid().nullable(),
+    /** The unfinished tasks it waits on now, run and manual (rule A3). */
+    waitingOn: z.array(z.object({ id: z.uuid(), title: z.string() })),
+    handoverNote: z.string().nullable(),
+  })
+  .meta({ id: 'Subtask' });
+
+export type Subtask = z.infer<typeof subtaskSchema>;
+
+/** A parent's run mode, its non-archived stages and subtasks, each by position. */
+export const taskSubtasksSchema = z
+  .object({
+    runMode: subtaskRunModeSchema.nullable(),
+    stages: z.array(taskStageSchema),
+    subtasks: z.array(subtaskSchema),
+  })
+  .meta({ id: 'TaskSubtasks' });
+
+export type TaskSubtasks = z.infer<typeof taskSubtasksSchema>;
+
 export const taskPermissionsSchema = z
   .object({
     canEdit: z.boolean(),
@@ -737,6 +1021,12 @@ export const taskPermissionsSchema = z
     canCancel: z.boolean(),
     canReopen: z.boolean(),
     canArchive: z.boolean(),
+    /** Add, reorder and cancel subtasks, edit stages, change the run mode (F06B, Roles). */
+    canManageSubtasks: z.boolean(),
+    /** "Reopen subtasks" while the parent is in revisions (rule A10). */
+    canReopenSubtasks: z.boolean(),
+    /** Write the subtask's handover note (rule A12). */
+    canWriteHandover: z.boolean(),
   })
   .meta({ id: 'TaskPermissions', description: 'What the caller may do, for the UI' });
 
@@ -783,6 +1073,14 @@ export const taskDetailSchema = taskSchema
     clientResponses: z.array(taskClientResponseSchema),
     /** The approval request holding the task's pending item. */
     pendingApproval: pendingApprovalSchema.nullable(),
+    /** The parent of a subtask, with its status (F06B). */
+    parent: z.object({ id: z.uuid(), title: z.string(), status: taskStatusSchema }).nullable(),
+    /** A parent's run mode, stages and subtasks; empty on a subtask (F06B part A). */
+    runMode: subtaskRunModeSchema.nullable(),
+    stages: z.array(taskStageSchema),
+    subtasks: z.array(subtaskSchema),
+    /** A subtask's note to the next ones (rule A12); null on a top-level task. */
+    handoverNote: z.string().nullable(),
     /** Null for a task the system created (an automatic template run, F07). */
     createdBy: personSchema.nullable(),
     createdAt: z.iso.datetime(),
@@ -835,6 +1133,10 @@ export const taskListQuerySchema = pageQuerySchema.extend({
   reviewStage: reviewStageSchema.optional(),
   /** `true` lists archived tasks only; needs `tasks.manage` with scope all. */
   archived: queryBooleanSchema.default(false),
+  /** The subtasks of one parent (F06B rule A13). */
+  parentId: z.uuid().optional(),
+  /** `true` hides subtasks ("Hide subtasks"). */
+  topLevel: queryBooleanSchema.optional(),
   sort: z.enum(TASK_SORTS).default('dueDate'),
   order: sortOrderSchema.default('asc'),
 });
@@ -967,6 +1269,8 @@ export const taskBoardQuerySchema = z.object({
   department: viewDepartmentsSchema,
   assigneeId: z.union([z.uuid(), z.literal('me')]).optional(),
   clientId: z.uuid().optional(),
+  /** `true` hides subtasks (F06B rule A13). */
+  topLevel: queryBooleanSchema.optional(),
 });
 
 export type TaskBoardQuery = z.infer<typeof taskBoardQuerySchema>;
