@@ -380,6 +380,27 @@ export class UserDirectory implements OnModuleInit {
     return new Map(rows.map((row) => [row.userId, row.code]));
   }
 
+  /** The archived users whose primary department is one of `codes` (F06B edge case 14). */
+  async archivedPrimaryMembers(
+    codes: readonly DepartmentCode[],
+    executor: Database | Transaction = this.db,
+  ): Promise<string[]> {
+    if (codes.length === 0) return [];
+    const rows = await executor
+      .select({ userId: departmentMembers.userId })
+      .from(departmentMembers)
+      .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
+      .innerJoin(users, eq(users.id, departmentMembers.userId))
+      .where(
+        and(
+          inArray(departments.code, [...codes]),
+          eq(departmentMembers.isPrimary, true),
+          isNotNull(users.archivedAt),
+        ),
+      );
+    return rows.map((row) => row.userId);
+  }
+
   /** The department codes each of the given users belongs to. */
   async memberships(ids: string[], executor: Database | Transaction = this.db) {
     const unique = [...new Set(ids)];

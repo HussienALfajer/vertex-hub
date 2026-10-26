@@ -46,6 +46,19 @@ export const TASK_ACTION_TYPES = [
   'subtask_handover',
   'subtasks_all_finished',
   'subtask_holding_next',
+  'task_question_asked',
+  'task_question_reminder',
+  'task_question_escalated',
+] as const satisfies readonly NotificationType[];
+
+/**
+ * F06B rule B10: a question's notifications; they close with the question, and the task's
+ * delivery voids those still open (its questions stay open, their reminders stop).
+ */
+export const TASK_QUESTION_TYPES = [
+  'task_question_asked',
+  'task_question_reminder',
+  'task_question_escalated',
 ] as const satisfies readonly NotificationType[];
 
 /**
@@ -103,6 +116,9 @@ export function taskResolutions(
     done.push('task_awaiting_client');
   }
   if (before.status === 'revisions' && after.status !== 'revisions') done.push('task_returned');
+  if (before.status !== 'delivered' && after.status === 'delivered') {
+    voided.push(...TASK_QUESTION_TYPES);
+  }
   if (!isTaskFinished(before.status) && isTaskFinished(after.status)) {
     done.push(...TASK_DUE_TYPES);
   } else if (before.dueDate !== after.dueDate || before.dueTime !== after.dueTime) {

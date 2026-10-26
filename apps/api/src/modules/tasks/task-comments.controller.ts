@@ -12,14 +12,16 @@ import {
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
-  type PageQuery,
-  pageQuerySchema,
   type TaskComment,
   type TaskCommentInput,
+  type TaskCommentListQuery,
   type TaskCommentPage,
+  type TaskCommentUpdate,
   taskCommentInputSchema,
+  taskCommentListQuerySchema,
   taskCommentPageSchema,
   taskCommentSchema,
+  taskCommentUpdateSchema,
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
@@ -34,13 +36,14 @@ export class TaskCommentsController {
   @RequirePermissions('tasks.read')
   @SerializeOptions({ schema: taskCommentPageSchema })
   @ApiOkResponse({
-    description: 'Comments, oldest first; removed ones stay in place without their body',
+    description:
+      'Comments and questions, oldest first, each question with its replies; removed ones stay in place without their body',
     standardSchema: taskCommentPageSchema,
   })
   list(
     @CurrentUser() actor: CurrentUserInfo,
     @Param('id', ParseUUIDPipe) taskId: string,
-    @Query({ schema: pageQuerySchema }) query: PageQuery,
+    @Query({ schema: taskCommentListQuerySchema }) query: TaskCommentListQuery,
   ): Promise<TaskCommentPage> {
     return this.comments.list(actor, taskId, query);
   }
@@ -49,7 +52,8 @@ export class TaskCommentsController {
   @RequirePermissions('tasks.read')
   @SerializeOptions({ schema: taskCommentSchema })
   @ApiCreatedResponse({
-    description: 'The new comment; mentions are `@{userId}` tokens of active users',
+    description:
+      'The new comment, or a reply to `questionId`, with its attachments; mentions are nodes of active users',
     standardSchema: taskCommentSchema,
   })
   create(
@@ -71,7 +75,7 @@ export class TaskCommentsController {
     @CurrentUser() actor: CurrentUserInfo,
     @Param('id', ParseUUIDPipe) taskId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
-    @Body({ schema: taskCommentInputSchema }) input: TaskCommentInput,
+    @Body({ schema: taskCommentUpdateSchema }) input: TaskCommentUpdate,
   ): Promise<TaskComment> {
     return this.comments.update(actor, taskId, commentId, input);
   }

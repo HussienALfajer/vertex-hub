@@ -426,6 +426,8 @@ import {
   requestsOverlap,
   revisionSourceOf,
   revokePasskeySchema,
+  richTextFromPlain,
+  richTextPlain,
   type SalaryChange,
   type SalaryChangeList,
   type ScheduleConflict,
@@ -456,6 +458,7 @@ import {
   type TaskBoard,
   type TaskClientResponse,
   type TaskComment,
+  type TaskCommentInput,
   type TaskDependenciesInput,
   type TaskDetail,
   type TaskPriority,
@@ -5451,6 +5454,8 @@ function taskRoutes({
         (r.manage || task.assigneeId === me().user.id),
       canReopenSubtasks: live && task.status === 'revisions' && (r.work || r.manage),
       canWriteHandover: false,
+      canEditCriteria: live && r.manage,
+      canTickCriteria: live && (r.work || r.manage),
     };
   };
 
@@ -5515,6 +5520,7 @@ function taskRoutes({
       postId: task.postId,
       parent: null,
       progress: null,
+      openQuestions: { total: 0, inSubtasks: 0 },
     };
   };
   const dependencyOf = (task: TaskRecord) => ({
@@ -5529,6 +5535,7 @@ function taskRoutes({
   const detail = (task: TaskRecord): TaskDetail => ({
     ...summary(task),
     brief: task.brief,
+    briefDoc: task.brief ? richTextFromPlain(task.brief) : null,
     needsClientApproval: task.needsClientApproval,
     clientText: task.clientText,
     contentToken: MOCK_CONTENT_TOKEN,
@@ -5561,6 +5568,7 @@ function taskRoutes({
         doneAt: item.doneAt,
         doneBy: item.doneById ? person(item.doneById) : null,
       })),
+    criteria: [],
     links: task.links
       .filter((link) => !link.archived)
       .map((link) => ({
@@ -5612,16 +5620,26 @@ function taskRoutes({
         ...person(comment.authorId),
         archived: author?.status === 'archived',
       },
+      kind: 'comment',
       body: comment.archived ? null : comment.body,
+      bodyDoc: comment.archived
+        ? null
+        : (richTextFromPlain(comment.body, { mentions: true }) as TaskComment['bodyDoc']),
       mentions: mentionedUserIds(comment.body).map((userId) => ({
         ...person(userId),
         archived: user(userId)?.status === 'archived',
       })),
+      attachments: [],
+      questionId: null,
+      convertedTask: null,
       editedAt: comment.editedAt,
       removed: comment.archived,
       createdAt: comment.createdAt,
       canEdit: mine && !comment.archived,
       canRemove: (mine || holds('tasks.manage', 'all')) && !comment.archived,
+      canConvert: false,
+      question: null,
+      replies: [],
     };
   };
   /** Logs an extra work item on the task's project or retainer (rules 10 and 11). */
@@ -6043,6 +6061,7 @@ function taskRoutes({
           managed().length === 0
             ? null
             : count(open, (t) => t.assigneeId === null && managed().includes(t.department)),
+        questionsWaiting: 0,
       };
       return json(route, summaryBody);
     }
@@ -6786,7 +6805,7 @@ function taskRoutes({
         const created: TaskCommentRecord = {
           id: id(next++),
           authorId: me().user.id,
-          body: body<{ body: string }>().body,
+          body: richTextPlain(body<TaskCommentInput>().bodyDoc),
           editedAt: null,
           archived: false,
           createdAt: TASKS_NOW.toISOString(),
@@ -6800,7 +6819,7 @@ function taskRoutes({
         comment.archived = true;
         return route.fulfill({ status: 204 });
       }
-      comment.body = body<{ body: string }>().body;
+      comment.body = richTextPlain(body<TaskCommentInput>().bodyDoc);
       comment.editedAt = TASKS_NOW.toISOString();
       return json(route, commentOf(task, comment));
     }

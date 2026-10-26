@@ -322,6 +322,13 @@ export const reopensSubtasks = (actor: CurrentUserInfo, parent: TaskAccess): boo
   return !parent.parentId && (rights.work || rights.manage);
 };
 
+/** F06B rule C6: manage scope writes the acceptance criteria. */
+export const editsCriteria = (rights: TaskRights): boolean => rights.manage;
+
+/** Rule C6: the assignee, the department managers, a reviewer of a subtask or manage scope tick them. */
+export const ticksCriteria = (rights: TaskRights): boolean =>
+  rights.work || rights.manage || rights.parentReviewer;
+
 /** A parent takes no new subtasks, order or mode once delivered, cancelled or archived. */
 export function assertParentOpen(parent: TaskAccess): void {
   if (parent.parentId) {
@@ -419,6 +426,8 @@ export function taskPermissions(
       canManageSubtasks: open && managesSubtasks(actor, task),
       canReopenSubtasks: !readOnly && task.status === 'revisions' && reopensSubtasks(actor, task),
       canWriteHandover: open && !!task.parentId && rights.work,
+      canEditCriteria: !readOnly && editsCriteria(rights),
+      canTickCriteria: !readOnly && ticksCriteria(rights),
     },
     allowedTransitions,
   };

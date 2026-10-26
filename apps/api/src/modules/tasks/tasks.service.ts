@@ -8,6 +8,7 @@ import {
 import {
   type AssigneeLeave,
   type AuditAction,
+  briefColumns,
   businessDate,
   type CalendarDate,
   type CreateTask,
@@ -15,6 +16,7 @@ import {
   isTaskFinished,
   isTaskOverdue,
   permissionScopes,
+  richTextFromPlain,
   SUBTASK_LIMITS,
   type Subtask,
   TASK_LIMITS,
@@ -29,6 +31,7 @@ import {
   type Database,
   type Transaction,
   taskChecklistItems,
+  taskComments,
   taskDependencies,
   taskLinks,
   taskRevisions,
@@ -98,8 +101,14 @@ import {
 } from './task-dependencies.js';
 import { TaskGuards } from './task-guards.js';
 import { blocksDependents, type NoticeTask, TaskNotices, toTimeOfDay } from './task-notices.js';
+import { restartQuestionClocks } from './task-questions.js';
 import { TaskReviews } from './task-reviews.js';
-import { clearedByMedicalSql, overdueSql, overLimitPendingSql } from './task-sql.js';
+import {
+  clearedByMedicalSql,
+  openQuestionsSql,
+  overdueSql,
+  overLimitPendingSql,
+} from './task-sql.js';
 
 type Executor = Database | Transaction;
 
@@ -205,6 +214,9 @@ export class TasksService {
     if (query.topLevel !== undefined) {
       filters.push(query.topLevel ? isNull(tasks.parentId) : isNotNull(tasks.parentId));
     }
+    if (query.hasOpenQuestions !== undefined) {
+      filters.push(query.hasOpenQuestions ? openQuestionsSql : sql`not ${openQuestionsSql}`);
+    }
     const where = and(...filters);
 
     const sortColumn = {
@@ -256,7 +268,7 @@ export class TasksService {
         .select()
         .from(taskChecklistItems)
         .where(and(eq(taskChecklistItems.taskId, id), isNull(taskChecklistItems.archivedAt)))
-        .orderBy(asc(taskChecklistItems.position)),
+        .orderBy(asc(taskChecklistItems.kind), asc(taskChecklistItems.position)),
       this.db
         .select()
         .from(taskLinks)
@@ -269,6 +281,7 @@ export class TasksService {
         .orderBy(asc(taskRevisions.createdAt), asc(taskRevisions.id)),
       this.db
         .select({
+          briefDoc: tasks.briefDoc,
           createdAt: tasks.createdAt,
           updatedAt: tasks.updatedAt,
           deliveredAt: tasks.deliveredAt,
@@ -307,9 +320,21 @@ export class TasksService {
     ]);
     const person = (userId: string) => personRef(people, userId);
     const requestExtra = task.extraWorkItemId ? extraWork.get(task.extraWorkItemId) : undefined;
+    const checklistItem = (i: (typeof checklist)[number]) => ({
+      id: i.id,
+      text: i.text,
+      position: i.position,
+      done: !!i.doneAt,
+      doneAt: i.doneAt?.toISOString() ?? null,
+      doneBy: i.doneById ? person(i.doneById) : null,
+    });
     return {
       ...item,
       brief: task.brief,
+      // A brief written by the previous release has no document yet (expand only).
+      briefDoc:
+        (row.briefDoc as TaskDetail['briefDoc']) ??
+        (task.brief ? richTextFromPlain(task.brief) : null),
       needsClientApproval: task.needsClientApproval,
       clientRequest:
         task.type === 'client_request' && task.requestedOn && task.requestScope
@@ -330,14 +355,8 @@ export class TasksService {
           : null,
       dependencies,
       dependents,
-      checklistItems: checklist.map((i) => ({
-        id: i.id,
-        text: i.text,
-        position: i.position,
-        done: !!i.doneAt,
-        doneAt: i.doneAt?.toISOString() ?? null,
-        doneBy: i.doneById ? person(i.doneById) : null,
-      })),
+      checklistItems: checklist.filter((i) => i.kind === 'checklist').map(checklistItem),
+      criteria: checklist.filter((i) => i.kind === 'criterion').map(checklistItem),
       links: links.map((l) => ({
         id: l.id,
         url: l.url,
@@ -484,9 +503,10 @@ export class TasksService {
       await this.assertContact(tx, client.id, request.requestedByContactId);
     }
 
+    const brief = briefColumns(input) ?? { brief: null, briefDoc: null };
     const values = {
       title: input.title,
-      brief: input.brief ?? null,
+      brief: brief.brief,
       type: input.type,
       department: input.department,
       assigneeId: input.assigneeId,
@@ -513,6 +533,7 @@ export class TasksService {
       .insert(tasks)
       .values({
         ...values,
+        briefDoc: brief.briefDoc,
         ...subtask,
         createdById: actor.id,
         ...(postId && { postId, postLinkedAt: new Date() }),
@@ -782,10 +803,13 @@ export class TasksService {
         await this.assertContact(tx, links.clientId, contactId);
       }
 
+      const brief = briefColumns(input);
       const basics = changedFields(
         {
           title: task.title,
           brief: task.brief,
+          // Rule C1: a new document with the same plain text (a bold word) is an edit too.
+          briefDoc: brief ? await this.storedBriefDoc(tx, id) : undefined,
           priority: task.priority,
           dueDate: task.dueDate,
           dueTime: toTimeOfDay(task.dueTime),
@@ -797,7 +821,8 @@ export class TasksService {
         },
         {
           title: input.title,
-          brief: input.brief,
+          brief: brief?.brief,
+          briefDoc: brief?.briefDoc,
           priority: input.priority,
           dueDate: input.dueDate,
           dueTime: input.dueTime,
@@ -1130,6 +1155,8 @@ export class TasksService {
       .set({ archivedAt: null, ...(unassign && { assigneeId: null }) })
       .where(eq(tasks.id, task.id));
     await this.auditArchive(tx, actor, 'task.restored', task.id, false);
+    // F06B rule B10: open work back from the archive restarts its open questions' clocks.
+    if (open) await restartQuestionClocks(tx, [task.id], new Date());
     if (unassign && task.assigneeId) {
       const people = await this.users.summaries([task.assigneeId], tx);
       await recordAudit(tx, {
@@ -1285,6 +1312,7 @@ export class TasksService {
       revisions,
       parents,
       progress,
+      questions,
     ] = await Promise.all([
       this.users.summaries(assignees, executor),
       this.users.memberships(assignees, executor),
@@ -1301,6 +1329,7 @@ export class TasksService {
         rows.filter((row) => !row.parentId).map((row) => row.id),
         executor,
       ),
+      this.openQuestionCounts(ids, executor),
     ]);
     return rows.map((row) => {
       const assignee = row.assigneeId ? people.get(row.assigneeId) : undefined;
@@ -1352,6 +1381,7 @@ export class TasksService {
           return parent ? { id: parent.id, title: parent.title } : null;
         })(),
         progress: progress.get(row.id) ?? null,
+        openQuestions: questions.get(row.id) ?? { total: 0, inSubtasks: 0 },
         readOnly:
           !!row.archivedAt ||
           !!client?.archived ||
@@ -1433,6 +1463,47 @@ export class TasksService {
     });
   }
 
+  /** F06B rule B7, edge case 13: open questions of each task and of its live subtasks. */
+  private async openQuestionCounts(ids: string[], executor: Executor) {
+    const counts = new Map<string, { total: number; inSubtasks: number }>();
+    if (ids.length === 0) return counts;
+    const open = and(
+      eq(taskComments.kind, 'question'),
+      eq(taskComments.questionStatus, 'open'),
+      isNull(taskComments.archivedAt),
+    );
+    const [own, inSubtasks] = await Promise.all([
+      executor
+        .select({ taskId: taskComments.taskId, value: count() })
+        .from(taskComments)
+        .where(and(inArray(taskComments.taskId, ids), open))
+        .groupBy(taskComments.taskId),
+      executor
+        .select({ taskId: tasks.parentId, value: count() })
+        .from(taskComments)
+        .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
+        .where(and(inArray(tasks.parentId, ids), isNull(tasks.archivedAt), open))
+        .groupBy(tasks.parentId),
+    ]);
+    const entry = (taskId: string) => {
+      const found = counts.get(taskId) ?? { total: 0, inSubtasks: 0 };
+      counts.set(taskId, found);
+      return found;
+    };
+    for (const row of own) entry(row.taskId).total += row.value;
+    for (const row of inSubtasks) {
+      if (!row.taskId) continue;
+      entry(row.taskId).total += row.value;
+      entry(row.taskId).inSubtasks += row.value;
+    }
+    return counts;
+  }
+
+  private async storedBriefDoc(tx: Transaction, id: string): Promise<unknown> {
+    const [row] = await tx.select({ briefDoc: tasks.briefDoc }).from(tasks).where(eq(tasks.id, id));
+    return row?.briefDoc ?? null;
+  }
+
   private async checklistCounts(ids: string[], executor: Executor) {
     if (ids.length === 0) return new Map<string, { done: number; total: number }>();
     const rows = await executor
@@ -1442,7 +1513,13 @@ export class TasksService {
         done: count(taskChecklistItems.doneAt),
       })
       .from(taskChecklistItems)
-      .where(and(inArray(taskChecklistItems.taskId, ids), isNull(taskChecklistItems.archivedAt)))
+      .where(
+        and(
+          inArray(taskChecklistItems.taskId, ids),
+          eq(taskChecklistItems.kind, 'checklist'),
+          isNull(taskChecklistItems.archivedAt),
+        ),
+      )
       .groupBy(taskChecklistItems.taskId);
     return new Map(rows.map((row) => [row.taskId, { done: row.done, total: row.total }]));
   }

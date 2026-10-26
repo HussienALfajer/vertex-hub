@@ -17,6 +17,7 @@ import {
   weekOf,
   workDaysBefore,
   workDaysBetween,
+  workHoursBetween,
 } from './dates.js';
 
 describe('work week (ADR 0016)', () => {
@@ -172,5 +173,31 @@ describe('calendar date and month ranges', () => {
     expect(instantSchema.safeParse('0000-01-01T00:00:00Z').success).toBe(false);
     expect(instantSchema.safeParse('9999-12-31T00:00:00Z').success).toBe(false);
     expect(instantSchema.safeParse('2026-10-08T00:00:00+03:00').success).toBe(true);
+  });
+});
+
+describe('work hours (F06B rule B9)', () => {
+  const at = (date: string, time: string) => businessInstant(date, time);
+
+  it('counts every hour of a work day and none of a Friday', () => {
+    // Thursday 11:00 → Saturday 11:00: 13 hours on Thursday, Friday skipped, 11 on Saturday.
+    expect(workHoursBetween(at('2026-10-29', '11:00'), at('2026-10-31', '11:00'))).toBe(24);
+    expect(workHoursBetween(at('2026-10-29', '11:00'), at('2026-11-01', '11:00'))).toBe(48);
+    expect(workHoursBetween(at('2026-10-30', '08:00'), at('2026-10-30', '20:00'))).toBe(0);
+  });
+
+  it('crosses midnight in Asia/Damascus, not in UTC', () => {
+    // 23:00 Sunday to 01:00 Monday in Damascus is 20:00 to 22:00 UTC on Sunday.
+    expect(workHoursBetween(at('2026-11-01', '23:00'), at('2026-11-02', '01:00'))).toBe(2);
+    // Thursday 23:00 to Saturday 01:00: one hour on each side of the Friday.
+    expect(workHoursBetween(at('2026-10-29', '23:00'), at('2026-10-31', '01:00'))).toBe(2);
+  });
+
+  it('skips public holidays, and is 0 when the end is not after the start', () => {
+    const holidays = [{ startsOn: '2026-10-31', endsOn: '2026-10-31' }];
+    expect(workHoursBetween(at('2026-10-29', '11:00'), at('2026-11-01', '11:00'), holidays)).toBe(
+      24,
+    );
+    expect(workHoursBetween(at('2026-10-29', '11:00'), at('2026-10-29', '10:00'))).toBe(0);
   });
 });

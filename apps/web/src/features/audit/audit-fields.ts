@@ -46,9 +46,16 @@ const REFERENCE_FIELDS = new Set([
   // F01C: the image itself shows on the record; the brand logo version it was cut from.
   'imageId',
   'brandVersionId',
-  // F06B: a subtask's parent and stage.
+  // F06B: a subtask's parent and stage; a question's people, its replies' question, the subtask
+  // it became and an attachment's comment. The brief's text shows a change of its document.
   'parentId',
   'stageId',
+  'questionId',
+  'addressedUserId',
+  'answeredById',
+  'subtaskId',
+  'taskCommentId',
+  'briefDoc',
 ]);
 
 /** The fields an entry shows: the changed ones, without links and references to other records. */

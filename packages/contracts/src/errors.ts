@@ -269,6 +269,13 @@ export const ERROR_CODES = [
   'SUBTASKS_OPEN',
   'SUBTASK_DUE_AFTER_PARENT',
   'STAGE_NOT_EMPTY',
+  // F06B parts B and C.
+  'CRITERIA_OPEN',
+  'INVALID_ADDRESSEE',
+  'QUESTION_NOT_FOUND',
+  'QUESTION_NO_REPLY',
+  'QUESTION_CLOSED',
+  'NOT_QUESTION_ASKER',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });

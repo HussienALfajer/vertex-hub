@@ -1,5 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto';
-import type { AssignableRole, DepartmentCode } from '@vertex-hub/contracts';
+import { type AssignableRole, type DepartmentCode, richTextFromPlain } from '@vertex-hub/contracts';
 import {
   accounts,
   adCampaigns,
@@ -100,6 +100,7 @@ import {
   tasks,
   templateRuns,
   templateRunTasks,
+  timedReminders,
   userRoles,
   users,
   verifications,
@@ -119,6 +120,9 @@ import { and, eq, inArray, isNotNull, like, or, type SQL, sql } from 'drizzle-or
 
 /** Better Auth rejects cookie-carrying requests from origins it does not trust (CSRF). */
 export const ORIGIN = 'http://127.0.0.1:5173';
+
+/** A plain text as a comment's rich-text body: a paragraph per line, `@{userId}` as mentions. */
+export const textDoc = (text: string) => richTextFromPlain(text, { mentions: true });
 export const PASSWORD = 'correct-horse-battery-staple';
 
 export const uniqueEmail = (label: string) =>
@@ -428,14 +432,37 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
         .where(or(inArray(contentPosts.createdById, ids), inArray(contentPosts.responsibleId, ids)))
     ).map((row) => row.id),
   );
-  const comments = (
+  // F06B: questions addressed to or answered by them, and the replies and files of those rows.
+  const authored = (
     await db
       .select({ id: taskComments.id })
       .from(taskComments)
-      .where(inArray(taskComments.authorId, ids))
+      .where(
+        or(
+          inArray(taskComments.authorId, ids),
+          inArray(taskComments.addressedUserId, ids),
+          inArray(taskComments.answeredById, ids),
+        ),
+      )
   ).map((row) => row.id);
+  const comments =
+    authored.length === 0
+      ? []
+      : [
+          ...new Set([
+            ...authored,
+            ...(
+              await db
+                .select({ id: taskComments.id })
+                .from(taskComments)
+                .where(inArray(taskComments.questionId, authored))
+            ).map((row) => row.id),
+          ]),
+        ];
   if (comments.length > 0) {
+    await removeFileItems(db, inArray(fileItems.taskCommentId, comments));
     await db.delete(auditEntries).where(inArray(auditEntries.entityId, comments));
+    await db.delete(timedReminders).where(inArray(timedReminders.subjectId, comments));
     await db.delete(taskComments).where(inArray(taskComments.id, comments));
   }
   await db
@@ -735,6 +762,8 @@ export async function removeTasks(db: Database, given: string[]): Promise<void> 
     .where(or(inArray(taskDependencies.taskId, ids), inArray(taskDependencies.dependsOnId, ids)));
   await db.delete(taskChecklistItems).where(inArray(taskChecklistItems.taskId, ids));
   await db.delete(taskLinks).where(inArray(taskLinks.taskId, ids));
+  // F06B: the reminders of the tasks' questions.
+  await db.delete(timedReminders).where(inArray(timedReminders.subjectId, children));
   await db.delete(taskComments).where(inArray(taskComments.taskId, ids));
   // F09: responses and reviews point at revisions, and tasks at their cleared review.
   await db.update(tasks).set({ clearedReviewId: null }).where(inArray(tasks.id, ids));

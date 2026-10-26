@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   allowedTaskTransitions,
   BOARD_STATUSES,
+  briefColumns,
   CLIENT_TEXT_MAX,
   canMakeTaskMove,
   commentExcerpt,
@@ -9,10 +10,11 @@ import {
   createsDependencyCycle,
   createTaskChecklistItemSchema,
   createTaskSchema,
+  forwardQuestionSchema,
   isTaskBlocked,
   isTaskOverdue,
   medicalReviewSchema,
-  mentionedUserIds,
+  myQuestionsQuerySchema,
   reopenSubtasksSchema,
   reviewContentToken,
   revisionDecisionInputSchema,
@@ -24,13 +26,17 @@ import {
   type TaskRights,
   type TaskState,
   taskBoardQuerySchema,
+  taskBriefDocSchema,
   taskClientTextInputSchema,
+  taskCommentDocSchema,
   taskCommentInputSchema,
+  taskCommentListQuerySchema,
   taskDependenciesInputSchema,
   taskLinkProblem,
   taskListQuerySchema,
   taskMove,
   taskMoveNeedsNote,
+  taskQuestionInputSchema,
   taskStatusChangeSchema,
   taskWorkloadQuerySchema,
   updateTaskChecklistItemSchema,
@@ -693,17 +699,6 @@ describe('other inputs', () => {
   });
 });
 
-describe('mentionedUserIds', () => {
-  it('lists each mentioned user once, in order, lowercased', () => {
-    const body = `@{${ids.user.toUpperCase()}} please check with @{${ids.contact}} and @{${ids.user}}`;
-    expect(mentionedUserIds(body)).toEqual([ids.user, ids.contact]);
-  });
-
-  it('ignores text that only looks like a mention', () => {
-    expect(mentionedUserIds('@{not-a-uuid} @name {x}')).toEqual([]);
-  });
-});
-
 describe('commentExcerpt', () => {
   const names = new Map([[ids.user, 'Rana']]);
   const nameOf = (id: string) => names.get(id) ?? '';
@@ -721,23 +716,108 @@ check`;
   });
 });
 
-describe('taskCommentInputSchema', () => {
-  it('trims the body and keeps line breaks', () => {
-    expect(taskCommentInputSchema.parse({ body: '  Line one\nLine two ' })).toEqual({
-      body: 'Line one\nLine two',
+const textDoc = (...lines: string[]) => ({
+  type: 'doc',
+  content: lines.map((text) => ({ type: 'paragraph', content: [{ type: 'text', text }] })),
+});
+
+const mention = (n: number) => ({
+  type: 'mention',
+  attrs: { userId: `01a0e97d-0028-7d46-8479-${String(n).padStart(12, '0')}` },
+});
+
+describe('rich-text bodies (F06B rule B2)', () => {
+  it('takes mentions in comments and refuses them in the brief', () => {
+    const doc = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hi ' }, mention(1)] }],
+    };
+    expect(taskCommentDocSchema.safeParse(doc).success).toBe(true);
+    expect(taskBriefDocSchema.safeParse(doc).success).toBe(false);
+  });
+
+  it('refuses an empty or too long comment, and more than 20 mentioned people', () => {
+    expect(taskCommentDocSchema.safeParse(textDoc('   ')).success).toBe(false);
+    expect(taskCommentDocSchema.safeParse(textDoc('x'.repeat(4000))).success).toBe(true);
+    expect(taskCommentDocSchema.safeParse(textDoc('x'.repeat(4001))).success).toBe(false);
+    const people = (count: number) => ({
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: Array.from({ length: count }, (_, n) => mention(n)) },
+      ],
     });
+    expect(taskCommentDocSchema.safeParse(people(20)).success).toBe(true);
+    expect(taskCommentDocSchema.safeParse(people(21)).success).toBe(false);
   });
 
-  it('refuses an empty or too long body', () => {
-    expect(taskCommentInputSchema.safeParse({ body: '   ' }).success).toBe(false);
-    expect(taskCommentInputSchema.safeParse({ body: 'x'.repeat(4001) }).success).toBe(false);
+  it('holds a brief of up to 20 000 characters', () => {
+    expect(taskBriefDocSchema.safeParse(textDoc('x'.repeat(20_000))).success).toBe(true);
+    expect(taskBriefDocSchema.safeParse(textDoc('x'.repeat(20_001))).success).toBe(false);
+  });
+});
+
+describe('briefColumns (F06B rule C1)', () => {
+  it('writes the plain brief from the document, or the document from the plain brief', () => {
+    expect(briefColumns({ briefDoc: textDoc('one', 'two') as never })).toEqual({
+      brief: 'one\ntwo',
+      briefDoc: textDoc('one', 'two'),
+    });
+    expect(briefColumns({ brief: 'one\ntwo' })).toEqual({
+      brief: 'one\ntwo',
+      briefDoc: textDoc('one', 'two'),
+    });
+    expect(briefColumns({ brief: null })).toEqual({ brief: null, briefDoc: null });
+    expect(briefColumns({ brief: 'x', briefDoc: null })).toEqual({ brief: null, briefDoc: null });
+    expect(briefColumns({})).toBeUndefined();
+  });
+});
+
+describe('taskCommentInputSchema', () => {
+  it('defaults to no files and refuses an upload listed twice or more than 10', () => {
+    expect(taskCommentInputSchema.parse({ bodyDoc: textDoc('Hi') }).files).toEqual([]);
+    const upload = (n: number) => ({
+      uploadId: `01a0e97d-0028-7d46-8479-${String(n).padStart(12, '0')}`,
+    });
+    expect(
+      taskCommentInputSchema.safeParse({ bodyDoc: textDoc('Hi'), files: [upload(1), upload(1)] })
+        .success,
+    ).toBe(false);
+    const files = (count: number) => Array.from({ length: count }, (_, n) => upload(n));
+    expect(
+      taskCommentInputSchema.safeParse({ bodyDoc: textDoc('Hi'), files: files(10) }).success,
+    ).toBe(true);
+    expect(
+      taskCommentInputSchema.safeParse({ bodyDoc: textDoc('Hi'), files: files(11) }).success,
+    ).toBe(false);
+  });
+});
+
+describe('question inputs (F06B part B)', () => {
+  it('addresses exactly one person or one department (rule B1)', () => {
+    const bodyDoc = textDoc('Which sizes?');
+    expect(taskQuestionInputSchema.safeParse({ bodyDoc, addressedUserId: ids.user }).success).toBe(
+      true,
+    );
+    expect(
+      taskQuestionInputSchema.safeParse({ bodyDoc, addressedDepartment: 'design' }).success,
+    ).toBe(true);
+    expect(taskQuestionInputSchema.safeParse({ bodyDoc }).success).toBe(false);
+    expect(
+      taskQuestionInputSchema.safeParse({
+        bodyDoc,
+        addressedUserId: ids.user,
+        addressedDepartment: 'design',
+      }).success,
+    ).toBe(false);
   });
 
-  it('refuses more than 20 mentioned people', () => {
-    const mention = (n: number) => `@{01a0e97d-0028-7d46-8479-${String(n).padStart(12, '0')}}`;
-    const body = (count: number) => Array.from({ length: count }, (_, n) => mention(n)).join(' ');
-    expect(taskCommentInputSchema.safeParse({ body: body(20) }).success).toBe(true);
-    expect(taskCommentInputSchema.safeParse({ body: body(21) }).success).toBe(false);
+  it('forwards to a user and filters by kind and status', () => {
+    expect(forwardQuestionSchema.safeParse({ userId: 'x' }).success).toBe(false);
+    expect(taskCommentListQuerySchema.parse({ kind: 'question', status: 'open' })).toMatchObject({
+      kind: 'question',
+      status: 'open',
+    });
+    expect(myQuestionsQuerySchema.parse({}).status).toBe('open');
   });
 });
 

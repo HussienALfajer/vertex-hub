@@ -18,7 +18,7 @@ import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { NotificationCenter, TimedNotifications } from '../src/modules/notifications/index.js';
-import { api } from './helpers.js';
+import { api, textDoc } from './helpers.js';
 import { seedPostCast } from './post-cast.js';
 import { startApp } from './start-app.js';
 
@@ -264,12 +264,14 @@ describe('notification catalog of the workflow modules (F16 part C)', () => {
         clientId,
       });
       const comment = await client.post(`/api/tasks/${task.id}/comments`, cast.employee.cookie, {
-        body: `راجع هذا @{${cast.writer.id}}`,
+        bodyDoc: textDoc(`راجع هذا @{${cast.writer.id}}`),
       });
       expect(comment.status, await comment.clone().text()).toBe(201);
       // The creator follows: they hear of the comment.
       expect(await rowsOf(cast.designManager.id, 'task_commented', task.id)).toHaveLength(1);
-      await client.post(`/api/tasks/${task.id}/comments`, cast.designer.cookie, { body: 'تم' });
+      await client.post(`/api/tasks/${task.id}/comments`, cast.designer.cookie, {
+        bodyDoc: textDoc('تم'),
+      });
       expect(await rowsOf(cast.employee.id, 'task_commented', task.id)).toHaveLength(1);
       expect(await rowsOf(cast.writer.id, 'task_commented', task.id)).toHaveLength(1);
     });
@@ -280,9 +282,11 @@ describe('notification catalog of the workflow modules (F16 part C)', () => {
         clientId,
       });
       await client.post(`/api/tasks/${task.id}/comments`, cast.designManager.cookie, {
-        body: `@{${cast.employee.id}} ما رأيك؟`,
+        bodyDoc: textDoc(`@{${cast.employee.id}} ما رأيك؟`),
       });
-      await client.post(`/api/tasks/${task.id}/comments`, cast.employee.cookie, { body: 'موافق' });
+      await client.post(`/api/tasks/${task.id}/comments`, cast.employee.cookie, {
+        bodyDoc: textDoc('موافق'),
+      });
       const row = await oneOf(cast.employee.id, 'task_mentioned', task.id);
       expect(row).toMatchObject({ resolution: 'done', resolvedById: cast.employee.id });
     });

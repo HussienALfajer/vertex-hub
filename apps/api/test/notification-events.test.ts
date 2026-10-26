@@ -21,7 +21,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RetainerRenewals } from '../src/modules/projects/retainer-renewals.js';
 import { TaskReminders } from '../src/modules/tasks/task-reminders.js';
-import { api, removeTemplates } from './helpers.js';
+import { api, removeTemplates, textDoc } from './helpers.js';
 import { startApp } from './start-app.js';
 import { seedTaskCast } from './task-cast.js';
 
@@ -63,7 +63,7 @@ describe('notification events', () => {
     client.request('PATCH', path, { cookie, body });
 
   const comment = (taskId: string, cookie: string, body: string) =>
-    client.post(`/api/tasks/${taskId}/comments`, cookie, { body });
+    client.post(`/api/tasks/${taskId}/comments`, cookie, { bodyDoc: textDoc(body) });
 
   const mute = (cookie: string, mutedTypes: NotificationType[]) =>
     client.request('PUT', '/api/me/notification-settings', { cookie, body: { mutedTypes } });
@@ -398,7 +398,7 @@ describe('notification events', () => {
       const { id: commentId } = (await own.json()) as { id: string };
       expect(await typesOf(cast.writer.id, task.id)).toEqual([]);
       await patch(`/api/tasks/${task.id}/comments/${commentId}`, cast.designer.cookie, {
-        body: `تم @{${cast.writer.id}}`,
+        bodyDoc: textDoc(`تم @{${cast.writer.id}}`),
       });
       expect(await typesOf(cast.writer.id, task.id)).toEqual(['task_mentioned']);
       expect(await inbox(cast.designer.id, task.id)).toHaveLength(2);

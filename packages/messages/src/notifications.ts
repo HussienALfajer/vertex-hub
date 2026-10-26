@@ -306,6 +306,26 @@ export const NOTIFICATION_TEXT = {
     waiting: '«{{waiting}}» تنتظر «{{task}}» المتأخرة',
   },
   task_blocked: '«{{task}}» عادت بانتظار مهام أخرى',
+  /** F06B part B. */
+  task_question_asked: {
+    person: 'سألك {{actor}} في «{{task}}»: {{excerpt}}',
+    department: 'سأل {{actor}} قسم {{department}} في «{{task}}»: {{excerpt}}',
+    forwarded: 'حوّل {{actor}} إليك سؤالًا في «{{task}}»: {{excerpt}}',
+  },
+  task_question_answered: {
+    reply: 'ردّ {{actor}} على سؤالك في «{{task}}»: {{excerpt}}',
+    marked: 'عدّ {{actor}} سؤالك في «{{task}}» مُجابًا',
+    merged: 'ردود جديدة على سؤالك في «{{task}}»',
+  },
+  task_question_reminder: 'سؤال في «{{task}}» ينتظر إجابتك منذ يوم عمل: {{excerpt}}',
+  task_question_escalated: {
+    person: 'سؤال في «{{task}}» ينتظر {{addressee}} منذ يومَي عمل: {{excerpt}}',
+    department: 'سؤال في «{{task}}» ينتظر قسم {{department}} منذ يومَي عمل: {{excerpt}}',
+  },
+  task_question_converted: {
+    question: 'حوّل {{actor}} سؤالًا في «{{task}}» إلى المهمة الفرعية «{{subtask}}»',
+    comment: 'حوّل {{actor}} تعليقًا في «{{task}}» إلى المهمة الفرعية «{{subtask}}»',
+  },
   task_delivered: 'سُلّمت «{{task}}»',
   task_revision_decided: {
     free: 'قرر {{actor}} تنفيذ تعديل العميل على «{{task}}» دون مقابل',
@@ -1552,7 +1572,7 @@ export function notificationText(
     default: {
       const { task } = notification.data;
       return {
-        text: taskText(notification, actor),
+        text: taskText(notification, actor, departmentName),
         context: context(task.client, task.project),
       };
     }
@@ -1648,9 +1668,51 @@ type TaskNotification = Exclude<
   }
 >;
 
-function taskText(notification: TaskNotification, actor: string): string {
+function taskText(
+  notification: TaskNotification,
+  actor: string,
+  departmentName: (code: DepartmentCode) => string,
+): string {
   const task = notification.data.task.title;
+  const department = (code: DepartmentCode | null) => (code ? departmentName(code) || code : '');
   switch (notification.type) {
+    case 'task_question_asked': {
+      const { excerpt, forwarded, addressee } = notification.data;
+      const form = forwarded ? 'forwarded' : addressee ? 'person' : 'department';
+      return fill(text.task_question_asked[form], {
+        actor,
+        task,
+        excerpt,
+        department: department(notification.data.department),
+      });
+    }
+    case 'task_question_answered':
+      if (notification.count > 1) return fill(text.task_question_answered.merged, { task });
+      return fill(text.task_question_answered[notification.data.reply ? 'reply' : 'marked'], {
+        actor,
+        task,
+        excerpt: notification.data.excerpt,
+      });
+    case 'task_question_reminder':
+      return fill(text.task_question_reminder, { task, excerpt: notification.data.excerpt });
+    case 'task_question_escalated': {
+      const { addressee, excerpt } = notification.data;
+      return fill(text.task_question_escalated[addressee ? 'person' : 'department'], {
+        task,
+        excerpt,
+        addressee: addressee ?? '',
+        department: department(notification.data.department),
+      });
+    }
+    case 'task_question_converted':
+      return fill(
+        text.task_question_converted[notification.data.question ? 'question' : 'comment'],
+        {
+          actor,
+          task,
+          subtask: notification.data.subtask,
+        },
+      );
     case 'task_assigned': {
       const parent = notification.data.task.parent;
       return parent

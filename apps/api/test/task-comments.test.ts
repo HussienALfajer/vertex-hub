@@ -6,7 +6,7 @@ import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { expectError } from './client-cast.js';
-import { api } from './helpers.js';
+import { api, textDoc } from './helpers.js';
 import { startApp } from './start-app.js';
 import { seedTaskCast } from './task-cast.js';
 
@@ -18,11 +18,11 @@ describe('task comments (rule 16)', () => {
   let cast: Awaited<ReturnType<typeof seedTaskCast>>;
 
   const post = (taskId: string, cookie: string | undefined, body: string) =>
-    client.post(`/api/tasks/${taskId}/comments`, cookie, { body });
+    client.post(`/api/tasks/${taskId}/comments`, cookie, { bodyDoc: textDoc(body) });
   const edit = (taskId: string, commentId: string, cookie: string | undefined, body: string) =>
     client.request('PATCH', `/api/tasks/${taskId}/comments/${commentId}`, {
       cookie,
-      body: { body },
+      body: { bodyDoc: textDoc(body) },
     });
   const remove = (taskId: string, commentId: string, cookie?: string) =>
     client.post(`/api/tasks/${taskId}/comments/${commentId}/archive`, cookie);
@@ -67,7 +67,7 @@ describe('task comments (rule 16)', () => {
     const first = await comment(
       task.id,
       cast.writer.cookie,
-      ` Ready?\n${mention(cast.designer.id)} ${mention(cast.designManager.id)} `,
+      `Ready?\n${mention(cast.designer.id)} ${mention(cast.designManager.id)}`,
     );
     expect(first).toMatchObject({
       author: { id: cast.writer.id, archived: false },

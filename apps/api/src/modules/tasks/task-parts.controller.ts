@@ -30,7 +30,11 @@ import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
 import { TaskPartsService } from './task-parts.service.js';
 
-/** Checklist and links: `tasks.work` or manage scope on the task, checked by the service. */
+/**
+ * Checklist and links: `tasks.work` or manage scope on the task; acceptance criteria (F06B rule
+ * C6): manage scope writes them, the assignee, a reviewer or manage scope tick them. The service
+ * checks each.
+ */
 @ApiTags('tasks')
 @Controller('tasks/:id')
 export class TaskPartsController {
@@ -93,6 +97,65 @@ export class TaskPartsController {
     @Param('itemId', ParseUUIDPipe) itemId: string,
   ): Promise<void> {
     return this.parts.archiveChecklistItem(actor, taskId, itemId);
+  }
+
+  @Post('criteria')
+  @RequirePermissions('tasks.read')
+  @SerializeOptions({ schema: taskChecklistItemSchema })
+  @ApiCreatedResponse({
+    description: 'The new acceptance criterion, last in the list (manage scope; F06B rule C6)',
+    standardSchema: taskChecklistItemSchema,
+  })
+  addCriterion(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) taskId: string,
+    @Body({ schema: createTaskChecklistItemSchema }) input: CreateTaskChecklistItem,
+  ): Promise<TaskChecklistItem> {
+    return this.parts.addChecklistItem(actor, taskId, input, 'criterion');
+  }
+
+  @Put('criteria/order')
+  @RequirePermissions('tasks.read')
+  @SerializeOptions({ schema: taskChecklistSchema })
+  @ApiOkResponse({
+    description: 'The acceptance criteria in their new order (manage scope)',
+    standardSchema: taskChecklistSchema,
+  })
+  reorderCriteria(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) taskId: string,
+    @Body({ schema: taskChecklistOrderSchema }) order: TaskChecklistOrder,
+  ): Promise<TaskChecklist> {
+    return this.parts.reorderChecklist(actor, taskId, order, 'criterion');
+  }
+
+  @Patch('criteria/:itemId')
+  @RequirePermissions('tasks.read')
+  @SerializeOptions({ schema: taskChecklistItemSchema })
+  @ApiOkResponse({
+    description:
+      'The renamed (manage scope), ticked or unticked criterion (assignee, reviewer or manage scope)',
+    standardSchema: taskChecklistItemSchema,
+  })
+  updateCriterion(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) taskId: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Body({ schema: updateTaskChecklistItemSchema }) input: UpdateTaskChecklistItem,
+  ): Promise<TaskChecklistItem> {
+    return this.parts.updateChecklistItem(actor, taskId, itemId, input, 'criterion');
+  }
+
+  @Post('criteria/:itemId/archive')
+  @HttpCode(204)
+  @RequirePermissions('tasks.read')
+  @ApiNoContentResponse({ description: 'The criterion is removed (manage scope)' })
+  archiveCriterion(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) taskId: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+  ): Promise<void> {
+    return this.parts.archiveChecklistItem(actor, taskId, itemId, 'criterion');
   }
 
   @Post('links')

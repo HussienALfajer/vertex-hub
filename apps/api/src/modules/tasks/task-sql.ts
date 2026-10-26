@@ -1,5 +1,5 @@
 import { businessDate, businessTimeOfDay, OPEN_TASK_STATUSES } from '@vertex-hub/contracts';
-import { taskReviews, taskRevisions, tasks } from '@vertex-hub/db';
+import { taskComments, taskReviews, taskRevisions, tasks } from '@vertex-hub/db';
 import { type SQL, sql } from 'drizzle-orm';
 
 /*
@@ -30,3 +30,10 @@ export const overLimitPendingSql = sql<boolean>`exists (
 export const clearedByMedicalSql = sql<boolean>`exists (
   select 1 from ${taskReviews} as p
   where p.id = "tasks"."cleared_review_id" and p.stage = 'medical')`;
+
+/** F06B rule B7: an open question on the task or on one of its live subtasks. */
+export const openQuestionsSql = sql<boolean>`exists (
+  select 1 from ${taskComments} as q
+  where q.kind = 'question' and q.question_status = 'open' and q.archived_at is null
+    and (q.task_id = "tasks"."id" or q.task_id in (
+      select s.id from ${tasks} as s where s.parent_id = "tasks"."id" and s.archived_at is null)))`;

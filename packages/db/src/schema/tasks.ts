@@ -1,9 +1,12 @@
 import {
+  CHECKLIST_ITEM_KINDS,
   DEPENDENCY_SOURCES,
+  QUESTION_STATUSES,
   REQUEST_SCOPES,
   REVISION_DECISIONS,
   REVISION_SOURCES,
   SUBTASK_RUN_MODES,
+  TASK_COMMENT_KINDS,
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
@@ -16,6 +19,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -65,12 +69,21 @@ export const subtaskRunModeEnum = pgEnum('subtask_run_mode', SUBTASK_RUN_MODES);
 
 export const dependencySourceEnum = pgEnum('dependency_source', DEPENDENCY_SOURCES);
 
+export const checklistItemKindEnum = pgEnum('checklist_item_kind', CHECKLIST_ITEM_KINDS);
+
+export const taskCommentKindEnum = pgEnum('task_comment_kind', TASK_COMMENT_KINDS);
+
+export const questionStatusEnum = pgEnum('question_status', QUESTION_STATUSES);
+
 export const tasks = pgTable(
   'tasks',
   {
     id: id(),
     title: text('title').notNull(),
+    /** The plain-text extract of `brief_doc`, written from it (search, emails, notifications). */
     brief: text('brief'),
+    /** F06B rule C1: the brief as an ADR 0038 rich-text document; null without a brief. */
+    briefDoc: jsonb('brief_doc'),
     type: taskTypeEnum('type').notNull().default('work'),
     department: departmentCodeEnum('department').notNull(),
     /** Null while the task waits in its department's unassigned queue. */
@@ -242,7 +255,9 @@ export const taskChecklistItems = pgTable(
       .notNull()
       .references(() => tasks.id),
     text: text('text').notNull(),
-    /** Order within the task, dense from 1 among non-archived items. */
+    /** F06B rule C6: an acceptance criterion, ordered and limited apart from the checklist. */
+    kind: checklistItemKindEnum('kind').notNull().default('checklist'),
+    /** Order within the task and kind, dense from 1 among non-archived items. */
     position: integer('position').notNull(),
     doneAt: timestamp('done_at', { withTimezone: true }),
     doneById: uuid('done_by_id').references(() => users.id),
@@ -326,7 +341,10 @@ export const taskRevisions = pgTable(
   ],
 );
 
-/** Comments on a task (rule 16); mentions are `@{userId}` tokens in the plain-text body. */
+/**
+ * The thread of a task (rule 16): comments, questions and their replies (F06B part B, ADR 0041).
+ * `body` is the plain-text extract of `body_doc`, with mentions as `@{userId}` tokens.
+ */
 export const taskComments = pgTable(
   'task_comments',
   {
@@ -338,8 +356,24 @@ export const taskComments = pgTable(
       .notNull()
       .references(() => users.id),
     body: text('body').notNull(),
+    /** F06B rule B2: the rich-text document with mention nodes; written on every new row. */
+    bodyDoc: jsonb('body_doc'),
     /** Derived from the body on save. */
     mentionedUserIds: uuid('mentioned_user_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    kind: taskCommentKindEnum('kind').notNull().default('comment'),
+    /** A reply: the question of the same task it answers. */
+    questionId: uuid('question_id').references((): AnyPgColumn => taskComments.id),
+    /** Questions: the person asked, or the member a department question was forwarded to. */
+    addressedUserId: uuid('addressed_user_id').references(() => users.id),
+    /** Questions: set for a department question; kept when it is forwarded. */
+    addressedDepartment: departmentCodeEnum('addressed_department'),
+    questionStatus: questionStatusEnum('question_status'),
+    /** Questions: when asked or last reopened; reminders count work hours from it (rule B8). */
+    clockStartedAt: timestamp('clock_started_at', { withTimezone: true }),
+    answeredAt: timestamp('answered_at', { withTimezone: true }),
+    answeredById: uuid('answered_by_id').references(() => users.id),
+    /** The subtask this question or comment was turned into (rule B11). */
+    convertedTaskId: uuid('converted_task_id').references(() => tasks.id),
     editedAt: timestamp('edited_at', { withTimezone: true }),
     ...timestamps(),
     archivedAt: archivedAt(),
@@ -347,6 +381,31 @@ export const taskComments = pgTable(
   (table) => [
     index('task_comments_task_id_idx').on(table.taskId, table.createdAt),
     index('task_comments_author_id_idx').on(table.authorId),
+    index('task_comments_question_id_idx').on(table.questionId),
+    index('task_comments_addressed_user_id_idx').on(table.addressedUserId),
+    index('task_comments_answered_by_id_idx').on(table.answeredById),
+    index('task_comments_converted_task_id_idx').on(table.convertedTaskId),
+    // Edge case 23: the minute job reads the open questions only.
+    index('task_comments_open_questions_idx')
+      .on(table.clockStartedAt)
+      .where(
+        sql`${table.kind} = 'question' and ${table.questionStatus} = 'open' and ${table.archivedAt} is null`,
+      ),
+    check(
+      'task_comments_question_check',
+      sql`case when ${table.kind} = 'question'
+        then (${table.addressedUserId} is not null or ${table.addressedDepartment} is not null)
+          and ${table.questionStatus} is not null and ${table.clockStartedAt} is not null
+          and ${table.questionId} is null
+        else ${table.addressedUserId} is null and ${table.addressedDepartment} is null
+          and ${table.questionStatus} is null and ${table.clockStartedAt} is null
+          and ${table.answeredAt} is null and ${table.answeredById} is null end`,
+    ),
+    check(
+      'task_comments_answered_check',
+      sql`(${table.answeredAt} is null) = (${table.answeredById} is null)
+        and (${table.questionStatus} = 'answered') = (${table.answeredAt} is not null)`,
+    ),
   ],
 );
 

@@ -40,7 +40,8 @@ export type FileRole = z.infer<typeof fileRoleSchema>;
 
 /** Which roles each owner type holds (data table, check constraint). */
 export const FILE_ROLES_BY_OWNER: Record<FileOwnerType, readonly FileRole[]> = {
-  task: ['deliverable', 'reference'],
+  /** F06B rule B2: `attachment` only through the task's thread. */
+  task: ['deliverable', 'reference', 'attachment'],
   client: ['brand', 'document'],
   project: ['document'],
   retainer: ['document'],

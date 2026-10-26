@@ -14,12 +14,13 @@ import {
   type TaskWorkloadQuery,
   weekOf,
 } from '@vertex-hub/contracts';
-import { type Database, tasks } from '@vertex-hub/db';
+import { type Database, taskComments, tasks } from '@vertex-hub/db';
 import { and, asc, count, eq, gte, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { accessColumns } from './task-access.js';
 import { blockedSql } from './task-dependencies.js';
+import { managedDepartments, waitingQuestionsSql } from './task-questions.js';
 import { TaskReports } from './task-reports.js';
 import { openSql, overdueSql } from './task-sql.js';
 import { TasksService } from './tasks.service.js';
@@ -143,7 +144,7 @@ export class TaskViewsService {
     const overdue = overdueSql(now);
     const managed = actor.access.departments.filter((d) => d.isManager).map((d) => d.code);
     const clientScope = this.tasks.clientScopeSql(actor);
-    const [[mine], [others], [unassigned], [medical], [ready]] = await Promise.all([
+    const [[mine], [others], [unassigned], [medical], [ready], [questions]] = await Promise.all([
       this.db
         .select({
           overdue: countWhere(and(eq(tasks.assigneeId, actor.id), overdue) as SQL),
@@ -210,6 +211,20 @@ export class TaskViewsService {
             .from(tasks)
             .where(and(this.tasks.visibleSql(), this.tasks.readyToSendSql(), clientScope))
         : [null],
+      // F06B rule B7: the questions waiting for the caller's answer.
+      this.db
+        .select({ value: count() })
+        .from(taskComments)
+        .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
+        .where(
+          and(
+            this.tasks.visibleSql(),
+            waitingQuestionsSql(
+              actor,
+              await this.users.archivedPrimaryMembers(managedDepartments(actor)),
+            ),
+          ),
+        ),
     ]);
     return {
       overdue: mine?.overdue ?? 0,
@@ -222,6 +237,7 @@ export class TaskViewsService {
       readyToSend: ready ? ready.value : null,
       requestedByMe: mine?.requestedByMe ?? 0,
       unassignedInMyDepartments: unassigned ? unassigned.value : null,
+      questionsWaiting: questions?.value ?? 0,
     };
   }
 }

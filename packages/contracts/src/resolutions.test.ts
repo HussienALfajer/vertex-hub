@@ -123,6 +123,16 @@ describe('task resolutions (F16 rule B5, part C)', () => {
     ]);
   });
 
+  it('voids the notifications of open questions when the task is delivered (F06B rule B10)', () => {
+    const approved = { ...task, status: 'approved' as const };
+    expect(taskResolutions(approved, { ...approved, status: 'delivered' })).toEqual([
+      {
+        types: ['task_question_asked', 'task_question_reminder', 'task_question_escalated'],
+        outcome: 'void',
+      },
+    ]);
+  });
+
   it('closes nothing when nothing it watches changed', () => {
     expect(taskResolutions(task, task)).toEqual([]);
     const cancelled = { ...task, status: 'cancelled' as const };
