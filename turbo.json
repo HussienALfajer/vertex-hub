@@ -2,7 +2,14 @@
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
   "globalDependencies": [".node-version"],
-  "globalPassThroughEnv": ["DATABASE_URL", "TEST_DATABASE_URL", "CI", "PLAYWRIGHT_BROWSERS_PATH"],
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "TEST_DATABASE_URL",
+    "TEST_WORKERS",
+    "CI",
+    "PLAYWRIGHT_BROWSERS_PATH"
+  ],
+  "remoteCache": { "signature": true },
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
