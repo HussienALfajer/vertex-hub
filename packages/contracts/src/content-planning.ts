@@ -243,11 +243,17 @@ export type UpdateClientContentSettings = z.infer<typeof updateClientContentSett
 
 export type UpdateClientContentSettingsInput = z.input<typeof updateClientContentSettingsSchema>;
 
-export const clientContentSettingsSchema = updateClientContentSettingsSchema
-  .extend({
+export const clientContentSettingsSchema = z
+  .object({
     clientId: z.uuid(),
     /** False until someone saved the client's settings: the defaults are shown. */
     saved: z.boolean(),
+    postingTimes: z.array(postingWindowSchema),
+    pillarTargets: z.array(pillarTargetSchema),
+    maxGapDays: z.number().int(),
+    occasionCategories: z.array(occasionCategorySchema),
+    excludedOccasionIds: z.array(z.uuid()),
+    xLongPosts: z.boolean(),
     skippedOccasions: z.array(occasionSkipSchema),
     /** The windows that apply: the client's per platform it sets, else the agency's. */
     effectivePostingTimes: z.array(postingWindowSchema),

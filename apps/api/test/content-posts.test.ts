@@ -669,6 +669,8 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
       await dated(today.id, now);
       await dated(overdue.id, addDays(now, -2));
       await dated(published.id, addDays(now, -2));
+      // F08B: in review, due tomorrow and not approved: at risk.
+      await dated(waiting.id, addDays(now, 1));
       await cast.moveOk(returned.id, cast.contentManager.cookie, {
         to: 'in_production',
         note: 'عدّل النص',
@@ -678,6 +680,7 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
         publishToday: 1,
         overdue: 1,
         returned: 1,
+        atRisk: 1,
         toReview: null,
       });
       const view = async (name: string, cookie: string) =>
@@ -686,6 +689,7 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
       expect(await view('overdue', mine.cookie)).toEqual([overdue.id]);
       expect(await view('returned', mine.cookie)).toEqual([returned.id]);
       expect(await view('to_review', mine.cookie)).toEqual([]);
+      expect(await view('at_risk', mine.cookie)).toEqual([waiting.id]);
       expect((await list(`view=overdue&clientId=${own}`, mine.cookie)).items[0]?.overdue).toBe(
         true,
       );
