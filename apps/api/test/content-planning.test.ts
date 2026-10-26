@@ -25,6 +25,7 @@ import {
   contentPlanningSettings,
   contentPosts,
   createDatabase,
+  notificationReminders,
   notifications,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
@@ -574,6 +575,15 @@ describe('planning aids (F08B part C)', () => {
     it('sends the weekly check once, on the week first work day only', async () => {
       const saturday = ahead(6);
       const subject = contentWeekSubjectId(saturday);
+      // The week's subject id is synthetic, so no seed cleanup removes its reminder row: clear
+      // it before and after, or a later run on this database finds the week already sent.
+      const clear = async () => {
+        await db.delete(notifications).where(eq(notifications.subjectId, subject));
+        await db
+          .delete(notificationReminders)
+          .where(eq(notificationReminders.subjectId, subject));
+      };
+      await clear();
       await reminders.remind(addDays(saturday, 1));
       await reminders.remind(saturday);
       await reminders.remind(saturday);
@@ -585,7 +595,7 @@ describe('planning aids (F08B part C)', () => {
         );
       expect(rows.filter((row) => row.recipientId === cast.writer.id)).toHaveLength(1);
       expect(rows.some((row) => row.recipientId === cast.designer.id)).toBe(false);
-      await db.delete(notifications).where(eq(notifications.subjectId, subject));
+      await clear();
     });
 
     it('reminds before the publish time of approved posts only', async () => {
