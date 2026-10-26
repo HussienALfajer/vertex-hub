@@ -174,6 +174,21 @@ Approved by the owner in full (2026-10-25).
   - quick ideas: an idea in one line from anywhere (an ideas bank), scheduled later;
   - a publishing pack: copy the caption of each platform and download the media with their names, since publishing stays manual.
 - **Notifications** (with the shared rules above): post assigned or its responsible changed, linked task or subtask ready, post moved to another day (to its responsible and the linked tasks' assignees), publish time approaching for an approved post not yet scheduled, a gap or an occasion without a post (to the client's content team), and the F08 events already in the catalog.
+- **Decided in the spec interview (owner, 2026-10-26):**
+  - a caption over its platform's limit is a warning while editing and blocks the submission for review;
+  - creation is a step-by-step wizard like the task wizard, with "Create now" from its first step;
+  - dropping a post on another day asks whether to shift its linked tasks' due dates by the same work days, ticked when a task would fall after the new date;
+  - the "content team" told of gaps and occasions is every member of Content Management;
+  - pillars are an agency list with an optional target mix per client;
+  - best times are entered by hand, with agency defaults per platform and overrides per client;
+  - occasions come from a starting list, general or by category, enabled per client;
+  - any employee adds ideas;
+  - previews show for the team and for the client on the approval page;
+  - a post holds 20 files of its own, and the client sees the slide captions;
+  - a post not yet approved two work days before its date notifies its responsible person and the account manager;
+  - the gap check is sent once a week for the next two weeks.
+
+  Spec: `docs/specs/F08B-content-2.md`, ADR 0042.
 
 ### Later (approved in principle by the owner, 2026-10-25; not scheduled)
 - An AI assistant: per-platform captions drafted from one caption, hashtag suggestions, brief summaries.
