@@ -59,9 +59,12 @@ export class TaskViewsController {
       "A project's or a retainer cycle's tasks by milestone with their subtasks, the dependencies and the bottleneck (F06B rule D4)",
     standardSchema: taskTreeSchema,
   })
-  @ApiNotFoundResponse({ description: 'No such project or retainer cycle' })
-  tree(@Query({ schema: taskTreeQuerySchema }) query: TaskTreeQuery): Promise<TaskTree> {
-    return this.trees.tree(query);
+  @ApiNotFoundResponse({ description: 'No project or retainer cycle the caller may read' })
+  tree(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Query({ schema: taskTreeQuerySchema }) query: TaskTreeQuery,
+  ): Promise<TaskTree> {
+    return this.trees.tree(actor, query);
   }
 
   @Get('tasks/board')

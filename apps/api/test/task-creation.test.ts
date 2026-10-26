@@ -307,7 +307,7 @@ describe('task creation, readiness and estimates (F06B part C)', () => {
 
   it('refuses two deliverables of one name, brief fields of another department and unknown parts', async () => {
     const [a, b] = [await upload(cast.gm.cookie, 'a.pdf'), await upload(cast.gm.cookie, 'b.pdf')];
-    await expectError(
+    const taken = await expectError(
       await create(cast.gm.cookie, {
         files: [
           { uploadId: a.uploadId, role: 'deliverable', name: 'Final' },
@@ -317,6 +317,8 @@ describe('task creation, readiness and estimates (F06B part C)', () => {
       409,
       'FILE_NAME_TAKEN',
     );
+    // The second file is the one the wizard leads back to.
+    expect(taken.details).toEqual({ part: 'files', index: 1 });
     expect((await create(cast.gm.cookie, { briefFields: { sizes: ['1:1'] } })).status).toBe(400);
     expect((await create(undefined, {})).status).toBe(401);
   });

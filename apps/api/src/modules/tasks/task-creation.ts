@@ -89,9 +89,20 @@ export class TaskCreation {
       stageIds.push(await this.runs.insertStage(tx, actorOf(actor), id, stage.name, index + 1));
     }
     const due = { dueDate: input.dueDate, dueTime: input.dueTime ?? null };
-    let preview = await inPart({ part: 'files', index: 0 }, () =>
-      this.attachments.attachToTask(tx, actor, { taskId: id, clientId: input.clientId }, files),
-    );
+    let preview = false;
+    const deliverables = new Set<string>();
+    for (const [index, file] of files.entries()) {
+      const filePreview = await inPart({ part: 'files', index }, () =>
+        this.attachments.attachToTask(
+          tx,
+          actor,
+          { taskId: id, clientId: input.clientId },
+          [file],
+          deliverables,
+        ),
+      );
+      preview ||= filePreview;
+    }
     const created: { id: string; title: string; department: CreateTask['department'] }[] = [];
     for (const [index, subtask] of subtasks.entries()) {
       const subtaskId = await inPart({ part: 'subtasks', index }, async () => {

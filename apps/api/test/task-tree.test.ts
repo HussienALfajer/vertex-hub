@@ -96,6 +96,14 @@ describe('the task tree (F06B rule D4)', () => {
     expect(tree.outside).toEqual([{ id: outside.id, title: outside.title, status: 'new' }]);
     // Two open subtasks wait on the copy, directly or through the design.
     expect(tree.bottleneckId).toBe(copy?.id);
+
+    // An archived project's tasks are read-only (F06 rule 17): below scope all, no tree.
+    const archived = await client.post(`/api/projects/${project.id}/archive`, cast.gm.cookie, {});
+    expect(archived.status, await archived.clone().text()).toBe(200);
+    expect((await treeOf(`projectId=${project.id}`, cast.employee.cookie)).status).toBe(404);
+    expect(
+      (await treeOk(`projectId=${project.id}`, cast.gm.cookie)).groups.flatMap((g) => g.tasks),
+    ).toHaveLength(3);
   });
 
   it("draws a retainer cycle's tasks in one group", async () => {

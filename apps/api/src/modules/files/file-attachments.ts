@@ -108,17 +108,18 @@ export class FileAttachments {
 
   /**
    * F06B rule C3: the actor's held uploads attached to a new task as references or as the first
-   * version of a deliverable (`FILE_NAME_TAKEN` for two deliverables of one name). Returns
-   * whether a preview waits: call `queuePreviews` once the transaction committed.
+   * version of a deliverable (`FILE_NAME_TAKEN` for two deliverables of one name; a caller
+   * attaching one file at a time passes the same `deliverables` set). Returns whether a preview
+   * waits: call `queuePreviews` once the transaction committed.
    */
   async attachToTask(
     tx: Transaction,
     actor: CurrentUserInfo,
     target: { taskId: string; clientId: string | null },
     files: readonly { uploadId: string; role: 'reference' | 'deliverable'; name?: string }[],
+    deliverables = new Set<string>(),
   ): Promise<boolean> {
     let preview = false;
-    const deliverables = new Set<string>();
     for (const file of files) {
       const upload = await this.takeUpload(tx, actor, file.uploadId);
       const name = file.name ?? documentName(upload.originalName);

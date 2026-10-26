@@ -1004,6 +1004,14 @@ describe('bottleneck (F06B rule D4)', () => {
     expect(bottleneck(nodes, edges)).toBe('a');
   });
 
+  it('stops at a finished task: nothing waits through it', () => {
+    const edges = [
+      { taskId: 'b', dependsOnId: 'a' },
+      { taskId: 'c', dependsOnId: 'b' },
+    ];
+    expect(bottleneck([node('a'), node('b', { open: false }), node('c')], edges)).toBeNull();
+  });
+
   it('counts only open waiters and skips finished or blocked candidates', () => {
     const edges = [{ taskId: 'b', dependsOnId: 'a' }];
     expect(bottleneck([node('a'), node('b', { open: false })], edges)).toBeNull();

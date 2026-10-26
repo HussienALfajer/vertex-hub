@@ -28360,7 +28360,7 @@ export interface operations {
                     "application/json": components["schemas"]["TaskTree"];
                 };
             };
-            /** @description No such project or retainer cycle */
+            /** @description No project or retainer cycle the caller may read */
             404: {
                 headers: {
                     [name: string]: unknown;

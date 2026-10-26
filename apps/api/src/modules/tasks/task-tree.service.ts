@@ -10,8 +10,9 @@ import {
 import { type Database, taskDependencies, tasks } from '@vertex-hub/db';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
+import type { CurrentUserInfo } from '../auth/index.js';
 import { EngagementDirectory } from '../projects/index.js';
-import { accessColumns } from './task-access.js';
+import { accessColumns, holdsAll } from './task-access.js';
 import { TasksService } from './tasks.service.js';
 
 type TreeItem = Omit<Task, 'parent'> & { parentId: string | null; position: number | null };
@@ -41,10 +42,17 @@ export class TaskTreeService {
     private readonly tasks: TasksService,
   ) {}
 
-  async tree(query: TaskTreeQuery): Promise<TaskTree> {
+  /**
+   * 404 for a project or cycle the actor may not read; read-only tasks (an archived client,
+   * F06 rule 17) are left out below scope all, as in the list.
+   */
+  async tree(actor: CurrentUserInfo, query: TaskTreeQuery): Promise<TaskTree> {
     const milestones = query.projectId
-      ? await this.milestones(query.projectId)
-      : await this.cycle(query.retainerCycleId as string);
+      ? await this.milestones(actor, query.projectId)
+      : await this.cycle(actor, query.retainerCycleId as string);
+    const visible = holdsAll(actor, 'tasks.manage')
+      ? isNull(tasks.archivedAt)
+      : this.tasks.visibleSql();
     const rows = await this.db
       .select(accessColumns)
       .from(tasks)
@@ -53,7 +61,7 @@ export class TaskTreeService {
           query.projectId
             ? eq(tasks.projectId, query.projectId)
             : eq(tasks.retainerCycleId, query.retainerCycleId as string),
-          isNull(tasks.archivedAt),
+          visible,
         ),
       )
       .orderBy(asc(tasks.dueDate), asc(tasks.dueTime), asc(tasks.id));
@@ -87,7 +95,7 @@ export class TaskTreeService {
       ? await this.db
           .select({ id: tasks.id, title: tasks.title, status: tasks.status })
           .from(tasks)
-          .where(inArray(tasks.id, outsideIds))
+          .where(and(inArray(tasks.id, outsideIds), visible))
           .orderBy(asc(tasks.title))
       : [];
 
@@ -130,18 +138,24 @@ export class TaskTreeService {
     };
   }
 
-  /** The project's milestones by position; 404 for an unknown project. */
-  private async milestones(projectId: string): Promise<{ id: string; name: string }[]> {
-    const projects = await this.engagements.projects([projectId], this.db);
-    if (!projects.has(projectId)) throw new NotFoundException();
+  /** The project's milestones by position; 404 for a project the actor may not read. */
+  private async milestones(
+    actor: CurrentUserInfo,
+    projectId: string,
+  ): Promise<{ id: string; name: string }[]> {
+    await this.engagements.readableProject(actor, projectId);
     const milestones = await this.engagements.projectMilestones(projectId, this.db);
     return milestones.map((milestone) => ({ id: milestone.id, name: milestone.name }));
   }
 
-  /** A cycle has one group, without a milestone; 404 for an unknown cycle. */
-  private async cycle(cycleId: string): Promise<{ id: string; name: string }[]> {
-    const cycles = await this.engagements.cycles([cycleId], this.db);
-    if (!cycles.has(cycleId)) throw new NotFoundException();
+  /** A cycle has one group, without a milestone; 404 for a cycle the actor may not read. */
+  private async cycle(
+    actor: CurrentUserInfo,
+    cycleId: string,
+  ): Promise<{ id: string; name: string }[]> {
+    const cycle = (await this.engagements.cycles([cycleId], this.db)).get(cycleId);
+    if (!cycle) throw new NotFoundException();
+    await this.engagements.readableRetainer(actor, cycle.retainerId);
     return [];
   }
 }

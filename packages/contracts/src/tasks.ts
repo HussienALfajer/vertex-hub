@@ -1952,10 +1952,11 @@ export function bottleneck(
     let open = 0;
     while (queue.length > 0) {
       for (const next of dependents.get(queue.shift() as string) ?? []) {
-        if (seen.has(next)) continue;
+        // A finished task makes nobody wait: the chain stops there.
+        if (seen.has(next) || !byId.get(next)?.open) continue;
         seen.add(next);
         queue.push(next);
-        if (byId.get(next)?.open) open += 1;
+        open += 1;
       }
     }
     return open;
