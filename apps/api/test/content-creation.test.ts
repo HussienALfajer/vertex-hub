@@ -7,6 +7,7 @@ import {
   type ContentIdea,
   type CreatePostInput,
   contentIdeaSchema,
+  errorResponseSchema,
   fileUploadSchema,
   postDetailSchema,
 } from '@vertex-hub/contracts';
@@ -225,7 +226,10 @@ describe('creating a post in one save (F08B rules B1–B3)', () => {
       ],
     });
     expect(forbidden.status, await forbidden.clone().text()).toBe(403);
-    expect((await forbidden.json()).details).toEqual({ part: 'tasks', index: 1 });
+    expect(errorResponseSchema.parse(await forbidden.json()).details).toEqual({
+      part: 'tasks',
+      index: 1,
+    });
 
     await expectError(
       await create(cast.writer.cookie, {

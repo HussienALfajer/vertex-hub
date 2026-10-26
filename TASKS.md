@@ -22,7 +22,9 @@ Work branch: `feat/f08b-pr2-api` (pushed, no PR yet). Built on PR 1, merged as H
 - [x] FIX (the week's reminder row was never cleaned, so a rerun on the same database found the week sent; the test clears it): `content-planning.test.ts` 13/14: "sends the weekly check once" finds no `content_week_check` row after `PostReminders.remind(saturday)`, though `ContentPlanner.weekCheck(saturday, [writer])` builds the notice. Debug `PostReminders.weekCheck` (`nthWorkDay(weekOf(today).from, 1, holidays) !== today`, `remindOnce` key, `runEach` swallowing an error)
 - [x] bridge: `pnpm build`, `openapi:export`, `api:generate`; web typecheck (fixtures: `Post.pillar`/`occasionId`, detail `occasion`, calendar `occasions`/`issues`, summary `atRisk`)
 - [x] docs: `docs/architecture.md` (content tables and services, `openContentCycles`), spec details settled (wizard `files[].slideCaption` instead of `layout`; `post_unassigned` replaces `responsibility_moved`; category `content`; subjects `content_week`/`content_ideas`; `post_moved` ordered in the F08B block)
-- [ ] checks (full `pnpm verify`; api/web typecheck need `NODE_OPTIONS=--max-old-space-size=6144` here), reviewer, acceptance, PR with auto-merge
+- [x] checks: full `pnpm verify` passes (api/web typecheck need `NODE_OPTIONS=--max-old-space-size=6144` here; on this 4-CPU machine the api suite's start hooks can time out while typecheck and build run beside it, and pass alone)
+- [x] reviewer: 6 blocking findings fixed (catalog test, per-year occasion coverage, route tests, wizard part on a bare 403, `content_idea_used` subject in the spec, client settings lock); planning and grid have no 403 case (every role reads content over all clients)
+- [ ] owner acceptance (and the rule C6 per-year reading), PR with auto-merge
 
 ## PR 3 — Wizard, captions, slides and previews (web)
 - [ ] ui: components the previews need (if missing) on the design-system page
