@@ -15,6 +15,7 @@ import { SubtaskRuns } from './subtask-runs.js';
 import { TaskApprovals } from './task-approvals.js';
 import { TaskCommentsController } from './task-comments.controller.js';
 import { TaskCommentsService } from './task-comments.service.js';
+import { TaskCreation } from './task-creation.js';
 import { TaskDigest } from './task-digest.js';
 import { TaskFileOwner } from './task-file-owner.js';
 import { TaskGenerator } from './task-generator.js';
@@ -27,6 +28,7 @@ import { TaskPartsService } from './task-parts.service.js';
 import { TaskQuestionsController } from './task-questions.controller.js';
 import { TaskQuestionsService } from './task-questions.service.js';
 import { TaskQueueHooks } from './task-queue-hooks.js';
+import { TaskReadinessService } from './task-readiness.service.js';
 import { TaskReminders } from './task-reminders.js';
 import { TaskReports } from './task-reports.js';
 import { TaskReviewsController } from './task-reviews.controller.js';
@@ -34,6 +36,9 @@ import { TaskReviews } from './task-reviews.js';
 import { TaskReviewsService } from './task-reviews.service.js';
 import { TaskSubtasksController } from './task-subtasks.controller.js';
 import { TaskSubtasksService } from './task-subtasks.service.js';
+import { TaskTemplateHooks } from './task-template-hooks.js';
+import { TaskTemplates } from './task-templates.js';
+import { TaskTreeService } from './task-tree.service.js';
 import { TaskViewsController } from './task-views.controller.js';
 import { TaskViewsService } from './task-views.service.js';
 import { TaskWorkflowService } from './task-workflow.service.js';
@@ -58,7 +63,11 @@ import { TasksService } from './tasks.service.js';
  * Warns of an assignee's approved leave through `hr`'s `LeaveDirectory` and feeds open tasks into
  * its `LeaveWorkSources` (F17 rules B14 and B17). Owns subtasks, their stages and run, and the
  * questions of a task's thread (F06B, ADR 0041): attaches their files through `files`'
- * `FileAttachments` and counts reminders in work hours with `hr`'s `HolidayCalendar`.
+ * `FileAttachments` and counts reminders in work hours with `hr`'s `HolidayCalendar`. Creates a
+ * task with its parts in one transaction, checks readiness and shows estimates against `hr`'s
+ * `WorkCapacity`, draws a project's tree, and exports `TaskTemplates` (snapshots and draft
+ * assignees) and the `TaskTemplateHooks` registry, where `templates` records the run of a task
+ * template, for the `templates` module (F06B part D).
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule, HrModule],
@@ -100,6 +109,11 @@ import { TasksService } from './tasks.service.js';
     TaskSubtasksService,
     TaskQuestionsService,
     QuestionReminders,
+    TaskCreation,
+    TaskReadinessService,
+    TaskTreeService,
+    TaskTemplates,
+    TaskTemplateHooks,
   ],
   exports: [
     TaskGenerator,
@@ -112,6 +126,8 @@ import { TasksService } from './tasks.service.js';
     TaskGuards,
     TaskLinks,
     TaskReports,
+    TaskTemplates,
+    TaskTemplateHooks,
   ],
 })
 export class TasksModule {}

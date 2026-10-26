@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   allowedTaskTransitions,
   BOARD_STATUSES,
+  bottleneck,
   briefColumns,
   CLIENT_TEXT_MAX,
   canMakeTaskMove,
@@ -10,6 +11,7 @@ import {
   createsDependencyCycle,
   createTaskChecklistItemSchema,
   createTaskSchema,
+  draftWarnings,
   forwardQuestionSchema,
   isTaskBlocked,
   isTaskOverdue,
@@ -37,7 +39,9 @@ import {
   taskMove,
   taskMoveNeedsNote,
   taskQuestionInputSchema,
+  taskReadinessInputSchema,
   taskStatusChangeSchema,
+  taskTreeQuerySchema,
   taskWorkloadQuerySchema,
   updateTaskChecklistItemSchema,
   updateTaskSchema,
@@ -74,6 +78,14 @@ describe('createTaskSchema', () => {
       checklist: [],
       links: [],
       requestScope: undefined,
+      briefFields: null,
+      estimateMinutes: null,
+      criteria: [],
+      runMode: undefined,
+      stages: [],
+      subtasks: [],
+      files: [],
+      questions: [],
     });
   });
 
@@ -847,5 +859,190 @@ describe('views', () => {
   it('filters the list by what the caller may review', () => {
     expect(taskListQuerySchema.parse({ reviewer: 'me' })).toMatchObject({ reviewer: 'me' });
     expect(taskListQuerySchema.safeParse({ reviewer: ids.user }).success).toBe(false);
+  });
+});
+
+describe('createTaskSchema with its parts (F06B rule C2)', () => {
+  const subtask = { title: 'Copy', department: 'content_management', dueDate: '2026-10-04' };
+  const doc = {
+    type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Which sizes?' }] }],
+  };
+
+  it('gives subtasks a sequential run by default and drops the mode without them', () => {
+    expect(createTaskSchema.parse({ ...task, subtasks: [subtask] }).runMode).toBe('sequential');
+    expect(createTaskSchema.parse({ ...task, runMode: 'parallel' }).runMode).toBeUndefined();
+  });
+
+  it('needs a stage of the task for each subtask by stages, and none otherwise', () => {
+    const staged = { ...task, runMode: 'stages', stages: [{ name: 'Copy' }] };
+    expect(
+      createTaskSchema.safeParse({ ...staged, subtasks: [{ ...subtask, stageIndex: 0 }] }).success,
+    ).toBe(true);
+    expect(createTaskSchema.safeParse({ ...staged, subtasks: [subtask] }).success).toBe(false);
+    expect(
+      createTaskSchema.safeParse({ ...staged, subtasks: [{ ...subtask, stageIndex: 1 }] }).success,
+    ).toBe(false);
+    expect(
+      createTaskSchema.safeParse({ ...task, subtasks: [{ ...subtask, stageIndex: 0 }] }).success,
+    ).toBe(false);
+    expect(createTaskSchema.safeParse({ ...task, stages: [{ name: 'Copy' }] }).success).toBe(false);
+  });
+
+  it('holds at most 30 subtasks, 10 stages, 15 criteria, 10 questions and 20 files', () => {
+    const many = <T>(n: number, item: (i: number) => T) =>
+      Array.from({ length: n }, (_, i) => item(i));
+    const upload = (i: number) => ({
+      uploadId: `01a0e97d-0028-7d46-8479-${String(i).padStart(12, '0')}`,
+    });
+    expect(createTaskSchema.safeParse({ ...task, subtasks: many(31, () => subtask) }).success).toBe(
+      false,
+    );
+    expect(
+      createTaskSchema.safeParse({ ...task, criteria: many(16, (i) => `C${i}`) }).success,
+    ).toBe(false);
+    expect(
+      createTaskSchema.safeParse({
+        ...task,
+        questions: many(11, () => ({ bodyDoc: doc, addressedDepartment: 'design' })),
+      }).success,
+    ).toBe(false);
+    // Twenty files across the task and its subtasks pass; one more does not.
+    const files = {
+      ...task,
+      files: many(15, upload),
+      subtasks: [{ ...subtask, files: many(5, (i) => upload(i + 15)) }],
+    };
+    expect(createTaskSchema.safeParse(files).success).toBe(true);
+    expect(createTaskSchema.safeParse({ ...files, files: many(16, upload) }).success).toBe(false);
+  });
+
+  it('lists each upload once across files and questions', () => {
+    const file = { uploadId: ids.user };
+    expect(
+      createTaskSchema.safeParse({
+        ...task,
+        files: [file],
+        questions: [{ bodyDoc: doc, addressedDepartment: 'design', files: [file] }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('takes brief fields of the department only, and estimates in half hours', () => {
+    expect(
+      createTaskSchema.parse({ ...task, briefFields: { sizes: ['1080 × 1350'] } }).briefFields,
+    ).toEqual({ sizes: ['1080 × 1350'] });
+    expect(createTaskSchema.safeParse({ ...task, briefFields: { goal: 'Reach' } }).success).toBe(
+      false,
+    );
+    expect(
+      createTaskSchema.safeParse({
+        ...task,
+        subtasks: [{ ...subtask, briefFields: { sizes: ['1:1'] } }],
+      }).success,
+    ).toBe(false);
+    expect(createTaskSchema.parse({ ...task, estimateMinutes: 90 }).estimateMinutes).toBe(90);
+    for (const estimateMinutes of [0, 45, 12_030])
+      expect(createTaskSchema.safeParse({ ...task, estimateMinutes }).success).toBe(false);
+  });
+});
+
+describe('draftWarnings (F06B rule C5)', () => {
+  const draft = (input: object) =>
+    draftWarnings(
+      taskReadinessInputSchema.parse({ department: 'design', dueDate: '2026-10-05', ...input }),
+    );
+
+  it('warns of a missing brief on the task and each subtask, then of no criteria last', () => {
+    expect(
+      draft({
+        needsClientApproval: true,
+        subtasks: [
+          { department: 'design', dueDate: '2026-10-04', hasReferences: true },
+          { department: 'design', dueDate: '2026-10-04' },
+        ],
+      }),
+    ).toEqual([
+      { subtaskIndex: null, code: 'brief_missing' },
+      { subtaskIndex: 1, code: 'brief_missing' },
+      { subtaskIndex: null, code: 'no_criteria' },
+    ]);
+  });
+
+  it('counts brief text, brief fields or a reference as a brief', () => {
+    for (const filled of ['hasBrief', 'hasBriefFields', 'hasReferences'])
+      expect(draft({ [filled]: true })).toEqual([]);
+    expect(draft({ hasBrief: true, needsClientApproval: true, hasCriteria: true })).toEqual([]);
+  });
+});
+
+describe('bottleneck (F06B rule D4)', () => {
+  const node = (id: string, fields: Partial<Parameters<typeof bottleneck>[0][number]> = {}) => ({
+    id,
+    open: true,
+    blocked: false,
+    dueDate: '2026-10-10',
+    dueTime: null,
+    overdue: false,
+    ...fields,
+  });
+
+  it('is the open, unblocked task the most open tasks wait on, through others too', () => {
+    // a ← b ← c and d ← e: three wait on a (b directly, c through b), one on d.
+    const nodes = [
+      node('a'),
+      node('b', { blocked: true }),
+      node('c', { blocked: true }),
+      node('d'),
+      node('e', { blocked: true }),
+    ];
+    const edges = [
+      { taskId: 'b', dependsOnId: 'a' },
+      { taskId: 'c', dependsOnId: 'b' },
+      { taskId: 'e', dependsOnId: 'd' },
+    ];
+    expect(bottleneck(nodes, edges)).toBe('a');
+  });
+
+  it('stops at a finished task: nothing waits through it', () => {
+    const edges = [
+      { taskId: 'b', dependsOnId: 'a' },
+      { taskId: 'c', dependsOnId: 'b' },
+    ];
+    expect(bottleneck([node('a'), node('b', { open: false }), node('c')], edges)).toBeNull();
+  });
+
+  it('counts only open waiters and skips finished or blocked candidates', () => {
+    const edges = [{ taskId: 'b', dependsOnId: 'a' }];
+    expect(bottleneck([node('a'), node('b', { open: false })], edges)).toBeNull();
+    expect(bottleneck([node('a', { open: false }), node('b')], edges)).toBeNull();
+    expect(bottleneck([node('a', { blocked: true }), node('b')], edges)).toBeNull();
+  });
+
+  it('breaks ties by the earliest due date, then the overdue one', () => {
+    const edges = [
+      { taskId: 'x', dependsOnId: 'a' },
+      { taskId: 'y', dependsOnId: 'b' },
+    ];
+    const waiters = [node('x', { blocked: true }), node('y', { blocked: true })];
+    expect(bottleneck([node('a'), node('b', { dueDate: '2026-10-09' }), ...waiters], edges)).toBe(
+      'b',
+    );
+    expect(bottleneck([node('a'), node('b', { overdue: true }), ...waiters], edges)).toBe('b');
+  });
+
+  it('is none without dependencies', () => {
+    expect(bottleneck([node('a'), node('b')], [])).toBeNull();
+  });
+});
+
+describe('taskTreeQuerySchema', () => {
+  it('takes a project or a retainer cycle, not both', () => {
+    expect(taskTreeQuerySchema.safeParse({ projectId: ids.project }).success).toBe(true);
+    expect(taskTreeQuerySchema.safeParse({ retainerCycleId: ids.cycle }).success).toBe(true);
+    expect(taskTreeQuerySchema.safeParse({}).success).toBe(false);
+    expect(
+      taskTreeQuerySchema.safeParse({ projectId: ids.project, retainerCycleId: ids.cycle }).success,
+    ).toBe(false);
   });
 });

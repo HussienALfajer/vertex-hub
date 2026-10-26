@@ -43,78 +43,92 @@ export class TaskQuestionsService {
   ): Promise<TaskComment> {
     const { task, created, preview } = await this.db.transaction(async (tx) => {
       const task = await this.comments.task(tx, actor, taskId);
-      assertTaskWritable(task);
-      const addressedUserId = input.addressedUserId ?? null;
-      if (
-        addressedUserId &&
-        (addressedUserId === actor.id || !(await this.users.activeUser(addressedUserId, tx)))
-      ) {
-        throw new CodedException(
-          400,
-          'INVALID_ADDRESSEE',
-          'A question is addressed to another active user or a department',
-        );
-      }
-      const { body, bodyDoc, mentions } = bodyOf(input.bodyDoc);
-      await this.comments.assertMentions(tx, mentions);
-      const [created] = await tx
-        .insert(taskComments)
-        .values({
-          taskId,
-          authorId: actor.id,
-          kind: 'question',
-          body,
-          bodyDoc,
-          mentionedUserIds: mentions,
-          addressedUserId,
-          addressedDepartment: input.addressedDepartment ?? null,
-          questionStatus: 'open',
-          clockStartedAt: new Date(),
-        })
-        .returning();
-      if (!created) throw new Error('Question insert returned no row');
-      const preview = await this.attachments.attach(
-        tx,
-        actor,
-        { taskId, clientId: task.clientId, commentId: created.id },
-        input.files.map((file) => file.uploadId),
-      );
-      await recordAudit(tx, {
-        actor: actorOf(actor),
-        action: 'task_comment.question_asked',
-        entityType: 'task_comment',
-        entityId: created.id,
-        after: {
-          taskId,
-          body,
-          mentionedUserIds: mentions,
-          ...(addressedUserId && { addressedUserId }),
-          ...(input.addressedDepartment && { addressedDepartment: input.addressedDepartment }),
-          ...(input.files.length > 0 && { attachments: input.files.length }),
-        },
-      });
-      const data = await this.comments.questionData(tx, created);
-      const addressees = await this.waitingOn(tx, created);
-      await this.notices.send(tx, [
-        // The addressee gets the question, which waits on them, not the earlier-ranked mention.
-        this.notices.notice(
-          task,
-          'task_mentioned',
-          mentions.filter((id) => !addressees.includes(id)),
-          actor.id,
-          { excerpt: data.excerpt },
-        ),
-        this.notices.notice(task, 'task_question_asked', addressees, actor.id, {
-          ...data,
-          forwarded: false,
-        }),
-      ]);
-      // F16 rule B12: the asker, those mentioned and the person asked follow the task.
-      await this.notices.follow(tx, taskId, [actor.id, ...mentions, addressedUserId]);
-      return { task, created, preview };
+      return { task, ...(await this.askIn(tx, actor, task, input)) };
     });
     if (preview) await this.attachments.queuePreviews();
     return this.comments.one(actor, task, created);
+  }
+
+  /**
+   * Rule B1 in the caller's transaction, on a task the caller read: also the questions asked in
+   * the creation wizard (rule C2). Returns whether a preview waits (`queuePreviews` after commit).
+   */
+  async askIn(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    task: TaskAccess,
+    input: TaskQuestionInput,
+  ): Promise<{ created: CommentRow; preview: boolean }> {
+    const taskId = task.id;
+    assertTaskWritable(task);
+    const addressedUserId = input.addressedUserId ?? null;
+    if (
+      addressedUserId &&
+      (addressedUserId === actor.id || !(await this.users.activeUser(addressedUserId, tx)))
+    ) {
+      throw new CodedException(
+        400,
+        'INVALID_ADDRESSEE',
+        'A question is addressed to another active user or a department',
+      );
+    }
+    const { body, bodyDoc, mentions } = bodyOf(input.bodyDoc);
+    await this.comments.assertMentions(tx, mentions);
+    const [created] = await tx
+      .insert(taskComments)
+      .values({
+        taskId,
+        authorId: actor.id,
+        kind: 'question',
+        body,
+        bodyDoc,
+        mentionedUserIds: mentions,
+        addressedUserId,
+        addressedDepartment: input.addressedDepartment ?? null,
+        questionStatus: 'open',
+        clockStartedAt: new Date(),
+      })
+      .returning();
+    if (!created) throw new Error('Question insert returned no row');
+    const preview = await this.attachments.attach(
+      tx,
+      actor,
+      { taskId, clientId: task.clientId, commentId: created.id },
+      input.files.map((file) => file.uploadId),
+    );
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'task_comment.question_asked',
+      entityType: 'task_comment',
+      entityId: created.id,
+      after: {
+        taskId,
+        body,
+        mentionedUserIds: mentions,
+        ...(addressedUserId && { addressedUserId }),
+        ...(input.addressedDepartment && { addressedDepartment: input.addressedDepartment }),
+        ...(input.files.length > 0 && { attachments: input.files.length }),
+      },
+    });
+    const data = await this.comments.questionData(tx, created);
+    const addressees = await this.waitingOn(tx, created);
+    await this.notices.send(tx, [
+      // The addressee gets the question, which waits on them, not the earlier-ranked mention.
+      this.notices.notice(
+        task,
+        'task_mentioned',
+        mentions.filter((id) => !addressees.includes(id)),
+        actor.id,
+        { excerpt: data.excerpt },
+      ),
+      this.notices.notice(task, 'task_question_asked', addressees, actor.id, {
+        ...data,
+        forwarded: false,
+      }),
+    ]);
+    // F16 rule B12: the asker, those mentioned and the person asked follow the task.
+    await this.notices.follow(tx, taskId, [actor.id, ...mentions, addressedUserId]);
+    return { created, preview };
   }
 
   /** Rule B4: marks a question answered; without a reply only the asker may. */

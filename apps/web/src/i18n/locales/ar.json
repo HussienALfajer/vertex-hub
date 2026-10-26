@@ -1784,7 +1784,10 @@
       "addressedDepartment": "القسم المسؤول",
       "questionStatus": "حالة السؤال",
       "answered": "مُجاب",
-      "attachments": "المرفقات"
+      "attachments": "المرفقات",
+      "briefFields": "حقول الموجز",
+      "estimateMinutes": "التقدير بالدقائق",
+      "criteria": "معايير القبول"
     },
     "checklistKinds": {
       "checklist": "قائمة التحقق",
@@ -4089,7 +4092,8 @@
   "templates": {
     "kinds": {
       "project": "مشروع",
-      "retainer_cycle": "شهري"
+      "retainer_cycle": "شهري",
+      "task": "مهمة"
     },
     "title": "قوالب العمل",
     "subtitle": "مجموعات مهام جاهزة تبدأ بها المشاريع وكل دورة من العقود الشهرية.",
@@ -4103,7 +4107,8 @@
     "archivedOnly": "المؤرشفة",
     "kindNames": {
       "project": "قالب مشروع",
-      "retainer_cycle": "قالب شهري"
+      "retainer_cycle": "قالب شهري",
+      "task": "قالب مهمة"
     },
     "columns": {
       "name": "القالب",

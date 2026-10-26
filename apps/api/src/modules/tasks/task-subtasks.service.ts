@@ -132,6 +132,9 @@ export class TaskSubtasksService {
           revisionLimit: DEFAULT_REVISION_LIMIT,
           dependsOn: [],
           checklist: input.checklist,
+          criteria: input.criteria,
+          briefFields: input.briefFields,
+          estimateMinutes: input.estimateMinutes,
           links: [],
           requestScope: undefined,
           acceptLeave: input.acceptLeave,
@@ -143,6 +146,12 @@ export class TaskSubtasksService {
           parent: { id: parentId, position, stageId, assigneeId: parent.assigneeId },
         },
       );
+      const filesPreview = await this.attachments.attachToTask(
+        tx,
+        actor,
+        { taskId: created, clientId: parent.clientId },
+        input.files,
+      );
       const preview = source
         ? await this.questions.converted(tx, actor, source, {
             id: created,
@@ -152,7 +161,7 @@ export class TaskSubtasksService {
         : false;
       await this.runs.sync(tx, parentId, actor.id);
       await this.runs.rearm(tx, parentId, actor.id);
-      return { id: created, preview };
+      return { id: created, preview: preview || filesPreview };
     });
     if (preview) await this.attachments.queuePreviews();
     return this.tasks.detail(actor, id);
@@ -234,7 +243,9 @@ export class TaskSubtasksService {
       let stageId: string | null = null;
       if (input.runMode === 'stages') {
         const [first] = await this.runs.stagesOf(tx, parentId);
-        stageId = first?.id ?? (await this.insertStage(tx, actor, parentId, FIRST_STAGE_NAME, 1));
+        stageId =
+          first?.id ??
+          (await this.runs.insertStage(tx, actorOf(actor), parentId, FIRST_STAGE_NAME, 1));
       }
       await tx
         .update(tasks)
@@ -265,7 +276,13 @@ export class TaskSubtasksService {
             .where(eq(taskStages.id, stage.id));
         }
       }
-      const created = await this.insertStage(tx, actor, parentId, input.name, position);
+      const created = await this.runs.insertStage(
+        tx,
+        actorOf(actor),
+        parentId,
+        input.name,
+        position,
+      );
       await this.runs.sync(tx, parentId, actor.id);
       return created;
     });
@@ -533,27 +550,5 @@ export class TaskSubtasksService {
       before: { runMode: parent.runMode },
       after: { runMode },
     });
-  }
-
-  private async insertStage(
-    tx: Transaction,
-    actor: CurrentUserInfo,
-    parentId: string,
-    name: string,
-    position: number,
-  ): Promise<string> {
-    const [created] = await tx
-      .insert(taskStages)
-      .values({ taskId: parentId, name, position })
-      .returning({ id: taskStages.id });
-    if (!created) throw new Error('Stage insert returned no row');
-    await recordAudit(tx, {
-      actor: actorOf(actor),
-      action: 'task_stage.created',
-      entityType: 'task_stage',
-      entityId: created.id,
-      after: { taskId: parentId, name, position },
-    });
-    return created.id;
   }
 }

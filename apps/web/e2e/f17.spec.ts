@@ -58,7 +58,11 @@ test('the General Manager keeps an employee file: personal, contract and pay', a
   // Contract: probation cannot end before the start date (rule A1).
   await page.getByRole('tab', { name: h.file.tabs.contract }).click();
   await expect(page).toHaveURL(/tab=contract/);
-  await page.getByRole('button', { name: h.file.edit }).click();
+  // The personal panel may still be leaving: its own edit button matches until then.
+  await page
+    .getByRole('tabpanel', { name: h.file.tabs.contract })
+    .getByRole('button', { name: h.file.edit })
+    .click();
   const contract = page.getByRole('dialog', { name: h.contract.title });
   await contract.getByLabel(h.fields.probationEndDate).fill('2025-01-01');
   await contract.getByRole('button', { name: ar.common.save }).click();

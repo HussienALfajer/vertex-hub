@@ -164,7 +164,8 @@ export function BasicsFields({ form, isNew }: { form: TemplateFormMethods; isNew
                   form.setValue('stages', [], change(form));
                 }}
               >
-                {TEMPLATE_KINDS.map((kind) => (
+                {/* Task templates are saved from a task; their editor comes with F06B's screens. */}
+                {TEMPLATE_KINDS.filter((kind) => kind !== 'task').map((kind) => (
                   <ToggleGroupItem key={kind} value={kind}>
                     {t(`templates.kindNames.${kind}`)}
                   </ToggleGroupItem>

@@ -6,17 +6,29 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  businessDate,
+  type CalendarDate,
   type CreateTemplate,
   type DepartmentCode,
   hasPermission,
+  nthWorkDay,
+  richTextPlain,
+  type SubtaskRunMode,
+  type TaskBriefDoc,
+  type TaskBriefFields,
+  type TaskTemplateDraft,
+  type TaskTemplateDraftInput,
+  TEMPLATE_LIMITS,
   type TemplateDetail,
   type TemplateDocument,
+  type TemplateFromTask,
   type TemplateKind,
   type TemplateListQuery,
   type TemplatePage,
   type TemplateStep,
   templateIssues,
   type UpdateTemplate,
+  workDaysBetween,
 } from '@vertex-hub/contracts';
 import {
   type Database,
@@ -35,7 +47,9 @@ import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientDirectory, clientRef } from '../clients/index.js';
+import { HolidayCalendar } from '../hr/index.js';
 import { EngagementDirectory } from '../projects/index.js';
+import { type TaskSnapshot, TaskTemplates } from '../tasks/index.js';
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
 
@@ -47,6 +61,8 @@ export interface TemplateForRun {
   id: string;
   name: string;
   kind: TemplateKind;
+  /** `task` templates only (F06B). */
+  runMode: SubtaskRunMode | null;
   archivedAt: Date | null;
   stages: { id: string; name: string; position: number }[];
   steps: TemplateStep[];
@@ -87,6 +103,11 @@ const STEP_FIELDS = [
   'repeatLabel',
   'spreadFromDay',
   'dependsOn',
+  'parentStepId',
+  'briefDoc',
+  'briefFields',
+  'estimateMinutes',
+  'criteria',
 ] as const satisfies readonly (keyof TemplateStep)[];
 
 /** Work templates (F07): list, read, and the whole document saved at once. */
@@ -97,6 +118,8 @@ export class TemplatesService {
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
     private readonly engagements: EngagementDirectory,
+    private readonly taskTemplates: TaskTemplates,
+    private readonly holidays: HolidayCalendar,
   ) {}
 
   async list(actor: CurrentUserInfo, query: TemplateListQuery): Promise<TemplatePage> {
@@ -150,11 +173,12 @@ export class TemplatesService {
     };
   }
 
-  /** Archived templates are seen by `templates.manage` only; others get 404. */
+  /** Archived templates are seen by those who may edit them only; others get 404. */
   async detail(actor: CurrentUserInfo, id: string): Promise<TemplateDetail> {
-    const manage = hasPermission(actor.access, 'templates.manage');
     const [row] = await this.db.select().from(workTemplates).where(eq(workTemplates.id, id));
-    if (!row || (row.archivedAt && !manage)) throw new NotFoundException();
+    if (!row) throw new NotFoundException();
+    const edits = await this.mayEdit(this.db, actor, row);
+    if (row.archivedAt && !edits) throw new NotFoundException();
     const [stages, steps, assignees, links] = await Promise.all([
       this.db
         .select({
@@ -179,6 +203,7 @@ export class TemplatesService {
       name: row.name,
       kind: row.kind,
       description: row.description,
+      runMode: row.runMode,
       stages,
       steps,
       assignees: assignees.map((a) => ({
@@ -197,39 +222,207 @@ export class TemplatesService {
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       archivedAt: row.archivedAt?.toISOString() ?? null,
-      permissions: { canEdit: manage && !row.archivedAt, canArchive: manage },
+      permissions: { canEdit: edits && !row.archivedAt, canArchive: edits },
     };
   }
 
   async create(actor: CurrentUserInfo, input: CreateTemplate): Promise<TemplateDetail> {
+    const id = await this.db.transaction((tx) => this.insert(tx, actor, input));
+    return this.detail(actor, id);
+  }
+
+  /**
+   * F06B rule D1: "Save as template" on a top-level task the actor has assign scope on. Due days
+   * count work days from the task's creation (at least 1); assignees are kept as the defaults
+   * per department only with `keepAssignees`. Files, questions, comments and links are not saved.
+   */
+  async fromTask(
+    actor: CurrentUserInfo,
+    taskId: string,
+    input: TemplateFromTask,
+  ): Promise<TemplateDetail> {
+    const task = await this.taskTemplates.snapshot(actor, taskId);
+    const createdOn = businessDate(task.createdAt);
+    const holidays = await this.holidays.from(createdOn);
+    const dueDay = (date: CalendarDate) =>
+      Math.min(
+        TEMPLATE_LIMITS.projectDueDay,
+        Math.max(1, workDaysBetween(createdOn, date, holidays).length),
+      );
+    const runMode = task.runMode ?? 'sequential';
+    const byStages = runMode === 'stages';
+    const stepOf = (item: TaskSnapshot | TaskSnapshot['subtasks'][number]) => ({
+      title: item.title,
+      brief: item.brief,
+      briefDoc: item.briefDoc,
+      briefFields: item.briefFields,
+      department: item.department,
+      dueDay: dueDay(item.dueDate),
+      priority: item.priority,
+      estimateMinutes: item.estimateMinutes,
+      checklist: item.checklist,
+      criteria: item.criteria,
+      needsClientApproval: false,
+      revisionLimit: task.revisionLimit,
+      repeatKind: null,
+      repeatLabel: null,
+      spreadFromDay: null,
+      dependsOn: [],
+    });
+    const assignees = new Map<DepartmentCode, string>();
+    if (input.keepAssignees) {
+      for (const item of [task, ...task.subtasks]) {
+        if (item.assigneeId && !assignees.has(item.department)) {
+          assignees.set(item.department, item.assigneeId);
+        }
+      }
+    }
+    const doc: TemplateDocument = {
+      name: input.name,
+      description: input.description,
+      runMode,
+      stages: byStages ? task.stages.map((stage) => ({ key: stage.id, name: stage.name })) : [],
+      steps: [
+        {
+          ...stepOf(task),
+          key: task.id,
+          stageKey: null,
+          parentKey: null,
+          needsClientApproval: task.needsClientApproval,
+        },
+        ...task.subtasks.map((subtask, index) => ({
+          ...stepOf(subtask),
+          key: `sub-${index}`,
+          stageKey: byStages ? subtask.stageId : null,
+          parentKey: task.id,
+        })),
+      ],
+      assignees: [...assignees].map(([department, userId]) => ({ department, userId })),
+    };
+    assertValid('task', doc);
+    const id = await this.db.transaction((tx) =>
+      this.insert(tx, actor, { ...doc, kind: 'task' }, { fromTaskId: task.id }),
+    );
+    return this.detail(actor, id);
+  }
+
+  /**
+   * F06B rule D2: a task template as the wizard's draft. Dates are work days from `startDate`
+   * (today by default), skipping Fridays and holidays; a default assignee applies where the
+   * actor may assign and is still a member, otherwise the task goes to its department's queue.
+   */
+  async taskDraft(
+    actor: CurrentUserInfo,
+    id: string,
+    input: TaskTemplateDraftInput,
+  ): Promise<TaskTemplateDraft> {
+    const template = await this.forRun(this.db, id);
+    if (!template || template.archivedAt) throw new NotFoundException();
+    if (template.kind !== 'task') {
+      throw new CodedException(
+        400,
+        'TEMPLATE_KIND_MISMATCH',
+        'The template is not a task template',
+      );
+    }
+    const start = input.startDate ?? businessDate();
+    const holidays = await this.holidays.from(start);
+    const valid = await this.validAssignments(template.assignees);
+    const assigneeOf = (department: DepartmentCode) => {
+      const assignee = template.assignees.find((a) => a.department === department);
+      return assignee &&
+        valid(assignee) &&
+        this.taskTemplates.mayAssign(actor, department, assignee.userId)
+        ? assignee.userId
+        : null;
+    };
+    const itemOf = (step: TemplateStep) => ({
+      title: step.title,
+      brief: step.brief,
+      briefDoc: step.briefDoc,
+      briefFields: step.briefFields,
+      department: step.department,
+      assigneeId: assigneeOf(step.department),
+      dueDate: nthWorkDay(start, step.dueDay ?? 1, holidays),
+      priority: step.priority,
+      estimateMinutes: step.estimateMinutes,
+      checklist: step.checklist,
+      criteria: step.criteria,
+    });
+    const [root, ...subSteps] = template.steps;
+    if (!root) throw new NotFoundException();
+    const stagePosition = new Map(template.stages.map((stage, index) => [stage.id, index]));
+    return {
+      ...itemOf(root),
+      templateId: template.id,
+      needsClientApproval: root.needsClientApproval,
+      revisionLimit: root.revisionLimit,
+      runMode: template.runMode,
+      stages: template.stages.map((stage) => ({ name: stage.name })),
+      subtasks: subSteps.map((step) => ({
+        ...itemOf(step),
+        stageIndex: step.stageId ? (stagePosition.get(step.stageId) ?? null) : null,
+      })),
+    };
+  }
+
+  /** A new template with its document, assignees and audit entries; returns its id. */
+  private async insert(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    input: CreateTemplate,
+    origin: { fromTaskId?: string } = {},
+  ): Promise<string> {
     const id = newId();
-    await this.db.transaction(async (tx) => {
-      await this.assertNameFree(tx, input.name, null);
-      await tx.insert(workTemplates).values({
-        id,
+    await this.assertNameFree(tx, input.name, null);
+    await tx.insert(workTemplates).values({
+      id,
+      name: input.name,
+      kind: input.kind,
+      description: input.description,
+      runMode: input.runMode,
+      createdById: actor.id,
+    });
+    await this.saveDocument(tx, id, input, []);
+    const assignees = await this.saveAssignees(tx, id, input.assignees, []);
+    await recordAudit(tx, {
+      actor: toActor(actor),
+      action: 'template.created',
+      entityType: 'template',
+      entityId: id,
+      after: {
         name: input.name,
         kind: input.kind,
         description: input.description,
-        createdById: actor.id,
-      });
-      await this.saveDocument(tx, id, input, []);
-      const assignees = await this.saveAssignees(tx, id, input.assignees, []);
-      await recordAudit(tx, {
-        actor: toActor(actor),
-        action: 'template.created',
-        entityType: 'template',
-        entityId: id,
-        after: {
-          name: input.name,
-          kind: input.kind,
-          description: input.description,
-          stages: input.stages.length,
-          steps: input.steps.length,
-        },
-      });
-      await auditAssignees(tx, actor, id, assignees);
+        ...(input.runMode && { runMode: input.runMode }),
+        stages: input.stages.length,
+        steps: input.steps.length,
+        ...origin,
+      },
     });
-    return this.detail(actor, id);
+    await auditAssignees(tx, actor, id, assignees);
+    return id;
+  }
+
+  /**
+   * `templates.manage`, or (F06B Roles) the creator of a `task` template while they keep assign
+   * scope in one of its departments.
+   */
+  private async mayEdit(
+    executor: Executor,
+    actor: CurrentUserInfo,
+    row: { id: string; kind: TemplateKind; createdById: string | null },
+  ): Promise<boolean> {
+    if (hasPermission(actor.access, 'templates.manage')) return true;
+    if (row.kind !== 'task' || row.createdById !== actor.id) return false;
+    const departments = await executor
+      .selectDistinct({ department: workTemplateSteps.department })
+      .from(workTemplateSteps)
+      .where(eq(workTemplateSteps.templateId, row.id));
+    return this.taskTemplates.assignsIn(
+      actor,
+      departments.map((row) => row.department),
+    );
   }
 
   async update(actor: CurrentUserInfo, id: string, input: UpdateTemplate): Promise<TemplateDetail> {
@@ -240,6 +433,7 @@ export class TemplatesService {
         .where(eq(workTemplates.id, id))
         .for('update');
       if (!current) throw new NotFoundException();
+      if (!(await this.mayEdit(tx, actor, current))) throw new ForbiddenException();
       if (current.archivedAt) {
         throw new CodedException(409, 'TEMPLATE_ARCHIVED', 'The template is archived');
       }
@@ -261,15 +455,24 @@ export class TemplatesService {
       const currentAssignees = await this.assigneeRows([id], tx);
       const assignees = await this.saveAssignees(tx, id, input.assignees, currentAssignees);
 
-      const basics = { name: current.name, description: current.description };
-      const changedBasics = (['name', 'description'] as const).filter(
+      const basics = {
+        name: current.name,
+        description: current.description,
+        runMode: current.runMode,
+      };
+      const changedBasics = (['name', 'description', 'runMode'] as const).filter(
         (key) => basics[key] !== input[key],
       );
       // A save that changes nothing keeps the version: another editor is not told of a newer one.
       if (changedBasics.length > 0 || summary || assignees.length > 0) {
         await tx
           .update(workTemplates)
-          .set({ name: input.name, description: input.description, updatedAt: new Date() })
+          .set({
+            name: input.name,
+            description: input.description,
+            runMode: input.runMode,
+            updatedAt: new Date(),
+          })
           .where(eq(workTemplates.id, id));
       }
       if (changedBasics.length > 0 || summary) {
@@ -293,11 +496,18 @@ export class TemplatesService {
   async setArchived(actor: CurrentUserInfo, id: string, archive: boolean): Promise<TemplateDetail> {
     await this.db.transaction(async (tx) => {
       const [current] = await tx
-        .select({ name: workTemplates.name, archivedAt: workTemplates.archivedAt })
+        .select({
+          id: workTemplates.id,
+          name: workTemplates.name,
+          kind: workTemplates.kind,
+          createdById: workTemplates.createdById,
+          archivedAt: workTemplates.archivedAt,
+        })
         .from(workTemplates)
         .where(eq(workTemplates.id, id))
         .for('update');
       if (!current) throw new NotFoundException();
+      if (!(await this.mayEdit(tx, actor, current))) throw new ForbiddenException();
       if (archive && current.archivedAt) {
         throw new CodedException(409, 'TEMPLATE_ARCHIVED', 'The template is archived');
       }
@@ -332,6 +542,7 @@ export class TemplatesService {
         id: workTemplates.id,
         name: workTemplates.name,
         kind: workTemplates.kind,
+        runMode: workTemplates.runMode,
         archivedAt: workTemplates.archivedAt,
       })
       .from(workTemplates)
@@ -375,9 +586,14 @@ export class TemplatesService {
       .select({
         id: workTemplateSteps.id,
         stageId: workTemplateSteps.stageId,
+        parentStepId: workTemplateSteps.parentStepId,
         position: workTemplateSteps.position,
         title: workTemplateSteps.title,
         brief: workTemplateSteps.brief,
+        briefDoc: workTemplateSteps.briefDoc,
+        briefFields: workTemplateSteps.briefFields,
+        estimateMinutes: workTemplateSteps.estimateMinutes,
+        criteria: workTemplateSteps.criteria,
         department: workTemplateSteps.department,
         dueDay: workTemplateSteps.dueDay,
         priority: workTemplateSteps.priority,
@@ -406,6 +622,8 @@ export class TemplatesService {
     const position = new Map(rows.map((row) => [row.id, row.position]));
     return rows.map((row) => ({
       ...row,
+      briefDoc: row.briefDoc as TaskBriefDoc | null,
+      briefFields: row.briefFields as TaskBriefFields | null,
       dependsOn: dependencies
         .filter((d) => d.stepId === row.id)
         .map((d) => d.dependsOnStepId)
@@ -463,9 +681,14 @@ export class TemplatesService {
     const after: TemplateStep[] = doc.steps.map((step, index) => ({
       id: stepIds.get(step.key) as string,
       stageId: step.stageKey === null ? null : (stageIds.get(step.stageKey) ?? null),
+      parentStepId: step.parentKey === null ? null : (stepIds.get(step.parentKey) ?? null),
       position: index + 1,
       title: step.title,
-      brief: step.brief,
+      brief: step.briefDoc ? richTextPlain(step.briefDoc) : step.brief,
+      briefDoc: step.briefDoc,
+      briefFields: step.briefFields,
+      estimateMinutes: step.estimateMinutes,
+      criteria: step.criteria,
       department: step.department,
       dueDay: step.dueDay,
       priority: step.priority,

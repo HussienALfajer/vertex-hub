@@ -20,11 +20,12 @@ Spec: `docs/specs/F06B-tasks-2.md` (Approved 2026-10-26) · ADR 0041 (and 0013, 
 - [x] checks (full run green), reviewer (3 findings fixed), acceptance (owner), PR with auto-merge
 
 ## PR 3 — Creation, readiness, estimates, templates and tree API (Parts C, D)
-- [ ] contracts: `briefFieldsSchemas`, `estimateMinutes`, extended `createTaskSchema` (subtasks, stages, files, questions, criteria, limits), readiness schemas, `bottleneck` with tests, tree schema, workload capacity fields; `template_kind` `task` schemas; `TEMPLATE_KIND`
-- [ ] db: `tasks.brief_fields`, `estimate_minutes`; `template_kind` `task`, `work_templates.run_mode`, `work_template_steps.parent_step_id`, brief/fields/estimate/criteria on steps
-- [ ] api: one-transaction create; `POST /tasks/readiness` (leave, overload against the F17 schedule, Friday/holiday, brief missing, criteria); workload estimated vs capacity; `GET /tasks/tree` with the bottleneck; `TaskTemplates.snapshot`; `POST /templates/from-task/:taskId`, `POST /templates/:id/task-draft`, task-kind editing; `test/task-creation.test.ts`, `task-templates.test.ts`, `task-tree.test.ts`
-- [ ] bridge
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+- [x] contracts: `briefFieldsSchemas` (`task-briefs.ts`), `estimateMinutes`, extended `createTaskSchema` (subtasks, stages, files, questions, criteria, `CREATE_LIMITS`), readiness schemas and `draftWarnings`, `bottleneck` with tests, tree schema, workload capacity fields, `canSaveTemplate`; `template_kind` `task` schemas (`taskTemplateIssues`, from-task, draft); the kind error reuses F07's `TEMPLATE_KIND_MISMATCH` instead of a new `TEMPLATE_KIND`
+- [x] db (`/db-migration`, 0089, expand only): `tasks.brief_fields`, `estimate_minutes`; `template_kind` `task`, `work_templates.run_mode`, `work_template_steps.parent_step_id`, brief/fields/estimate/criteria on steps; `template_runs_target_check` relaxed for a task template's manual run
+- [x] api: one-transaction create (`TaskCreation`); `POST /tasks/readiness` (leave, overload against the F17 schedule through `hr`'s new `WorkCapacity`, Friday/holiday, brief missing, criteria); workload estimated vs capacity; `GET /tasks/tree` with the bottleneck; `TaskTemplates.snapshot` and the `TaskTemplateHooks` registry (the run recorded by `templates`); `POST /templates/from-task/:taskId`, `POST /templates/:id/task-draft`, task-kind editing by the creator; subtask add takes estimate, criteria, brief fields and files; `test/task-creation.test.ts`, `task-templates.test.ts`, `task-tree.test.ts`, `task-views.test.ts` adapted
+- [x] bridge: `openapi:export`, `api:generate`; fixtures (`canSaveTemplate`, `estimateMinutes`, `briefFields`, workload hours, template step fields); the template editor offers no `task` kind until PR 5's editor
+- [x] wiring: audit field labels (`briefFields`, `estimateMinutes`, `criteria`; `fromTaskId` as a reference), template kind labels, `docs/architecture.md`, the spec where PR 3 settled details
+- [x] checks (full run: only load timeouts, each file passing on its own), reviewer (3 findings fixed), acceptance (owner), PR with auto-merge
 
 ## PR 4 — Task page, lists, board and My tasks (web)
 - [ ] ui: viewer component (image zoom/pan, video, next/previous) on the design-system page; rich-text editor with mentions and attachments (drag, paste)

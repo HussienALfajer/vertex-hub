@@ -56,6 +56,8 @@ const REFERENCE_FIELDS = new Set([
   'subtaskId',
   'taskCommentId',
   'briefDoc',
+  // F06B part D: the task a template was saved from.
+  'fromTaskId',
 ]);
 
 /** The fields an entry shows: the changed ones, without links and references to other records. */

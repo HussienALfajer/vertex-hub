@@ -40,6 +40,7 @@ import {
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
+import { TaskCreation } from './task-creation.js';
 import { TaskWorkflowService } from './task-workflow.service.js';
 import { TasksService } from './tasks.service.js';
 
@@ -49,6 +50,7 @@ export class TasksController {
   constructor(
     private readonly tasks: TasksService,
     private readonly workflow: TaskWorkflowService,
+    private readonly creation: TaskCreation,
   ) {}
 
   @Get()
@@ -112,14 +114,14 @@ export class TasksController {
   @SerializeOptions({ schema: taskDetailSchema })
   @ApiCreatedResponse({
     description:
-      'The new task: unassigned or assigned to oneself for anyone; any assignee with assign scope; client requests with client scope',
+      'The new task: unassigned or assigned to oneself for anyone; any assignee with assign scope; client requests with client scope. With its stages, subtasks (each checked as its own create), criteria, files and questions in one transaction (F06B rule C2)',
     standardSchema: taskDetailSchema,
   })
   create(
     @CurrentUser() actor: CurrentUserInfo,
     @Body({ schema: createTaskSchema }) input: CreateTask,
   ): Promise<TaskDetail> {
-    return this.tasks.create(actor, input);
+    return this.creation.create(actor, input);
   }
 
   @Patch(':id')

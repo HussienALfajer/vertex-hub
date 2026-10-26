@@ -148,6 +148,11 @@ describe('stageMilestones', () => {
     repeatLabel: null,
     spreadFromDay: null,
     dependsOn: [],
+    parentStepId: null,
+    briefDoc: null,
+    briefFields: null,
+    estimateMinutes: null,
+    criteria: [],
   });
 
   it('keeps stages with steps, in stage order, due on their latest work day', () => {

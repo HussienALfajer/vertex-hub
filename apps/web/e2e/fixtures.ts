@@ -162,6 +162,7 @@ import {
   cycleDaysLeft,
   cyclePeriod,
   DASHBOARD_LIMITS,
+  DEFAULT_ESTIMATE_MINUTES,
   DEPARTMENT_CODES,
   type DeliverableKind,
   type DepartmentCode,
@@ -5456,6 +5457,7 @@ function taskRoutes({
       canWriteHandover: false,
       canEditCriteria: live && r.manage,
       canTickCriteria: live && (r.work || r.manage),
+      canSaveTemplate: live && r.assign,
     };
   };
 
@@ -5521,6 +5523,7 @@ function taskRoutes({
       parent: null,
       progress: null,
       openQuestions: { total: 0, inSubtasks: 0 },
+      estimateMinutes: null,
     };
   };
   const dependencyOf = (task: TaskRecord) => ({
@@ -5536,6 +5539,7 @@ function taskRoutes({
     ...summary(task),
     brief: task.brief,
     briefDoc: task.brief ? richTextFromPlain(task.brief) : null,
+    briefFields: null,
     needsClientApproval: task.needsClientApproval,
     clientText: task.clientText,
     contentToken: MOCK_CONTENT_TOKEN,
@@ -6530,15 +6534,21 @@ function taskRoutes({
           .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
           .map((u) => {
             const theirs = open.filter((t) => t.assigneeId === u.id);
+            const dueThisWeek = theirs.filter(
+              (t) => t.dueDate >= week.from && t.dueDate <= week.to,
+            ).length;
             return {
               user: { id: u.id, name: u.name, imageId: u.imageId },
               departments: u.departments
                 .map((d) => d.code)
                 .filter((code) => departments.includes(code)),
               overdue: theirs.filter(overdue).length,
-              dueThisWeek: theirs.filter((t) => t.dueDate >= week.from && t.dueDate <= week.to)
-                .length,
+              dueThisWeek,
               open: theirs.length,
+              // The mocks have no estimates: two hours each, and no employee files.
+              estimatedMinutes: dueThisWeek * DEFAULT_ESTIMATE_MINUTES,
+              unestimatedCount: dueThisWeek,
+              capacityMinutes: null,
             };
           }),
         unassigned: departments.map((department) => ({
@@ -8674,6 +8684,11 @@ function templateSteps(first: number, steps: (StepSeed & { after?: number[] })[]
     repeatKind: null,
     repeatLabel: null,
     spreadFromDay: null,
+    parentStepId: null,
+    briefDoc: null,
+    briefFields: null,
+    estimateMinutes: null,
+    criteria: [],
     ...step,
     dependsOn: after.map((n) => id(first + n - 1)),
   }));
@@ -8900,6 +8915,7 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
       name: t.name,
       kind: t.kind,
       description: t.description,
+      runMode: null,
       stages: t.stages,
       steps: t.steps,
       assignees,
@@ -8957,10 +8973,11 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
     t.name = doc.name;
     t.description = doc.description;
     t.stages = doc.stages.map((s, i) => ({ id: idOf(s.key), name: s.name, position: i + 1 }));
-    t.steps = doc.steps.map(({ key, stageKey, dependsOn, ...step }, i) => ({
+    t.steps = doc.steps.map(({ key, stageKey, parentKey, dependsOn, ...step }, i) => ({
       ...step,
       id: idOf(key),
       stageId: stageKey ? idOf(stageKey) : null,
+      parentStepId: parentKey ? idOf(parentKey) : null,
       position: i + 1,
       dependsOn: dependsOn.map(idOf),
     }));

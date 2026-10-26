@@ -6580,6 +6580,82 @@
         ]
       }
     },
+    "/api/tasks/readiness": {
+      "post": {
+        "operationId": "TaskViewsController_checkReadiness",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskReadinessInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Warnings for a draft and each of its subtasks before saving, assigning or re-dating (F06B rule C5); they never block",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskReadiness"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/tasks/tree": {
+      "get": {
+        "operationId": "TaskViewsController_tree",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "retainerCycleId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A project's or a retainer cycle's tasks by milestone with their subtasks, the dependencies and the bottleneck (F06B rule D4)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskTree"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No project or retainer cycle the caller may read"
+          }
+        },
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
     "/api/tasks/board": {
       "get": {
         "operationId": "TaskViewsController_board",
@@ -6697,7 +6773,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Open, overdue and due-this-week counts per person of the departments",
+            "description": "Open, overdue and due-this-week counts per person of the departments, with estimated hours against capacity",
             "content": {
               "application/json": {
                 "schema": {
@@ -7137,7 +7213,7 @@
         },
         "responses": {
           "201": {
-            "description": "The new task: unassigned or assigned to oneself for anyone; any assignee with assign scope; client requests with client scope",
+            "description": "The new task: unassigned or assigned to oneself for anyone; any assignee with assign scope; client requests with client scope. With its stages, subtasks (each checked as its own create), criteria, files and questions in one transaction (F06B rule C2)",
             "content": {
               "application/json": {
                 "schema": {
@@ -14673,6 +14749,89 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "`templates.manage`, or the creator of a task template with assign scope in it"
+          }
+        },
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/templates/from-task/{taskId}": {
+      "post": {
+        "operationId": "TemplatesController_fromTask",
+        "parameters": [
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateFromTask"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "A task template saved from a top-level task with its run mode, stages and subtasks (F06B rule D1); needs assign scope on the task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDetail"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/templates/{id}/task-draft": {
+      "post": {
+        "operationId": "TemplatesController_taskDraft",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskTemplateDraftInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A task template as the creation wizard's draft, dated from the start date in work days (F06B rule D2)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskTemplateDraft"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -14703,6 +14862,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "`templates.manage`, or the creator of a task template with assign scope in it"
           }
         },
         "tags": [
@@ -14733,6 +14895,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "`templates.manage`, or the creator of a task template with assign scope in it"
           }
         },
         "tags": [
@@ -59678,6 +59843,520 @@
           "annexDate"
         ]
       },
+      "TaskReadinessInput": {
+        "type": "object",
+        "properties": {
+          "department": {
+            "$ref": "#/components/schemas/DepartmentCode"
+          },
+          "assigneeId": {
+            "default": null,
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "dueTime": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "estimateMinutes": {
+            "default": null,
+            "nullable": true,
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 12000,
+            "multipleOf": 30
+          },
+          "hasBrief": {
+            "default": false,
+            "type": "boolean"
+          },
+          "hasBriefFields": {
+            "default": false,
+            "type": "boolean"
+          },
+          "hasReferences": {
+            "default": false,
+            "type": "boolean"
+          },
+          "hasCriteria": {
+            "default": false,
+            "type": "boolean"
+          },
+          "needsClientApproval": {
+            "default": false,
+            "type": "boolean"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "subtasks": {
+            "default": [],
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "assigneeId": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "dueDate": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "dueTime": {
+                  "nullable": true,
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                "estimateMinutes": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 30,
+                  "maximum": 12000,
+                  "multipleOf": 30
+                },
+                "hasBrief": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "hasBriefFields": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "hasReferences": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "hasCriteria": {
+                  "default": false,
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "department",
+                "dueDate"
+              ]
+            }
+          }
+        },
+        "required": [
+          "department",
+          "dueDate"
+        ]
+      },
+      "TaskReadiness": {
+        "type": "object",
+        "properties": {
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadinessWarning"
+            }
+          }
+        },
+        "required": [
+          "warnings"
+        ],
+        "additionalProperties": false
+      },
+      "ReadinessWarning": {
+        "type": "object",
+        "properties": {
+          "subtaskIndex": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "code": {
+            "$ref": "#/components/schemas/ReadinessWarningCode"
+          },
+          "leaves": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssigneeLeave"
+            }
+          },
+          "estimatedMinutes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "capacityMinutes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "suggestedDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": [
+          "subtaskIndex",
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "ReadinessWarningCode": {
+        "type": "string",
+        "enum": [
+          "assignee_on_leave",
+          "assignee_overloaded",
+          "due_on_day_off",
+          "brief_missing",
+          "no_criteria"
+        ]
+      },
+      "AssigneeLeave": {
+        "type": "object",
+        "properties": {
+          "startsOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "endsOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": [
+          "startsOn",
+          "endsOn"
+        ],
+        "additionalProperties": false
+      },
+      "TaskTree": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "milestone": {
+                  "nullable": true,
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskTreeNode"
+                  }
+                }
+              },
+              "required": [
+                "milestone",
+                "tasks"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "dependsOnId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "manual",
+                    "run"
+                  ]
+                }
+              },
+              "required": [
+                "taskId",
+                "dependsOnId",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "outside": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/TaskStatus"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "bottleneckId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "groups",
+          "edges",
+          "outside",
+          "bottleneckId"
+        ],
+        "additionalProperties": false
+      },
+      "TaskTreeNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "department": {
+            "$ref": "#/components/schemas/DepartmentCode"
+          },
+          "assignee": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "imageId": {
+                "nullable": true,
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "inDepartment": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "imageId",
+              "archived",
+              "inDepartment"
+            ],
+            "additionalProperties": false
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "dueTime": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "estimateMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "runMode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubtaskRunMode"
+              }
+            ]
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "assignee": {
+                  "nullable": true,
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "imageId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "archived": {
+                      "type": "boolean"
+                    },
+                    "inDepartment": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "imageId",
+                    "archived",
+                    "inDepartment"
+                  ],
+                  "additionalProperties": false
+                },
+                "status": {
+                  "$ref": "#/components/schemas/TaskStatus"
+                },
+                "dueDate": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "dueTime": {
+                  "nullable": true,
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                "overdue": {
+                  "type": "boolean"
+                },
+                "blocked": {
+                  "type": "boolean"
+                },
+                "estimateMinutes": {
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "department",
+                "assignee",
+                "status",
+                "dueDate",
+                "dueTime",
+                "overdue",
+                "blocked",
+                "estimateMinutes"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "department",
+          "assignee",
+          "status",
+          "dueDate",
+          "dueTime",
+          "overdue",
+          "blocked",
+          "estimateMinutes",
+          "runMode",
+          "subtasks"
+        ],
+        "additionalProperties": false
+      },
+      "SubtaskRunMode": {
+        "type": "string",
+        "enum": [
+          "sequential",
+          "parallel",
+          "stages"
+        ]
+      },
       "TaskBoard": {
         "type": "object",
         "properties": {
@@ -60005,6 +60684,12 @@
               "inSubtasks"
             ],
             "additionalProperties": false
+          },
+          "estimateMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -60032,7 +60717,8 @@
           "postId",
           "parent",
           "progress",
-          "openQuestions"
+          "openQuestions",
+          "estimateMinutes"
         ],
         "additionalProperties": false
       },
@@ -60141,6 +60827,22 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 9007199254740991
+                },
+                "estimatedMinutes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "unestimatedCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "capacityMinutes": {
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 }
               },
               "required": [
@@ -60148,7 +60850,10 @@
                 "departments",
                 "overdue",
                 "dueThisWeek",
-                "open"
+                "open",
+                "estimatedMinutes",
+                "unestimatedCount",
+                "capacityMinutes"
               ],
               "additionalProperties": false
             }
@@ -60610,6 +61315,12 @@
             ],
             "additionalProperties": false
           },
+          "estimateMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "brief": {
             "nullable": true,
             "type": "string"
@@ -60619,6 +61330,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/TaskBriefDoc"
+              }
+            ]
+          },
+          "briefFields": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefFields"
               }
             ]
           },
@@ -60915,8 +61634,10 @@
           "parent",
           "progress",
           "openQuestions",
+          "estimateMinutes",
           "brief",
           "briefDoc",
+          "briefFields",
           "needsClientApproval",
           "clientRequest",
           "dependencies",
@@ -61526,6 +62247,124 @@
           }
         ]
       },
+      "TaskBriefFields": {
+        "type": "object",
+        "properties": {
+          "sizes": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            }
+          },
+          "colors": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            }
+          },
+          "references": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 2048,
+              "format": "uri"
+            }
+          },
+          "length": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "aspectRatio": {
+            "type": "string",
+            "enum": [
+              "16:9",
+              "9:16",
+              "1:1",
+              "4:5",
+              "other"
+            ]
+          },
+          "music": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "link": {
+            "type": "string",
+            "maxLength": 2048,
+            "format": "uri"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "production",
+              "staging",
+              "development"
+            ]
+          },
+          "platforms": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostPlatform"
+            }
+          },
+          "tone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "audience": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "amountMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "$ref": "#/components/schemas/Currency"
+              }
+            },
+            "required": [
+              "amountMinor",
+              "currency"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "PostPlatform": {
+        "type": "string",
+        "enum": [
+          "instagram",
+          "facebook",
+          "tiktok",
+          "x",
+          "linkedin",
+          "youtube",
+          "snapchat",
+          "google_business"
+        ]
+      },
       "RequestScope": {
         "type": "string",
         "enum": [
@@ -61968,14 +62807,6 @@
           "revoked"
         ]
       },
-      "SubtaskRunMode": {
-        "type": "string",
-        "enum": [
-          "sequential",
-          "parallel",
-          "stages"
-        ]
-      },
       "TaskStage": {
         "type": "object",
         "properties": {
@@ -62350,6 +63181,12 @@
             ],
             "additionalProperties": false
           },
+          "estimateMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "position": {
             "type": "integer",
             "minimum": 1,
@@ -62413,6 +63250,7 @@
           "parent",
           "progress",
           "openQuestions",
+          "estimateMinutes",
           "position",
           "stageId",
           "waitingOn",
@@ -62476,6 +63314,9 @@
           },
           "canTickCriteria": {
             "type": "boolean"
+          },
+          "canSaveTemplate": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -62496,7 +63337,8 @@
           "canReopenSubtasks",
           "canWriteHandover",
           "canEditCriteria",
-          "canTickCriteria"
+          "canTickCriteria",
+          "canSaveTemplate"
         ],
         "additionalProperties": false,
         "description": "What the caller may do, for the UI"
@@ -62604,6 +63446,23 @@
               }
             ]
           },
+          "briefFields": {
+            "default": null,
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefFields"
+              }
+            ]
+          },
+          "estimateMinutes": {
+            "default": null,
+            "nullable": true,
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 12000,
+            "multipleOf": 30
+          },
           "type": {
             "default": "work",
             "allOf": [
@@ -62643,6 +63502,68 @@
               }
             ]
           },
+          "criteria": {
+            "default": [],
+            "maxItems": 15,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "runMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubtaskRunMode"
+              }
+            ]
+          },
+          "stages": {
+            "default": [],
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          },
+          "subtasks": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateTaskSubtask"
+            }
+          },
+          "files": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateTaskFile"
+            }
+          },
+          "questions": {
+            "default": [],
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskQuestionInput"
+            }
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "acceptLeave": {
             "type": "boolean"
           }
@@ -62667,6 +63588,867 @@
         },
         "required": [
           "url"
+        ]
+      },
+      "CreateTaskSubtask": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "brief": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 5000
+          },
+          "briefDoc": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefDoc"
+              }
+            ]
+          },
+          "briefFields": {
+            "default": null,
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefFields"
+              }
+            ]
+          },
+          "department": {
+            "$ref": "#/components/schemas/DepartmentCode"
+          },
+          "assigneeId": {
+            "default": null,
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "dueTime": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "priority": {
+            "default": "normal",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskPriority"
+              }
+            ]
+          },
+          "estimateMinutes": {
+            "default": null,
+            "nullable": true,
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 12000,
+            "multipleOf": 30
+          },
+          "stageIndex": {
+            "default": null,
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9
+          },
+          "checklist": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "criteria": {
+            "default": [],
+            "maxItems": 15,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "files": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateTaskFile"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "department",
+          "dueDate"
+        ]
+      },
+      "CreateTaskFile": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "role": {
+            "default": "reference",
+            "type": "string",
+            "enum": [
+              "reference",
+              "deliverable"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "uploadId"
+        ]
+      },
+      "TaskQuestionInput": {
+        "type": "object",
+        "properties": {
+          "bodyDoc": {
+            "$ref": "#/components/schemas/TaskCommentDoc"
+          },
+          "addressedUserId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "addressedDepartment": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DepartmentCode"
+              }
+            ]
+          },
+          "files": {
+            "default": [],
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uploadId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "uploadId"
+              ]
+            }
+          }
+        },
+        "required": [
+          "bodyDoc"
+        ]
+      },
+      "TaskCommentDoc": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "doc"
+            ]
+          },
+          "content": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "paragraph"
+                      ]
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "text"
+                                ]
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "marks": {
+                                "maxItems": 3,
+                                "type": "array",
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "bold"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "italic"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "link"
+                                          ]
+                                        },
+                                        "attrs": {
+                                          "type": "object",
+                                          "properties": {
+                                            "href": {
+                                              "type": "string",
+                                              "maxLength": 1000,
+                                              "format": "uri"
+                                            }
+                                          },
+                                          "required": [
+                                            "href"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "attrs"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "mention"
+                                ]
+                              },
+                              "attrs": {
+                                "type": "object",
+                                "properties": {
+                                  "userId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  }
+                                },
+                                "required": [
+                                  "userId"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "attrs"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "heading"
+                      ]
+                    },
+                    "attrs": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "number",
+                          "enum": [
+                            3
+                          ]
+                        }
+                      },
+                      "required": [
+                        "level"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "text"
+                                ]
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "marks": {
+                                "maxItems": 3,
+                                "type": "array",
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "bold"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "italic"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "link"
+                                          ]
+                                        },
+                                        "attrs": {
+                                          "type": "object",
+                                          "properties": {
+                                            "href": {
+                                              "type": "string",
+                                              "maxLength": 1000,
+                                              "format": "uri"
+                                            }
+                                          },
+                                          "required": [
+                                            "href"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "attrs"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "mention"
+                                ]
+                              },
+                              "attrs": {
+                                "type": "object",
+                                "properties": {
+                                  "userId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  }
+                                },
+                                "required": [
+                                  "userId"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "attrs"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "attrs"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "$ref": "#/components/schemas/__schema0"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "__schema1": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "bulletList"
+                ]
+              },
+              "content": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "listItem"
+                      ]
+                    },
+                    "content": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "paragraph"
+                                ]
+                              },
+                              "content": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "text"
+                                          ]
+                                        },
+                                        "text": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "marks": {
+                                          "maxItems": 3,
+                                          "type": "array",
+                                          "items": {
+                                            "oneOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "bold"
+                                                    ]
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "italic"
+                                                    ]
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "link"
+                                                    ]
+                                                  },
+                                                  "attrs": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "href": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "href"
+                                                    ]
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type",
+                                                  "attrs"
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "text"
+                                      ]
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "mention"
+                                          ]
+                                        },
+                                        "attrs": {
+                                          "type": "object",
+                                          "properties": {
+                                            "userId": {
+                                              "type": "string",
+                                              "format": "uuid",
+                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                            }
+                                          },
+                                          "required": [
+                                            "userId"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "attrs"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "type"
+                            ]
+                          },
+                          {
+                            "$ref": "#/components/schemas/__schema1"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "content"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "type",
+              "content"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "orderedList"
+                ]
+              },
+              "attrs": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "content": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "listItem"
+                      ]
+                    },
+                    "content": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "paragraph"
+                                ]
+                              },
+                              "content": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "text"
+                                          ]
+                                        },
+                                        "text": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "marks": {
+                                          "maxItems": 3,
+                                          "type": "array",
+                                          "items": {
+                                            "oneOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "bold"
+                                                    ]
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "italic"
+                                                    ]
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "link"
+                                                    ]
+                                                  },
+                                                  "attrs": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "href": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "href"
+                                                    ]
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type",
+                                                  "attrs"
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "text"
+                                      ]
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "enum": [
+                                            "mention"
+                                          ]
+                                        },
+                                        "attrs": {
+                                          "type": "object",
+                                          "properties": {
+                                            "userId": {
+                                              "type": "string",
+                                              "format": "uuid",
+                                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                            }
+                                          },
+                                          "required": [
+                                            "userId"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "attrs"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "type"
+                            ]
+                          },
+                          {
+                            "$ref": "#/components/schemas/__schema1"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "content"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "type",
+              "content"
+            ]
+          }
         ]
       },
       "UpdateTask": {
@@ -62767,6 +64549,21 @@
                 "$ref": "#/components/schemas/RequestScope"
               }
             ]
+          },
+          "briefFields": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefFields"
+              }
+            ]
+          },
+          "estimateMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 12000,
+            "multipleOf": 30
           },
           "acceptLeave": {
             "type": "boolean"
@@ -63184,329 +64981,6 @@
           "canConvert",
           "question",
           "replies"
-        ],
-        "additionalProperties": false
-      },
-      "TaskCommentDoc": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "doc"
-            ]
-          },
-          "content": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "anyOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "paragraph"
-                      ]
-                    },
-                    "content": {
-                      "type": "array",
-                      "items": {
-                        "anyOf": [
-                          {
-                            "type": "object",
-                            "properties": {
-                              "type": {
-                                "type": "string",
-                                "enum": [
-                                  "text"
-                                ]
-                              },
-                              "text": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "marks": {
-                                "maxItems": 3,
-                                "type": "array",
-                                "items": {
-                                  "oneOf": [
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "type": {
-                                          "type": "string",
-                                          "enum": [
-                                            "bold"
-                                          ]
-                                        }
-                                      },
-                                      "required": [
-                                        "type"
-                                      ],
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "type": {
-                                          "type": "string",
-                                          "enum": [
-                                            "italic"
-                                          ]
-                                        }
-                                      },
-                                      "required": [
-                                        "type"
-                                      ],
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "type": {
-                                          "type": "string",
-                                          "enum": [
-                                            "link"
-                                          ]
-                                        },
-                                        "attrs": {
-                                          "type": "object",
-                                          "properties": {
-                                            "href": {
-                                              "type": "string",
-                                              "maxLength": 1000,
-                                              "format": "uri"
-                                            }
-                                          },
-                                          "required": [
-                                            "href"
-                                          ],
-                                          "additionalProperties": false
-                                        }
-                                      },
-                                      "required": [
-                                        "type",
-                                        "attrs"
-                                      ],
-                                      "additionalProperties": false
-                                    }
-                                  ]
-                                }
-                              }
-                            },
-                            "required": [
-                              "type",
-                              "text"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
-                            "type": "object",
-                            "properties": {
-                              "type": {
-                                "type": "string",
-                                "enum": [
-                                  "mention"
-                                ]
-                              },
-                              "attrs": {
-                                "type": "object",
-                                "properties": {
-                                  "userId": {
-                                    "type": "string",
-                                    "format": "uuid",
-                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                  }
-                                },
-                                "required": [
-                                  "userId"
-                                ],
-                                "additionalProperties": false
-                              }
-                            },
-                            "required": [
-                              "type",
-                              "attrs"
-                            ],
-                            "additionalProperties": false
-                          }
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "type"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "heading"
-                      ]
-                    },
-                    "attrs": {
-                      "type": "object",
-                      "properties": {
-                        "level": {
-                          "type": "number",
-                          "enum": [
-                            3
-                          ]
-                        }
-                      },
-                      "required": [
-                        "level"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "content": {
-                      "type": "array",
-                      "items": {
-                        "anyOf": [
-                          {
-                            "type": "object",
-                            "properties": {
-                              "type": {
-                                "type": "string",
-                                "enum": [
-                                  "text"
-                                ]
-                              },
-                              "text": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "marks": {
-                                "maxItems": 3,
-                                "type": "array",
-                                "items": {
-                                  "oneOf": [
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "type": {
-                                          "type": "string",
-                                          "enum": [
-                                            "bold"
-                                          ]
-                                        }
-                                      },
-                                      "required": [
-                                        "type"
-                                      ],
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "type": {
-                                          "type": "string",
-                                          "enum": [
-                                            "italic"
-                                          ]
-                                        }
-                                      },
-                                      "required": [
-                                        "type"
-                                      ],
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "type": {
-                                          "type": "string",
-                                          "enum": [
-                                            "link"
-                                          ]
-                                        },
-                                        "attrs": {
-                                          "type": "object",
-                                          "properties": {
-                                            "href": {
-                                              "type": "string",
-                                              "maxLength": 1000,
-                                              "format": "uri"
-                                            }
-                                          },
-                                          "required": [
-                                            "href"
-                                          ],
-                                          "additionalProperties": false
-                                        }
-                                      },
-                                      "required": [
-                                        "type",
-                                        "attrs"
-                                      ],
-                                      "additionalProperties": false
-                                    }
-                                  ]
-                                }
-                              }
-                            },
-                            "required": [
-                              "type",
-                              "text"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
-                            "type": "object",
-                            "properties": {
-                              "type": {
-                                "type": "string",
-                                "enum": [
-                                  "mention"
-                                ]
-                              },
-                              "attrs": {
-                                "type": "object",
-                                "properties": {
-                                  "userId": {
-                                    "type": "string",
-                                    "format": "uuid",
-                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                  }
-                                },
-                                "required": [
-                                  "userId"
-                                ],
-                                "additionalProperties": false
-                              }
-                            },
-                            "required": [
-                              "type",
-                              "attrs"
-                            ],
-                            "additionalProperties": false
-                          }
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "attrs"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "$ref": "#/components/schemas/__schema0"
-                }
-              ]
-            }
-          }
-        },
-        "required": [
-          "type",
-          "content"
         ],
         "additionalProperties": false
       },
@@ -64066,47 +65540,6 @@
         ],
         "additionalProperties": false
       },
-      "TaskQuestionInput": {
-        "type": "object",
-        "properties": {
-          "bodyDoc": {
-            "$ref": "#/components/schemas/TaskCommentDoc"
-          },
-          "addressedUserId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "addressedDepartment": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/DepartmentCode"
-              }
-            ]
-          },
-          "files": {
-            "default": [],
-            "maxItems": 10,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "uploadId": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                }
-              },
-              "required": [
-                "uploadId"
-              ]
-            }
-          }
-        },
-        "required": [
-          "bodyDoc"
-        ]
-      },
       "ForwardQuestion": {
         "type": "object",
         "properties": {
@@ -64191,6 +65624,41 @@
                 "$ref": "#/components/schemas/TaskBriefDoc"
               }
             ]
+          },
+          "briefFields": {
+            "default": null,
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefFields"
+              }
+            ]
+          },
+          "estimateMinutes": {
+            "default": null,
+            "nullable": true,
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 12000,
+            "multipleOf": 30
+          },
+          "criteria": {
+            "default": [],
+            "maxItems": 15,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "files": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateTaskFile"
+            }
           },
           "fromCommentId": {
             "type": "string",
@@ -68086,19 +69554,6 @@
         ],
         "additionalProperties": false
       },
-      "PostPlatform": {
-        "type": "string",
-        "enum": [
-          "instagram",
-          "facebook",
-          "tiktok",
-          "x",
-          "linkedin",
-          "youtube",
-          "snapchat",
-          "google_business"
-        ]
-      },
       "PostType": {
         "type": "string",
         "enum": [
@@ -69543,6 +70998,12 @@
             ],
             "additionalProperties": false
           },
+          "estimateMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "inPublishCycle": {
             "type": "boolean"
           }
@@ -69573,6 +71034,7 @@
           "parent",
           "progress",
           "openQuestions",
+          "estimateMinutes",
           "inPublishCycle"
         ],
         "additionalProperties": false
@@ -73919,7 +75381,8 @@
         "type": "string",
         "enum": [
           "project",
-          "retainer_cycle"
+          "retainer_cycle",
+          "task"
         ]
       },
       "CreateCatalogService": {
@@ -74454,6 +75917,14 @@
             "nullable": true,
             "type": "string"
           },
+          "runMode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubtaskRunMode"
+              }
+            ]
+          },
           "stages": {
             "type": "array",
             "items": {
@@ -74544,6 +76015,7 @@
           "name",
           "kind",
           "description",
+          "runMode",
           "stages",
           "steps",
           "assignees",
@@ -74594,6 +76066,12 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
+          "parentStepId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "position": {
             "type": "integer",
             "minimum": 1,
@@ -74605,6 +76083,34 @@
           "brief": {
             "nullable": true,
             "type": "string"
+          },
+          "briefDoc": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefDoc"
+              }
+            ]
+          },
+          "briefFields": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefFields"
+              }
+            ]
+          },
+          "estimateMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "department": {
             "$ref": "#/components/schemas/DepartmentCode"
@@ -74662,9 +76168,14 @@
         "required": [
           "id",
           "stageId",
+          "parentStepId",
           "position",
           "title",
           "brief",
+          "briefDoc",
+          "briefFields",
+          "estimateMinutes",
+          "criteria",
           "department",
           "dueDay",
           "priority",
@@ -74753,6 +76264,15 @@
             "type": "string",
             "maxLength": 1000
           },
+          "runMode": {
+            "default": null,
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubtaskRunMode"
+              }
+            ]
+          },
           "stages": {
             "default": [],
             "maxItems": 30,
@@ -74796,6 +76316,13 @@
                   "minLength": 1,
                   "maxLength": 64
                 },
+                "parentKey": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
                 "title": {
                   "type": "string",
                   "minLength": 1,
@@ -74804,7 +76331,7 @@
                 "brief": {
                   "nullable": true,
                   "type": "string",
-                  "maxLength": 5000
+                  "maxLength": 20000
                 },
                 "department": {
                   "$ref": "#/components/schemas/DepartmentCode"
@@ -74872,6 +76399,42 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64
+                  }
+                },
+                "briefDoc": {
+                  "default": null,
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskBriefDoc"
+                    }
+                  ]
+                },
+                "briefFields": {
+                  "default": null,
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskBriefFields"
+                    }
+                  ]
+                },
+                "estimateMinutes": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 30,
+                  "maximum": 12000,
+                  "multipleOf": 30
+                },
+                "criteria": {
+                  "default": [],
+                  "maxItems": 15,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
                   }
                 }
               },
@@ -74913,6 +76476,244 @@
           "kind"
         ]
       },
+      "TemplateFromTask": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "description": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 1000
+          },
+          "keepAssignees": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "TaskTemplateDraftInput": {
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        }
+      },
+      "TaskTemplateDraft": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "brief": {
+            "nullable": true,
+            "type": "string"
+          },
+          "briefDoc": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefDoc"
+              }
+            ]
+          },
+          "briefFields": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskBriefFields"
+              }
+            ]
+          },
+          "department": {
+            "$ref": "#/components/schemas/DepartmentCode"
+          },
+          "assigneeId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "estimateMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "needsClientApproval": {
+            "type": "boolean"
+          },
+          "revisionLimit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "runMode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubtaskRunMode"
+              }
+            ]
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "brief": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "briefDoc": {
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskBriefDoc"
+                    }
+                  ]
+                },
+                "briefFields": {
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskBriefFields"
+                    }
+                  ]
+                },
+                "department": {
+                  "$ref": "#/components/schemas/DepartmentCode"
+                },
+                "assigneeId": {
+                  "nullable": true,
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "dueDate": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "priority": {
+                  "$ref": "#/components/schemas/TaskPriority"
+                },
+                "estimateMinutes": {
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "checklist": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "criteria": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "stageIndex": {
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "title",
+                "brief",
+                "briefDoc",
+                "briefFields",
+                "department",
+                "assigneeId",
+                "dueDate",
+                "priority",
+                "estimateMinutes",
+                "checklist",
+                "criteria",
+                "stageIndex"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "title",
+          "brief",
+          "briefDoc",
+          "briefFields",
+          "department",
+          "assigneeId",
+          "dueDate",
+          "priority",
+          "estimateMinutes",
+          "checklist",
+          "criteria",
+          "templateId",
+          "needsClientApproval",
+          "revisionLimit",
+          "runMode",
+          "stages",
+          "subtasks"
+        ],
+        "additionalProperties": false
+      },
       "UpdateTemplate": {
         "type": "object",
         "properties": {
@@ -74925,6 +76726,15 @@
             "nullable": true,
             "type": "string",
             "maxLength": 1000
+          },
+          "runMode": {
+            "default": null,
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubtaskRunMode"
+              }
+            ]
           },
           "stages": {
             "default": [],
@@ -74969,6 +76779,13 @@
                   "minLength": 1,
                   "maxLength": 64
                 },
+                "parentKey": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
                 "title": {
                   "type": "string",
                   "minLength": 1,
@@ -74977,7 +76794,7 @@
                 "brief": {
                   "nullable": true,
                   "type": "string",
-                  "maxLength": 5000
+                  "maxLength": 20000
                 },
                 "department": {
                   "$ref": "#/components/schemas/DepartmentCode"
@@ -75045,6 +76862,42 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64
+                  }
+                },
+                "briefDoc": {
+                  "default": null,
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskBriefDoc"
+                    }
+                  ]
+                },
+                "briefFields": {
+                  "default": null,
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskBriefFields"
+                    }
+                  ]
+                },
+                "estimateMinutes": {
+                  "default": null,
+                  "nullable": true,
+                  "type": "integer",
+                  "minimum": 30,
+                  "maximum": 12000,
+                  "multipleOf": 30
+                },
+                "criteria": {
+                  "default": [],
+                  "maxItems": 15,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
                   }
                 }
               },
@@ -79823,6 +81676,12 @@
             ],
             "additionalProperties": false
           },
+          "estimateMinutes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "snapshot": {
             "type": "object",
             "properties": {
@@ -79868,6 +81727,7 @@
           "parent",
           "progress",
           "openQuestions",
+          "estimateMinutes",
           "snapshot"
         ],
         "additionalProperties": false

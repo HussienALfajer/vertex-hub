@@ -37,4 +37,10 @@ export {
   type TaskProductivity,
   TaskReports,
 } from './task-reports.js';
+export {
+  TaskTemplateHooks,
+  type TaskTemplateListener,
+  type TaskTemplateUse,
+} from './task-template-hooks.js';
+export { type TaskSnapshot, type TaskSnapshotItem, TaskTemplates } from './task-templates.js';
 export { TasksModule } from './tasks.module.js';

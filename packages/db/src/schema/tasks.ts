@@ -132,6 +132,10 @@ export const tasks = pgTable(
     runMode: subtaskRunModeEnum('run_mode'),
     /** Subtasks only: the note handed over to the next ones (rule A12). */
     handoverNote: text('handover_note'),
+    /** F06B rule C7: the department's brief fields (`briefFieldsSchemas`); null when none. */
+    briefFields: jsonb('brief_fields'),
+    /** F06B rule C8: the estimate in minutes, a multiple of 30 from 30 to 12 000. */
+    estimateMinutes: integer('estimate_minutes'),
     ...timestamps(),
     archivedAt: archivedAt(),
   },
@@ -197,6 +201,10 @@ export const tasks = pgTable(
         else ${table.position} is null and ${table.stageId} is null and ${table.handoverNote} is null end`,
     ),
     check('tasks_handover_note_check', sql`char_length(${table.handoverNote}) between 1 and 2000`),
+    check(
+      'tasks_estimate_check',
+      sql`${table.estimateMinutes} between 30 and 12000 and ${table.estimateMinutes} % 30 = 0`,
+    ),
   ],
 );
 
