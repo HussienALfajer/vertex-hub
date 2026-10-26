@@ -9,7 +9,7 @@ Spec: `docs/specs/F06B-tasks-2.md` (Approved 2026-10-26) · ADR 0041 (and 0013, 
 - [x] bridge: `pnpm build`, `openapi:export`, `api:generate`; fixtures adapted to the new response fields
 - [x] wiring: error codes, audit actions and `task_stage` entity, notification types (messages + `ar.json` + resolutions), reminder kind `subtask_holding_next`, test cleanup of stages, `docs/architecture.md`
 - [x] notes: no screens in this PR; the E2E mocks only gained the new response fields (subtask mocks arrive with PR 4)
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+- [x] checks (full run: only load timeouts, each passing on its own), reviewer (8 findings fixed), acceptance (owner, rule A2 kept as 403), PR with auto-merge
 
 ## PR 2 — Questions, rich text and criteria API (Parts B, C6)
 - [ ] contracts: mention node in the ADR 0038 document schema; `TASK_COMMENT_KINDS`, `QUESTION_STATUSES`, `CHECKLIST_ITEM_KINDS`; `workHoursBetween` with tests; question/reply/forward schemas; comment `bodyDoc`, `attachments`, `question`, `replies`, `convertedTask`; criteria schemas; error codes `CRITERIA_OPEN`, `INVALID_ADDRESSEE`, `QUESTION_NOT_FOUND`, `QUESTION_NO_REPLY`, `QUESTION_CLOSED`, `NOT_QUESTION_ASKER`; notification types `task_question_*`
