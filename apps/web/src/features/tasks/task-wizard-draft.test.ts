@@ -17,6 +17,7 @@ import {
   type WizardFile,
   type WizardSubtask,
   type WizardValues,
+  warningsOnDraft,
   withRunMode,
 } from './task-wizard-draft';
 
@@ -230,7 +231,7 @@ describe('run modes and stages', () => {
 
 describe('readinessInput', () => {
   it('reads the brief, the fields, the references and the criteria of each task', () => {
-    const input = readinessInput(
+    const result = readinessInput(
       values({
         briefDoc: {
           type: 'doc',
@@ -242,7 +243,7 @@ describe('readinessInput', () => {
       [file('ref', { kind: 'subtask', index: 0 })],
       true,
     );
-    expect(input).toMatchObject({
+    expect(result?.input).toMatchObject({
       hasBrief: true,
       hasBriefFields: false,
       hasReferences: false,
@@ -253,6 +254,25 @@ describe('readinessInput', () => {
         { hasBrief: false, hasReferences: false, hasBriefFields: true },
       ],
     });
+  });
+
+  it('leaves out undated subtasks and puts their warnings back on the draft positions', () => {
+    const result = readinessInput(
+      values({ subtasks: [{ ...subtask('A'), dueDate: '' }, subtask('B')] }),
+      [],
+      false,
+    );
+    expect(result?.input.subtasks).toHaveLength(1);
+    expect(result?.subtaskIndexes).toEqual([1]);
+    expect(
+      warningsOnDraft(
+        [
+          { subtaskIndex: 0, code: 'brief_missing' },
+          { subtaskIndex: null, code: 'brief_missing' },
+        ],
+        result?.subtaskIndexes ?? [],
+      ).map((warning) => warning.subtaskIndex),
+    ).toEqual([1, null]);
   });
 
   it('waits for a department and a due date', () => {

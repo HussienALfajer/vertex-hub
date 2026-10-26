@@ -63,7 +63,7 @@ import { projectListQuery, projectQuery } from '../projects/projects.queries';
 import { lineName } from '../retainers/retainer-badges';
 import { retainerListQuery } from '../retainers/retainers.queries';
 import { userListQuery } from '../users/users.queries';
-import { BriefFieldsEditor } from './brief-fields-editor';
+import { BriefFieldsEditor, briefFieldProblem } from './brief-fields-editor';
 import { canAssignIn, memberOf } from './task-access';
 import { useRichTextLabels } from './task-rich-text';
 import { taskListQuery } from './tasks.queries';
@@ -1169,58 +1169,53 @@ export function LinksField({ form }: { form: TaskFormMethods }) {
   );
 }
 
-/** Hours with halves up to a day, then whole days (F06B rule C8). */
-const ESTIMATE_HOURS = [
-  ...Array.from({ length: 16 }, (_, index) => (index + 1) / 2),
-  10,
-  12,
-  16,
-  20,
-  24,
-  32,
-  40,
-];
-
-/** F06B rule C8: an estimate in hours, stored in minutes; empty for none. */
-export function EstimateSelect({
+/**
+ * F06B rule C8: an estimate in hours with halves (0.5 to 200), stored in minutes; empty for none.
+ * The typed text stays as typed until the value changes from outside.
+ */
+export function EstimateInput({
   value,
   onChange,
   labelledBy,
-  triggerRef,
+  inputRef,
 }: {
   value: number | null | undefined;
   onChange: (minutes: number | null) => void;
   labelledBy?: string;
-  triggerRef?: Ref<HTMLButtonElement>;
+  inputRef?: Ref<HTMLInputElement>;
 }) {
   const { t } = useTranslation();
-  const hours = value && !ESTIMATE_HOURS.includes(value / 60) ? [value / 60] : [];
-  const items = [
-    { value: '', label: t('tasks.subtasks.noEstimate') },
-    ...[...ESTIMATE_HOURS, ...hours]
-      .sort((a, b) => a - b)
-      .map((h) => ({
-        value: String(h * 60),
-        label: t('tasks.subtasks.hours', { hours: formatNumber(h) }),
-      })),
-  ];
+  const shown = (minutes: number | null | undefined) => (minutes ? String(minutes / 60) : '');
+  const [draft, setDraft] = useState(() => ({ text: shown(value), value: value ?? null }));
+  if ((value ?? null) !== draft.value) setDraft({ text: shown(value), value: value ?? null });
   return (
-    <Select
-      items={items}
-      value={value ? String(value) : ''}
-      onValueChange={(next) => onChange(next ? Number(next) : null)}
-    >
-      <SelectTrigger ref={triggerRef} aria-labelledby={labelledBy}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="flex items-center gap-2">
+      <Input
+        ref={inputRef}
+        aria-labelledby={labelledBy}
+        type="number"
+        inputMode="decimal"
+        dir="ltr"
+        min={0.5}
+        max={200}
+        step={0.5}
+        className="w-28"
+        placeholder={t('tasks.subtasks.noEstimate')}
+        value={draft.text}
+        onChange={(event) => {
+          const text = event.target.value;
+          const hours = Number(text);
+          // Halves only, within the contract's range; anything else counts as no estimate.
+          const minutes =
+            text.trim() && Number.isFinite(hours) && hours >= 0.5 && hours <= 200
+              ? Math.round(hours * 2) * 30
+              : null;
+          setDraft({ text, value: minutes });
+          onChange(minutes);
+        }}
+      />
+      <span className="text-sm text-muted-foreground">{t('tasks.form.hoursUnit')}</span>
+    </div>
   );
 }
 
@@ -1238,11 +1233,11 @@ export function EstimateField({ form }: { form: TaskFormMethods }) {
         control={form.control}
         name="estimateMinutes"
         render={({ field }) => (
-          <EstimateSelect
+          <EstimateInput
             value={field.value}
             onChange={field.onChange}
             labelledBy={id}
-            triggerRef={field.ref}
+            inputRef={field.ref}
           />
         )}
       />
@@ -1259,7 +1254,12 @@ export function BriefFieldsField({ form }: { form: TaskFormMethods }) {
       control={form.control}
       name="briefFields"
       render={({ field }) => (
-        <BriefFieldsEditor department={department} value={field.value} onChange={field.onChange} />
+        <BriefFieldsEditor
+          department={department}
+          value={field.value}
+          onChange={field.onChange}
+          invalid={briefFieldProblem(form.formState.errors.briefFields)}
+        />
       )}
     />
   );

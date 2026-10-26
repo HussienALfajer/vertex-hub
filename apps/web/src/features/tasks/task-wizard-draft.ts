@@ -3,6 +3,7 @@ import {
   type CreateTask,
   type CreateTaskInput,
   FILE_UPLOAD_LIFETIME_HOURS,
+  type ReadinessWarning,
   richTextPlain,
   type SubtaskRunMode,
   type TaskReadinessInput,
@@ -261,45 +262,60 @@ const briefWritten = (doc: WizardValues['briefDoc']) =>
 const filled = (fields: WizardValues['briefFields']) =>
   !!fields && Object.values(fields).some((value) => value !== undefined);
 
-/** Rule C5: the draft as the readiness check reads it. */
+/**
+ * Rule C5: the draft as the readiness check reads it, with the draft position of each subtask
+ * sent (those without a department or a due date yet are left out).
+ */
 export function readinessInput(
   values: WizardValues,
   files: WizardFile[],
   needsClientApproval: boolean,
-): TaskReadinessInput | null {
+): { input: TaskReadinessInput; subtaskIndexes: number[] } | null {
   if (!values.department || !values.dueDate) return null;
   const references = (target: (file: WizardFile) => boolean) =>
     files.some((file) => file.role === 'reference' && target(file));
+  const sent = (values.subtasks ?? []).flatMap((subtask, index) =>
+    subtask.department && subtask.dueDate ? [{ subtask, index }] : [],
+  );
   return {
-    department: values.department,
-    assigneeId: values.assigneeId ?? null,
-    dueDate: values.dueDate,
-    dueTime: values.dueTime ?? null,
-    estimateMinutes: values.estimateMinutes ?? null,
-    hasBrief: briefWritten(values.briefDoc),
-    hasBriefFields: filled(values.briefFields),
-    hasReferences: references((file) => file.target.kind === 'task'),
-    hasCriteria: (values.criteria ?? []).length > 0,
-    needsClientApproval,
-    subtasks: (values.subtasks ?? []).flatMap((subtask, index) =>
-      subtask.department && subtask.dueDate
-        ? [
-            {
-              department: subtask.department,
-              assigneeId: subtask.assigneeId ?? null,
-              dueDate: subtask.dueDate,
-              estimateMinutes: subtask.estimateMinutes ?? null,
-              hasBrief: briefWritten(subtask.briefDoc),
-              hasBriefFields: filled(subtask.briefFields),
-              hasReferences: references(
-                (file) => file.target.kind === 'subtask' && file.target.index === index,
-              ),
-              hasCriteria: (subtask.criteria ?? []).length > 0,
-            },
-          ]
-        : [],
-    ),
+    subtaskIndexes: sent.map(({ index }) => index),
+    input: {
+      department: values.department,
+      assigneeId: values.assigneeId ?? null,
+      dueDate: values.dueDate,
+      dueTime: values.dueTime ?? null,
+      estimateMinutes: values.estimateMinutes ?? null,
+      hasBrief: briefWritten(values.briefDoc),
+      hasBriefFields: filled(values.briefFields),
+      hasReferences: references((file) => file.target.kind === 'task'),
+      hasCriteria: (values.criteria ?? []).length > 0,
+      needsClientApproval,
+      subtasks: sent.map(({ subtask, index }) => ({
+        department: subtask.department,
+        assigneeId: subtask.assigneeId ?? null,
+        dueDate: subtask.dueDate,
+        estimateMinutes: subtask.estimateMinutes ?? null,
+        hasBrief: briefWritten(subtask.briefDoc),
+        hasBriefFields: filled(subtask.briefFields),
+        hasReferences: references(
+          (file) => file.target.kind === 'subtask' && file.target.index === index,
+        ),
+        hasCriteria: (subtask.criteria ?? []).length > 0,
+      })),
+    },
   };
+}
+
+/** The warnings with each `subtaskIndex` turned from the sent list's into the draft's. */
+export function warningsOnDraft(
+  warnings: readonly ReadinessWarning[],
+  subtaskIndexes: readonly number[],
+): ReadinessWarning[] {
+  return warnings.map((warning) =>
+    warning.subtaskIndex === null
+      ? warning
+      : { ...warning, subtaskIndex: subtaskIndexes[warning.subtaskIndex] ?? warning.subtaskIndex },
+  );
 }
 
 /** Rule C2: the checked draft with its held files, as one create request. */

@@ -86,10 +86,10 @@ import { uploadFile } from '../files/files.queries';
 import { namedFiles, pastedFiles } from '../files/held-uploads';
 import { holidaysQuery } from '../hr/hr.queries';
 import { useDepartmentNames } from '../projects/project-badges';
-import { BriefFieldsEditor } from './brief-fields-editor';
+import { BriefFieldsEditor, briefFieldProblem } from './brief-fields-editor';
 import { type Addressee, AddresseeSelect } from './task-comments';
 import {
-  EstimateSelect,
+  EstimateInput,
   ItemsEditor,
   type TaskFormMethods,
   useAssigneeOptions,
@@ -264,6 +264,14 @@ export function SubtasksStep({
   const full = subtasks.length >= SUBTASK_LIMITS.subtasks;
   // A new row's title takes the focus once it is drawn.
   const [focusRow, setFocusRow] = useState<number | null>(null);
+  // Rows are keyed by position: a move or a removal draws them again, so each brief editor
+  // (which reads its value when it mounts) shows its own subtask.
+  const [round, setRound] = useState(0);
+  const reorder = (next: Parameters<typeof apply>[0]) => {
+    apply(next);
+    setFocusRow(null);
+    setRound((current) => current + 1);
+  };
 
   const values = () => form.getValues();
   const add = (stageIndex: number | null) => {
@@ -306,14 +314,14 @@ export function SubtasksStep({
         index === to ? { ...subtask, stageIndex } : subtask,
       );
     }
-    apply(moved);
+    reorder(moved);
   };
 
   const rows = (indexes: number[]) => (
     <ol className="flex flex-col gap-2">
       {indexes.map((index) => (
         <SubtaskRow
-          key={index}
+          key={`${round}:${index}`}
           form={form}
           index={index}
           count={subtasks.length}
@@ -322,7 +330,7 @@ export function SubtasksStep({
           autoFocus={focusRow === index}
           accountManagerId={accountManagerId}
           onMove={move}
-          onRemove={() => apply(removeSubtask(values(), files, index))}
+          onRemove={() => reorder(removeSubtask(values(), files, index))}
         />
       ))}
     </ol>
@@ -342,8 +350,8 @@ export function SubtasksStep({
               count={stages.length}
               name={stage.name}
               empty={!subtasks.some((subtask) => subtask.stageIndex === stageIndex)}
-              onMove={(to) => apply({ values: moveStage(values(), stageIndex, to) })}
-              onRemove={() => apply({ values: removeStage(values(), stageIndex) })}
+              onMove={(to) => reorder({ values: moveStage(values(), stageIndex, to) })}
+              onRemove={() => reorder({ values: removeStage(values(), stageIndex) })}
               onAdd={() => add(stageIndex)}
               addDisabled={full}
             >
@@ -745,7 +753,7 @@ function SubtaskRow({
             <FieldLabel id={ids.estimate} render={<span />}>
               {t('tasks.subtasks.estimate')}
             </FieldLabel>
-            <EstimateSelect
+            <EstimateInput
               value={subtask.estimateMinutes}
               onChange={(value) => set('estimateMinutes', value)}
               labelledBy={ids.estimate}
@@ -848,6 +856,7 @@ function SubtaskRow({
             department={subtask.department}
             value={subtask.briefFields}
             onChange={(value) => set('briefFields', value)}
+            invalid={briefFieldProblem(errors?.briefFields)}
           />
           <ItemsEditor
             label={t('tasks.form.criteria')}
@@ -1107,6 +1116,8 @@ export function QuestionsStep({
   const { t } = useTranslation();
   const apply = useDraftChange(form, setFiles);
   const questions = useWatch({ control: form.control, name: 'questions' }) ?? [];
+  // Cards are keyed by position: a removal draws them again, so each editor shows its question.
+  const [round, setRound] = useState(0);
   const full = questions.length >= CREATE_LIMITS.questions;
   return (
     <div className="flex flex-col gap-4">
@@ -1117,14 +1128,17 @@ export function QuestionsStep({
         {questions.map((_, index) => (
           <QuestionCard
             // biome-ignore lint/suspicious/noArrayIndexKey: questions are drafts without ids
-            key={index}
+            key={`${round}:${index}`}
             form={form}
             index={index}
             files={files.filter(
               (file) => file.target.kind === 'question' && file.target.index === index,
             )}
             uploads={uploads}
-            onRemove={() => apply(removeQuestion(form.getValues(), files, index))}
+            onRemove={() => {
+              apply(removeQuestion(form.getValues(), files, index));
+              setRound((current) => current + 1);
+            }}
           />
         ))}
       </ol>

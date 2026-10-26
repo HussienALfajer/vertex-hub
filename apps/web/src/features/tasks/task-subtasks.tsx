@@ -86,7 +86,7 @@ import { clientQuery } from '../clients/clients.queries';
 import { useDepartmentNames } from '../projects/project-badges';
 import { assigneeLeaves, LeaveWarningDialog } from './leave-warning';
 import { BlockedBadge, formatDue, TaskOverdueBadge, TaskStatusBadge } from './task-badges';
-import { EstimateSelect, useAssigneeOptions, useDepartments } from './task-form';
+import { EstimateInput, useAssigneeOptions, useDepartments } from './task-form';
 import { TaskSection } from './task-parts';
 import { useRichTextLabels } from './task-rich-text';
 import {
@@ -1129,10 +1129,10 @@ export function AddSubtaskDialog({
                   control={form.control}
                   name="estimateMinutes"
                   render={({ field }) => (
-                    <EstimateSelect
+                    <EstimateInput
                       value={field.value}
                       onChange={field.onChange}
-                      triggerRef={field.ref}
+                      inputRef={field.ref}
                     />
                   )}
                 />

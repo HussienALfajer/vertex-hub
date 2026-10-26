@@ -13,6 +13,7 @@ import {
   ColorSwatch,
   Field,
   FieldDescription,
+  FieldError,
   FieldLabel,
   Input,
   MultiCombobox,
@@ -52,10 +53,13 @@ export function BriefFieldsEditor({
   department,
   value,
   onChange,
+  invalid,
 }: {
   department: DepartmentCode | null | undefined;
   value: Fields | null | undefined;
   onChange: (fields: Fields | null) => void;
+  /** The field the schema refused (`briefFieldProblem`), shown on that field. */
+  invalid?: string | null;
 }) {
   const { t } = useTranslation();
   const kind = department ? DEPARTMENT_BRIEF_KINDS[department] : undefined;
@@ -63,6 +67,9 @@ export function BriefFieldsEditor({
   const fields = value ?? {};
   const set = <K extends keyof Fields>(key: K, next: Fields[K]) =>
     onChange(compact({ ...fields, [key]: next }));
+  const error = (key: 'sizes' | 'colors' | 'references' | 'link') =>
+    invalid === key ? t(`tasks.briefFields.errors.${key}`) : undefined;
+  const shown = ['sizes', 'colors', 'references', 'link'];
   const text = (key: 'length' | 'music' | 'tone' | 'goal' | 'audience', max: number) => (
     <TextField
       key={key}
@@ -82,13 +89,19 @@ export function BriefFieldsEditor({
             hint={t('tasks.briefFields.sizesHint')}
             value={fields.sizes ?? []}
             onChange={(next) => set('sizes', next)}
+            error={error('sizes')}
           />
-          <ColorsField value={fields.colors ?? []} onChange={(next) => set('colors', next)} />
+          <ColorsField
+            value={fields.colors ?? []}
+            onChange={(next) => set('colors', next)}
+            error={error('colors')}
+          />
           <ListField
             label={t('tasks.brief.fields.references')}
             hint={t('tasks.briefFields.referencesHint')}
             value={fields.references ?? []}
             onChange={(next) => set('references', next)}
+            error={error('references')}
             ltr
           />
         </>
@@ -116,6 +129,7 @@ export function BriefFieldsEditor({
             ltr
             type="url"
             onChange={(next) => set('link', next.trim() ? next.trim() : undefined)}
+            error={error('link')}
           />
           <ChoiceField
             label={t('tasks.brief.fields.environment')}
@@ -145,6 +159,11 @@ export function BriefFieldsEditor({
           <BudgetField value={fields.budget} onChange={(next) => set('budget', next)} />
         </>
       )}
+      {invalid && !shown.includes(invalid) && (
+        <p role="alert" className="text-sm text-destructive-text sm:col-span-2">
+          {t('tasks.briefFields.errors.other')}
+        </p>
+      )}
     </fieldset>
   );
 }
@@ -156,6 +175,7 @@ function TextField({
   maxLength,
   ltr,
   type,
+  error,
 }: {
   label: string;
   value: string;
@@ -163,10 +183,11 @@ function TextField({
   maxLength?: number;
   ltr?: boolean;
   type?: string;
+  error?: string;
 }) {
   const id = useId();
   return (
-    <Field>
+    <Field invalid={!!error}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Input
         id={id}
@@ -177,6 +198,7 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      <FieldError match={!!error}>{error}</FieldError>
     </Field>
   );
 }
@@ -188,18 +210,20 @@ function ListField({
   value,
   onChange,
   ltr,
+  error,
 }: {
   label: string;
   hint: string;
   value: string[];
   onChange: (value: string[]) => void;
   ltr?: boolean;
+  error?: string;
 }) {
   const id = useId();
   const [draft, setDraft] = useState(() => ({ text: value.join('\n'), value }));
   if (draft.value.join('\n') !== value.join('\n')) setDraft({ text: value.join('\n'), value });
   return (
-    <Field>
+    <Field invalid={!!error}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Textarea
         id={id}
@@ -218,6 +242,7 @@ function ListField({
         }}
       />
       <FieldDescription>{hint}</FieldDescription>
+      <FieldError match={!!error}>{error}</FieldError>
     </Field>
   );
 }
@@ -225,9 +250,11 @@ function ListField({
 function ColorsField({
   value,
   onChange,
+  error,
 }: {
   value: string[];
   onChange: (value: string[]) => void;
+  error?: string;
 }) {
   const { t } = useTranslation();
   return (
@@ -237,6 +264,7 @@ function ColorsField({
         hint={t('tasks.briefFields.colorsHint')}
         value={value}
         onChange={onChange}
+        error={error}
         ltr
       />
       {value.some((color) => /^#[0-9a-fA-F]{6}$/.test(color)) && (
@@ -331,7 +359,9 @@ function BudgetField({
 }) {
   const { t } = useTranslation();
   const ids = { amount: useId(), currency: useId() };
-  const currency: Currency = value?.currency ?? 'USD';
+  // Chosen before the amount, the currency waits here for it.
+  const [chosen, setChosen] = useState<Currency>(value?.currency ?? 'USD');
+  const currency: Currency = value?.currency ?? chosen;
   return (
     <div className="grid grid-cols-[1fr_auto] gap-2 sm:col-span-2">
       <Field>
@@ -353,8 +383,9 @@ function BudgetField({
           items={CURRENCIES.map((code) => ({ value: code, label: code }))}
           value={currency}
           onValueChange={(next) => {
-            if (next && value) onChange({ ...value, currency: next as Currency });
-            else if (next) onChange(undefined);
+            if (!next) return;
+            setChosen(next as Currency);
+            if (value) onChange({ ...value, currency: next as Currency });
           }}
         >
           <SelectTrigger aria-labelledby={ids.currency} className="w-24" dir="ltr">
@@ -371,4 +402,17 @@ function BudgetField({
       </Field>
     </div>
   );
+}
+
+/**
+ * The brief field a form error names: the schema's issue paths end in the field
+ * (`briefFields.colors.0`, or `briefFields.<field>` from the department check).
+ */
+export function briefFieldProblem(errors: unknown): string | null {
+  if (!errors || typeof errors !== 'object') return null;
+  const key = Object.keys(errors).find(
+    (name) => !['message', 'type', 'ref', 'root'].includes(name),
+  );
+  if (key) return key;
+  return 'message' in errors ? 'other' : null;
 }

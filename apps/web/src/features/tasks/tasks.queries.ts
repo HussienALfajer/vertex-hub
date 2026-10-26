@@ -152,7 +152,6 @@ export const taskReadinessQuery = (input: TaskReadinessInput | null) =>
   queryOptions({
     queryKey: ['tasks', 'readiness', input] as const,
     queryFn: input ? () => call(api.POST('/api/tasks/readiness', { body: input })) : skipToken,
-    placeholderData: keepPreviousData,
     retry: false,
   });
 

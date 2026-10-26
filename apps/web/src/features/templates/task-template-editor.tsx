@@ -1,5 +1,6 @@
 import {
   type DepartmentCode,
+  departmentBriefFields,
   keepsBriefFields,
   SUBTASK_LIMITS,
   SUBTASK_RUN_MODES,
@@ -50,7 +51,7 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../lib/format';
 import { useDepartmentNames } from '../projects/project-badges';
 import { BriefFieldsEditor } from '../tasks/brief-fields-editor';
-import { EstimateSelect, ItemsEditor, useDepartments } from '../tasks/task-form';
+import { EstimateInput, ItemsEditor, useDepartments } from '../tasks/task-form';
 import { useRichTextLabels } from '../tasks/task-rich-text';
 import { moveItem, newKey, type StageValues, type StepValues } from './template-document';
 import type { TemplateFormMethods } from './template-editor';
@@ -439,6 +440,9 @@ function TaskStepDialog({
   const titleInvalid = !step.title.trim();
   const dayInvalid = !step.dueDay || step.dueDay < 1 || step.dueDay > maxDay;
   const revisionLimit = step.revisionLimit ?? TASK_LIMITS.revisionLimit;
+  // Rule C7: the fields must fit the department's schema before the template is saved.
+  const briefCheck = departmentBriefFields(step.department, step.briefFields);
+  const briefProblem = 'problem' in briefCheck ? briefCheck.problem : null;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -451,7 +455,7 @@ function TaskStepDialog({
             // The dialog sits in the template's form: React bubbles the submit through the portal.
             event.stopPropagation();
             setTried(true);
-            if (titleInvalid || dayInvalid) return;
+            if (titleInvalid || dayInvalid || briefProblem) return;
             onSave({ ...step, title: step.title.trim() });
           }}
         >
@@ -552,7 +556,7 @@ function TaskStepDialog({
               <FieldLabel id={ids.estimate} render={<span />}>
                 {t('tasks.subtasks.estimate')}
               </FieldLabel>
-              <EstimateSelect
+              <EstimateInput
                 value={step.estimateMinutes}
                 onChange={(value) => set('estimateMinutes', value)}
                 labelledBy={ids.estimate}
@@ -637,6 +641,7 @@ function TaskStepDialog({
             department={step.department}
             value={step.briefFields}
             onChange={(value) => set('briefFields', value)}
+            invalid={tried ? briefProblem : null}
           />
           <ItemsEditor
             label={t('tasks.form.criteria')}

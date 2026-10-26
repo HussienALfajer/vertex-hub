@@ -203,6 +203,15 @@ test('Create now confirms the readiness warnings before saving (rule C5)', async
   expect(api.created()).toMatchObject({ title: 'بانر سريع', subtasks: [] });
 });
 
+test('a wrong brief field shows its error on the field (rule C7)', async ({ page }) => {
+  await mockApi(page, { signedIn: true, me: accountManagerMe });
+  await page.goto('/tasks/new');
+  // Design is the account manager's own department: its brief fields show.
+  await page.getByLabel(ar.tasks.brief.fields.colors).fill('red');
+  await page.getByRole('button', { name: ar.tasks.wizard.createNow }).click();
+  await expect(page.getByText(ar.tasks.briefFields.errors.colors)).toBeVisible();
+});
+
 test('starting from a task template fills every step with dates from the start day (rule D2)', async ({
   page,
 }) => {
