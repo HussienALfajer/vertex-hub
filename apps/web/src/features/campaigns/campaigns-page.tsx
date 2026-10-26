@@ -559,7 +559,11 @@ export function CampaignsTable({
               </span>
             </TableCell>
             <TableCell>
-              <PersonName name={campaign.owner.name} archived={campaign.owner.archived} />
+              <PersonName
+                name={campaign.owner.name}
+                imageId={campaign.owner.imageId}
+                archived={campaign.owner.archived}
+              />
             </TableCell>
             <TableCell>
               <span className="flex flex-col gap-1">
@@ -702,7 +706,10 @@ function WalletsTable({ wallets }: { wallets: WalletSummary[] }) {
               </span>
             </TableCell>
             <TableCell>
-              <PersonName name={wallet.accountManager.name} />
+              <PersonName
+                name={wallet.accountManager.name}
+                imageId={wallet.accountManager.imageId}
+              />
             </TableCell>
             <TableCell className="text-end">
               <Money minor={wallet.depositedMinor} currency="USD" />

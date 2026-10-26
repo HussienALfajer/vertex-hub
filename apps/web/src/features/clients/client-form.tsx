@@ -31,6 +31,7 @@ import { Controller, type UseFormReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { imageSrc } from '../../lib/images';
 import { accountManagersQuery, invitedAccountManagersQuery, sectorsQuery } from './clients.queries';
 
 export type ClientFormMethods = UseFormReturn<CreateClientInput, unknown, CreateClient>;
@@ -137,7 +138,7 @@ export function AccountManagerField({
   current,
 }: {
   form: ClientFormMethods;
-  current?: { id: string; name: string; archived: boolean };
+  current?: { id: string; name: string; imageId: string | null; archived: boolean };
 }) {
   const { t } = useTranslation();
   const active = useQuery(accountManagersQuery);
@@ -145,10 +146,16 @@ export function AccountManagerField({
   const error = form.formState.errors.accountManagerId;
 
   const options = [
-    ...(active.data?.items ?? []).map((user) => ({ id: user.id, name: user.name, note: null })),
+    ...(active.data?.items ?? []).map((user) => ({
+      id: user.id,
+      name: user.name,
+      imageId: user.imageId,
+      note: null,
+    })),
     ...(invited.data?.items ?? []).map((user) => ({
       id: user.id,
       name: user.name,
+      imageId: user.imageId,
       note: t('clients.form.invited'),
     })),
   ];
@@ -156,6 +163,7 @@ export function AccountManagerField({
     options.push({
       id: current.id,
       name: current.name,
+      imageId: current.imageId,
       note: current.archived ? t('clients.archivedBadge') : null,
     });
   }
@@ -181,7 +189,7 @@ export function AccountManagerField({
               {options.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
                   <span className="flex items-center gap-2">
-                    <Avatar name={option.name} size="sm" />
+                    <Avatar name={option.name} src={imageSrc(option.imageId, 'sm')} size="sm" />
                     {option.name}
                     {option.note && <Badge tone="outline">{option.note}</Badge>}
                   </span>

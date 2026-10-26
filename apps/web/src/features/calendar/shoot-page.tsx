@@ -199,7 +199,11 @@ function ShootHero({
             params={{ userId: shoot.lead.id }}
             className="font-medium hover:underline"
           >
-            <PersonName name={shoot.lead.name} archived={shoot.lead.archived} />
+            <PersonName
+              name={shoot.lead.name}
+              imageId={shoot.lead.imageId}
+              archived={shoot.lead.archived}
+            />
           </Link>
         </Fact>
         <Fact label={t('calendar.shoot.bookedBy')}>
@@ -410,7 +414,11 @@ function CrewSection({ shoot }: { shoot: ShootDetail }) {
               params={{ userId: member.user.id }}
               className="min-w-0 self-start font-medium hover:underline"
             >
-              <PersonName name={member.user.name} archived={member.user.archived} />
+              <PersonName
+                name={member.user.name}
+                imageId={member.user.imageId}
+                archived={member.user.archived}
+              />
             </Link>
             <span className="flex flex-wrap items-center gap-2 ps-8 text-muted-foreground">
               {t(`calendar.crewRoles.${member.role}`)}

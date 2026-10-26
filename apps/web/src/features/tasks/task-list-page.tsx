@@ -61,6 +61,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import {
   ALL,
   dayParam,
@@ -701,6 +702,7 @@ function TasksTable({
                   <span className="flex items-center gap-2">
                     <Avatar
                       name={task.assignee.name}
+                      src={imageSrc(task.assignee.imageId, 'sm')}
                       size="sm"
                       tone={task.assignee.archived ? 'muted' : 'brand'}
                     />

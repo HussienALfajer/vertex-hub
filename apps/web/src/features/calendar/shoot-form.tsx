@@ -66,6 +66,7 @@ import { errorMessage } from '../../lib/errors';
 import { focusAfterRemoval } from '../../lib/focus-after-removal';
 import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { formatPeriod } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { projectListQuery, projectQuery } from '../projects/projects.queries';
 import { lineName } from '../retainers/retainer-badges';
 import { retainerListQuery } from '../retainers/retainers.queries';
@@ -609,8 +610,12 @@ function WorkFields({
     placeholderData: undefined,
   });
   const clientItems = [
-    ...(scopeAll ? [{ value: INTERNAL, label: t('calendar.form.noClient') }] : []),
-    ...clients.map((option) => ({ value: option.id, label: option.name })),
+    ...(scopeAll ? [{ value: INTERNAL, label: t('calendar.form.noClient'), imageId: null }] : []),
+    ...clients.map((option) => ({
+      value: option.id,
+      label: option.name,
+      imageId: option.imageId,
+    })),
   ];
   const taskItems = [
     { value: NEW_TASK, label: t('calendar.form.newTask') },
@@ -651,7 +656,12 @@ function WorkFields({
                         <span className="text-muted-foreground">{item.label}</span>
                       ) : (
                         <span className="flex items-center gap-2">
-                          <Avatar name={item.label} shape="square" size="sm" />
+                          <Avatar
+                            name={item.label}
+                            src={imageSrc(item.imageId, 'sm')}
+                            shape="square"
+                            size="sm"
+                          />
                           {item.label}
                         </span>
                       )}
@@ -941,7 +951,11 @@ function CrewField({
   const users = useQuery(userListQuery({ pageSize: 100 }));
   // A member archived after the booking stays listed (rule 6) and is not in the active list.
   const people = [
-    ...(users.data?.items ?? []).map((user) => ({ id: user.id, name: user.name })),
+    ...(users.data?.items ?? []).map((user) => ({
+      id: user.id,
+      name: user.name,
+      imageId: user.imageId,
+    })),
     ...(shoot?.crew ?? []).filter(({ user }) => user.archived).map(({ user }) => user),
   ];
 
@@ -954,7 +968,11 @@ function CrewField({
           const taken = crew.filter((_, other) => other !== index).map((other) => other.userId);
           const items = people
             .filter((person) => !taken.includes(person.id))
-            .map((person) => ({ value: person.id, label: person.name }));
+            .map((person) => ({
+              value: person.id,
+              label: person.name,
+              imageId: person.imageId,
+            }));
           return (
             <li
               key={row.key}
@@ -975,7 +993,7 @@ function CrewField({
                   {items.map((item) => (
                     <SelectItem key={item.value} value={item.value}>
                       <span className="flex items-center gap-2">
-                        <Avatar name={item.label} size="sm" />
+                        <Avatar name={item.label} src={imageSrc(item.imageId, 'sm')} size="sm" />
                         {item.label}
                       </span>
                     </SelectItem>

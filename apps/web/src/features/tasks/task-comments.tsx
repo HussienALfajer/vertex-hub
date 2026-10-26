@@ -30,6 +30,7 @@ import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { everyPage } from '../../lib/every-page';
 import { formatDateTime } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { userListQuery } from '../users/users.queries';
 import {
   EMPTY_DRAFT,
@@ -138,7 +139,11 @@ function CommentItem({
   };
   return (
     <li className="flex gap-3">
-      <Avatar name={comment.author.name} tone={comment.author.archived ? 'muted' : 'brand'} />
+      <Avatar
+        name={comment.author.name}
+        src={imageSrc(comment.author.imageId)}
+        tone={comment.author.archived ? 'muted' : 'brand'}
+      />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-medium">{comment.author.name}</span>
@@ -328,7 +333,7 @@ function Composer({
                 key={user.id}
                 onClick={() => mention({ id: user.id, name: user.name })}
               >
-                <Avatar name={user.name} size="sm" />
+                <Avatar name={user.name} src={imageSrc(user.imageId, 'sm')} size="sm" />
                 {user.name}
               </DropdownMenuItem>
             ))}

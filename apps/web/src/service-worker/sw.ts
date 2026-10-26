@@ -7,6 +7,7 @@ import {
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 // Only this key of the app's texts reaches the service worker (Vite's named JSON exports).
 import { push as texts } from '../i18n/locales/ar.json';
+import { IMAGE_CACHE, isImageRequest, isKeptImage } from './image-cache';
 import {
   appPath,
   notificationOptions,
@@ -19,7 +20,8 @@ import {
 /*
  * The service worker (F16 rules A2, A4, A8, A10, A11, A14; ADR 0036), built by vite-plugin-pwa. It
  * precaches the app shell, answers the app's pages with it offline, and shows pushes. API
- * responses never go through it: the app's own cache keeps what may be read offline (rule A5).
+ * responses never go through it, except images (F01C rule 13): the app's own cache keeps what may
+ * be read offline (rule A5).
  */
 
 declare const self: ServiceWorkerGlobalScope & {
@@ -35,6 +37,19 @@ const shell = 'index.html';
 if (manifest.some((entry) => (typeof entry === 'string' ? entry : entry.url) === shell)) {
   registerRoute(new NavigationRoute(createHandlerBoundToURL(shell), { denylist: [/^\/api\//] }));
 }
+
+// F01C rule 13: photos and logos cache-first; a request the network cannot answer fails as before.
+registerRoute(
+  ({ url, request }) => isImageRequest(url, request.method, self.location.origin),
+  async ({ request }) => {
+    const cache = await caches.open(IMAGE_CACHE);
+    const kept = await cache.match(request);
+    if (kept) return kept;
+    const response = await fetch(request);
+    if (isKeptImage(response)) await cache.put(request, response.clone());
+    return response;
+  },
+);
 
 // Rule A6: the app asks before a waiting version takes over.
 self.addEventListener('message', (event) => {

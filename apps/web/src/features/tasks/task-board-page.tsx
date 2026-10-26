@@ -36,6 +36,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { idParam, listParam } from '../../lib/search-params';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
@@ -447,6 +448,7 @@ function BoardCard({
                 <span className="flex">
                   <Avatar
                     name={task.assignee.name}
+                    src={imageSrc(task.assignee.imageId, 'sm')}
                     size="sm"
                     tone={task.assignee.archived ? 'muted' : 'brand'}
                   />

@@ -183,7 +183,7 @@ None. Every decision above was taken by the owner on 2026-10-25 or follows from 
   5. Give a project its own image, then remove it: it returns to the client's logo.
   6. Render a new quote PDF and a statement for that client: the logo sits beside the client's name; the Vertex logo is unchanged. An older invoice PDF has no logo.
   7. As B, check in at the entrance screen: the greeting shows B's photo.
-  8. Try uploading a 15 MB image: refused as too large; a GIF: refused as not allowed.
+  8. Upload a 15 MB phone photo: the browser crops and downsizes it, so it is saved (edge case 11: the 10 MB limit applies to the uploaded square); a GIF is refused as not allowed, before anything is uploaded (implementation, 2026-10-25).
 - Tests:
   - API (`apps/api/test/images.test.ts`): every route: success, 401, 403 (another user's photo without `users.manage`; the Operations manager on a General Manager; a client, project or retainer outside scope), 404 (unknown, archived and failed images on the serving route; records the actor cannot read). Upload once and only by the uploader, type, size and minimum side, `BRAND_FILE_NOT_FOUND` (another client's logo, a non-logo brand file), archived records, replacement archives the old row and keeps one current image under concurrent sets, remove as a no-op, the project and retainer fallback in references, `hasImage` filter, pending served with `no-store` and ready with `immutable`, the notifications (recipient, never the actor, merging) and audit entries.
   - Jobs: `files.preview` renders `sm` and `md` for a pending image, centre-crops a non-square one, keeps transparency, sets `failed` on a broken image after 3 attempts.

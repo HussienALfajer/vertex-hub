@@ -73,7 +73,11 @@ export function TaskShootSection({ task }: { task: TaskDetail }) {
             </Row>
             <Row label={t('calendar.shoot.location')}>{shoot.location}</Row>
             <Row label={t('calendar.shoot.lead')}>
-              <PersonName name={shoot.lead.name} archived={shoot.lead.archived} />
+              <PersonName
+                name={shoot.lead.name}
+                imageId={shoot.lead.imageId}
+                archived={shoot.lead.archived}
+              />
             </Row>
           </dl>
         </div>

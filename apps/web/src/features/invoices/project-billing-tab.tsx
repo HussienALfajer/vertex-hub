@@ -266,7 +266,7 @@ function ExpensesSection({ billing }: { billing: ProjectBilling }) {
                   <Money minor={expense.usdMinor} currency="USD" />
                 </TableCell>
                 <TableCell>
-                  <PersonName name={expense.loggedBy.name} />
+                  <PersonName name={expense.loggedBy.name} imageId={expense.loggedBy.imageId} />
                 </TableCell>
                 {manage && (
                   <TableCell className="text-end">

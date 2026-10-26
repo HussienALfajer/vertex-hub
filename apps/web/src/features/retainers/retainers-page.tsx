@@ -50,6 +50,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, canAll, scopesOf, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import {
   ALL,
   flagParam,
@@ -584,6 +585,7 @@ function RetainersTable({ retainers, archived }: { retainers: Retainer[]; archiv
               >
                 <Avatar
                   name={retainer.client.name}
+                  src={imageSrc(retainer.imageId)}
                   shape="square"
                   tone={archived || retainer.status === 'ended' ? 'muted' : 'brand'}
                 />
@@ -594,7 +596,10 @@ function RetainersTable({ retainers, archived }: { retainers: Retainer[]; archiv
               </Link>
             </TableCell>
             <TableCell>
-              <PersonName name={retainer.accountManager.name} />
+              <PersonName
+                name={retainer.accountManager.name}
+                imageId={retainer.accountManager.imageId}
+              />
             </TableCell>
             <TableCell>
               <DepartmentChips codes={retainer.departments} max={2} />

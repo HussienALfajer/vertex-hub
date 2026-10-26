@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { APPROVAL_REQUEST_STATES, type MeResponse } from '@vertex-hub/contracts';
+import { APPROVAL_REQUEST_STATES, type MeResponse, type PersonRef } from '@vertex-hub/contracts';
 import {
   Avatar,
   Badge,
@@ -23,6 +23,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
+import { imageSrc } from '../../lib/images';
 import { flagParam, idParam, listParam, oneOfParam, pageParam } from '../../lib/search-params';
 import { postListQuery } from '../content/content.queries';
 import { formatPublish, PostPlatforms } from '../content/post-parts';
@@ -185,9 +186,14 @@ function MedicalQueue() {
       />
     );
   }
-  const person = (person: { id: string; name: string; archived: boolean }) => (
+  const person = (person: PersonRef & { archived: boolean }) => (
     <span className="flex items-center gap-2">
-      <Avatar name={person.name} size="sm" tone={person.archived ? 'muted' : 'brand'} />
+      <Avatar
+        name={person.name}
+        src={imageSrc(person.imageId, 'sm')}
+        size="sm"
+        tone={person.archived ? 'muted' : 'brand'}
+      />
       <span className="flex flex-wrap items-center gap-2">
         {person.name}
         {person.id === me.user.id && <Badge tone="outline">{t('approvals.medical.own')}</Badge>}

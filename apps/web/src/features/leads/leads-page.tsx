@@ -83,6 +83,7 @@ import { LoadError } from '../../components/load-error';
 import { can, canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatDate, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { ALL, idParam, listParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { useReturnFocus } from '../../lib/use-return-focus';
@@ -787,6 +788,7 @@ function LeadCard({
           <TooltipTrigger render={<span className="flex" />}>
             <Avatar
               name={lead.owner.name}
+              src={imageSrc(lead.owner.imageId, 'sm')}
               size="sm"
               tone={lead.owner.archived ? 'muted' : 'brand'}
             />
@@ -1044,6 +1046,7 @@ function LeadsTable({
                 <span className="flex items-center gap-2">
                   <Avatar
                     name={lead.owner.name}
+                    src={imageSrc(lead.owner.imageId, 'sm')}
                     size="sm"
                     tone={lead.owner.archived ? 'muted' : 'brand'}
                   />

@@ -55,6 +55,7 @@ import {
   formatNumber,
   formatTime,
 } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { useReturnFocus } from '../../lib/use-return-focus';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { HealthcareBadge } from '../clients/client-badges';
@@ -375,6 +376,7 @@ function Header({
               <Fact label={t('leads.form.owner')}>
                 <Avatar
                   name={lead.owner.name}
+                  src={imageSrc(lead.owner.imageId, 'sm')}
                   size="sm"
                   tone={lead.owner.archived ? 'muted' : 'brand'}
                 />
@@ -696,7 +698,11 @@ function ActivitySection({
                             {formatTime(note.occurredAt)}
                           </time>
                           <span className="ms-auto flex items-center gap-2">
-                            <Avatar name={note.author.name} size="sm" />
+                            <Avatar
+                              name={note.author.name}
+                              src={imageSrc(note.author.imageId, 'sm')}
+                              size="sm"
+                            />
                             <span className="text-muted-foreground">{note.author.name}</span>
                             {(canEdit || canArchive) && (
                               <DropdownMenu>

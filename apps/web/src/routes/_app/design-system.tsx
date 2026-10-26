@@ -77,6 +77,7 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  Slider,
   StatusBadge,
   Switch,
   Table,
@@ -281,6 +282,13 @@ function DesignSystemPage() {
               aria-label={t('designSystem.progressUpload')}
             />
           ))}
+          <Slider
+            thumbLabel={t('designSystem.sliderZoom')}
+            defaultValue={1.5}
+            min={1}
+            max={4}
+            step={0.01}
+          />
         </div>
       </Section>
 

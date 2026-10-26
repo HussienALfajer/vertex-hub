@@ -73,12 +73,14 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { ClientApprovalsTab } from '../approvals/client-approvals-tab';
 import { ClientAdsTab, hasCampaignAccess } from '../campaigns/client-ads-tab';
 import { ClientContentTab } from '../content/client-content-tab';
 import { ClientFilesTab } from '../files/client-files-tab';
 import { type FileLibrarySearch, parseFileLibrarySearch } from '../files/library-search';
+import { ChooseLogoTile, ImageActions } from '../images/image-actions';
 import { ClientInvoicesTab } from '../invoices/client-invoices-tab';
 import { ConvertedFromLead } from '../leads/converted-from-lead';
 import { ClientProjectsTab } from '../projects/client-projects-tab';
@@ -460,12 +462,17 @@ function ClientHero({
     <section className="relative overflow-hidden rounded-lg border border-border bg-surface">
       <AscentLines className="absolute inset-y-0 end-0 hidden h-full w-32 text-border md:block" />
       <div className="relative flex flex-col gap-6 p-6 xl:flex-row xl:items-center">
-        <Avatar
-          name={client.tradeName}
-          shape="square"
-          size="xl"
-          tone={archived || client.status === 'ended' ? 'muted' : 'brand'}
-        />
+        {editable && !client.imageId ? (
+          <ChooseLogoTile clientId={client.id} />
+        ) : (
+          <Avatar
+            name={client.tradeName}
+            src={imageSrc(client.imageId, 'xl')}
+            shape="square"
+            size="xl"
+            tone={archived || client.status === 'ended' ? 'muted' : 'brand'}
+          />
+        )}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <h1 ref={heading} tabIndex={-1} className="min-w-0 text-2xl font-bold wrap-anywhere">
@@ -484,6 +491,7 @@ function ClientHero({
               >
                 <Avatar
                   name={client.accountManager.name}
+                  src={imageSrc(client.accountManager.imageId, 'sm')}
                   size="sm"
                   tone={client.accountManager.archived ? 'muted' : 'brand'}
                 />
@@ -503,6 +511,9 @@ function ClientHero({
             </HeroFact>
           </dl>
           <ConvertedFromLead clientId={client.id} />
+          {editable && client.imageId && (
+            <ImageActions subject={{ type: 'client', id: client.id }} imageId={client.imageId} />
+          )}
         </div>
         {(editable || (scopeAll && !archived) || reportReader) && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">

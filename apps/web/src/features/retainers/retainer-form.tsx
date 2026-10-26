@@ -48,6 +48,7 @@ import { ApiError } from '../../lib/api/client';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { focusAfterRemoval } from '../../lib/focus-after-removal';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { departmentListQuery } from '../departments/departments.queries';
 import { DeliverableIcon, lineName } from './retainer-badges';
@@ -148,7 +149,12 @@ export function ClientField({
               {clients.map((client) => (
                 <SelectItem key={client.id} value={client.id}>
                   <span className="flex items-center gap-2">
-                    <Avatar name={client.tradeName} shape="square" size="sm" />
+                    <Avatar
+                      name={client.tradeName}
+                      src={imageSrc(client.imageId, 'sm')}
+                      shape="square"
+                      size="sm"
+                    />
                     {client.tradeName}
                     {client.status !== 'active' && <ClientStatusBadge status={client.status} />}
                   </span>

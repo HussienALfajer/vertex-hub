@@ -402,7 +402,7 @@ function QuotesTable({ quotes }: { quotes: Quote[] }) {
               <Recipient recipient={quote.recipient} />
             </TableCell>
             <TableCell>
-              <PersonName name={quote.accountManager.name} />
+              <PersonName name={quote.accountManager.name} imageId={quote.accountManager.imageId} />
             </TableCell>
             <TableCell>
               <span className="flex flex-wrap items-center gap-1.5">

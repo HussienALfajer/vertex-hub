@@ -21,6 +21,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { scopesOf } from '../../lib/auth';
 import { formatCalendarDate, formatTimeOfDay } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { fileThumbnailUrl } from '../files/files.queries';
 
 /*
@@ -275,6 +276,7 @@ export function PostRows({
               <span className="flex items-center gap-1.5 text-sm">
                 <Avatar
                   name={post.responsible.name}
+                  src={imageSrc(post.responsible.imageId, 'sm')}
                   size="sm"
                   tone={post.responsible.archived ? 'muted' : 'brand'}
                 />

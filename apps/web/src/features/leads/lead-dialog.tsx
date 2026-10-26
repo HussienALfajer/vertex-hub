@@ -50,6 +50,7 @@ import { MoneyInput } from '../../components/money-input';
 import { ApiError } from '../../lib/api/client';
 import { can, canAll, useMe } from '../../lib/auth';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { imageSrc } from '../../lib/images';
 import { useDebouncedValue } from '../../lib/use-search-text';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { sectorsQuery } from '../clients/clients.queries';
@@ -682,7 +683,7 @@ function DuplicatePanel({
             )}
             <LeadStageBadge stage={match.stage} />
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <Avatar name={match.owner.name} size="sm" />
+              <Avatar name={match.owner.name} src={imageSrc(match.owner.imageId, 'sm')} size="sm" />
               {match.owner.name}
             </span>
           </li>
@@ -704,7 +705,11 @@ function DuplicatePanel({
             )}
             <ClientStatusBadge status={match.status} />
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <Avatar name={match.accountManager.name} size="sm" />
+              <Avatar
+                name={match.accountManager.name}
+                src={imageSrc(match.accountManager.imageId, 'sm')}
+                size="sm"
+              />
               {match.accountManager.name}
             </span>
           </li>

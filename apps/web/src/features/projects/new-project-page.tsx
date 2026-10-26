@@ -20,6 +20,7 @@ import { FormSection } from '../../components/form-section';
 import { UnsavedChangesGuard } from '../../components/unsaved-changes-guard';
 import { useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { formatMoney } from '../../lib/money';
 import { idParam } from '../../lib/search-params';
 import { stageMilestones } from '../templates/template-document';
@@ -221,6 +222,7 @@ function Preview({
       <div className="relative flex items-center gap-3">
         <Avatar
           name={client?.tradeName ?? t('projects.form.client')}
+          src={imageSrc(client?.imageId, 'lg')}
           shape="square"
           size="lg"
           tone={client ? 'brand' : 'muted'}
@@ -247,7 +249,7 @@ function Preview({
           <dt className="text-xs text-muted-foreground">{t('projects.form.projectManager')}</dt>
           <dd className="font-medium">
             {manager ? (
-              <PersonName name={manager.name} />
+              <PersonName name={manager.name} imageId={manager.imageId} />
             ) : (
               <span className="font-normal text-muted-foreground">
                 {t('projects.form.projectManagerPlaceholder')}

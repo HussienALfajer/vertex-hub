@@ -33,6 +33,7 @@ import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
@@ -123,7 +124,12 @@ export function ClientField({
               {clients.map((client) => (
                 <SelectItem key={client.id} value={client.id}>
                   <span className="flex items-center gap-2">
-                    <Avatar name={client.tradeName} shape="square" size="sm" />
+                    <Avatar
+                      name={client.tradeName}
+                      src={imageSrc(client.imageId, 'sm')}
+                      shape="square"
+                      size="sm"
+                    />
                     {client.tradeName}
                     {client.status !== 'active' && <ClientStatusBadge status={client.status} />}
                   </span>
@@ -180,6 +186,7 @@ export function DescriptionField({ form }: { form: ProjectFormMethods }) {
 export function useProjectManagerOptions(current?: {
   id: string;
   name: string;
+  imageId: string | null;
   archived: boolean;
 }) {
   const { t } = useTranslation();
@@ -194,11 +201,13 @@ export function useProjectManagerOptions(current?: {
     ...(active.data?.items ?? []).map((user) => ({
       id: user.id,
       name: user.name,
+      imageId: user.imageId,
       note: user.title,
     })),
     ...(invited.data?.items ?? []).map((user) => ({
       id: user.id,
       name: user.name,
+      imageId: user.imageId,
       note: t('projects.form.invited'),
     })),
   ];
@@ -206,6 +215,7 @@ export function useProjectManagerOptions(current?: {
     options.push({
       id: current.id,
       name: current.name,
+      imageId: current.imageId,
       note: current.archived ? t('projects.archivedBadge') : null,
     });
   }
@@ -217,7 +227,7 @@ export function ProjectManagerField({
   current,
 }: {
   form: ProjectFormMethods;
-  current?: { id: string; name: string; archived: boolean };
+  current?: { id: string; name: string; imageId: string | null; archived: boolean };
 }) {
   const { t } = useTranslation();
   const options = useProjectManagerOptions(current);
@@ -242,7 +252,7 @@ export function ProjectManagerField({
               {options.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
                   <span className="flex items-center gap-2">
-                    <Avatar name={option.name} size="sm" />
+                    <Avatar name={option.name} src={imageSrc(option.imageId, 'sm')} size="sm" />
                     {option.name}
                     {option.note && (
                       <span className="text-sm text-muted-foreground">{option.note}</span>

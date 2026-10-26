@@ -199,7 +199,11 @@ function PostHero({
               params={{ userId: post.responsible.id }}
               className="font-medium hover:underline"
             >
-              <PersonName name={post.responsible.name} archived={post.responsible.archived} />
+              <PersonName
+                name={post.responsible.name}
+                imageId={post.responsible.imageId}
+                archived={post.responsible.archived}
+              />
             </Link>
             {!post.responsible.inScope && (
               <Badge tone="warning">

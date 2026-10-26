@@ -41,11 +41,13 @@ import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatDateTime, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { formatMoney } from '../../lib/money';
 import { idParam } from '../../lib/search-params';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
+import { ImageActions } from '../images/image-actions';
 import { ProjectBillingTab } from '../invoices/project-billing-tab';
 import { SourceQuotes } from '../quotes/source-quotes';
 import { ProjectTasksTab } from '../tasks/project-tasks-tab';
@@ -315,19 +317,25 @@ function ProjectHero({
       <AscentLines className="absolute inset-y-0 end-0 hidden h-full w-32 text-border md:block" />
       <div className="relative flex flex-col gap-6 p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
-          <Link
-            to="/clients/$clientId"
-            params={{ clientId: project.client.id }}
-            aria-label={project.client.name}
-            className="shrink-0 rounded-lg outline-offset-4"
-          >
-            <Avatar
-              name={project.client.name}
-              shape="square"
-              size="lg"
-              tone={muted ? 'muted' : 'brand'}
-            />
-          </Link>
+          <div className="flex shrink-0 flex-col items-start gap-1.5">
+            <Link
+              to="/clients/$clientId"
+              params={{ clientId: project.client.id }}
+              aria-label={project.client.name}
+              className="shrink-0 rounded-lg outline-offset-4"
+            >
+              <Avatar
+                name={project.client.name}
+                src={imageSrc(project.imageId, 'lg')}
+                shape="square"
+                size="lg"
+                tone={muted ? 'muted' : 'brand'}
+              />
+            </Link>
+            {!project.ownImageId && project.imageId && (
+              <span className="text-xs text-muted-foreground">{t('images.clientLogo')}</span>
+            )}
+          </div>
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <div className="flex flex-col gap-1">
               <Link
@@ -362,6 +370,7 @@ function ProjectHero({
                   >
                     <PersonName
                       name={project.projectManager.name}
+                      imageId={project.projectManager.imageId}
                       archived={project.projectManager.archived}
                     />
                   </Link>
@@ -375,6 +384,13 @@ function ProjectHero({
               </div>
               <SourceQuotes projectId={project.id} />
             </dl>
+            {project.permissions.canManage && !archived && (
+              <ImageActions
+                subject={{ type: 'project', id: project.id }}
+                imageId={project.ownImageId}
+                showsClientLogo={!!project.imageId}
+              />
+            )}
           </div>
           <ProjectActions
             project={project}

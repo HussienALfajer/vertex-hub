@@ -170,7 +170,11 @@ export function PostTasksSection({ post }: { post: PostDetail }) {
                   {departmentName(task.department)}
                   <span aria-hidden="true">·</span>
                   {task.assignee ? (
-                    <PersonName name={task.assignee.name} archived={task.assignee.archived} />
+                    <PersonName
+                      name={task.assignee.name}
+                      imageId={task.assignee.imageId}
+                      archived={task.assignee.archived}
+                    />
                   ) : (
                     t('tasks.unassigned')
                   )}

@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import type { Task } from '@vertex-hub/contracts';
 import { Avatar, cn } from '@vertex-hub/ui';
 import { useTranslation } from 'react-i18next';
+import { imageSrc } from '../../lib/images';
 import { useDepartmentNames } from '../projects/project-badges';
 import {
   BlockedBadge,
@@ -68,6 +69,7 @@ export function TaskRows({
                   <span className="flex items-center gap-1.5 text-sm">
                     <Avatar
                       name={task.assignee.name}
+                      src={imageSrc(task.assignee.imageId, 'sm')}
                       size="sm"
                       tone={task.assignee.archived ? 'muted' : 'brand'}
                     />

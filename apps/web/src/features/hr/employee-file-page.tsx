@@ -40,6 +40,7 @@ import { isMissing, LoadError } from '../../components/load-error';
 import { TabHeader } from '../../components/tab-header';
 import { can, useMe } from '../../lib/auth';
 import { formatDate, formatList, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { formatMoney } from '../../lib/money';
 import { monthParam } from '../../lib/search-params';
 import { OwnerDocumentsTab } from '../files/owner-documents-tab';
@@ -255,6 +256,7 @@ function FileHero({
       <AscentLines className="absolute inset-y-0 end-0 hidden h-full w-32 text-border md:block" />
       <Avatar
         name={file.name}
+        src={imageSrc(file.imageId, 'xl')}
         size="xl"
         tone={file.status === 'ended' ? 'muted' : 'brand'}
         className="ring-4 ring-muted"

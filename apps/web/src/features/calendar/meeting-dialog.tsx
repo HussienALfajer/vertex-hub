@@ -48,6 +48,7 @@ import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { focusFirstInvalid } from '../../lib/focus-first-invalid';
+import { imageSrc } from '../../lib/images';
 import { clientListQuery, clientQuery } from '../clients/clients.queries';
 import { userListQuery } from '../users/users.queries';
 import { conflictsQuery, useCreateMeeting, useUpdateMeeting } from './calendar.queries';
@@ -116,6 +117,8 @@ const PROBLEM_OF_CODE: Record<string, Problem> = {
 interface Person {
   id: string;
   name: string;
+  /** People only: contacts have no photo. */
+  imageId?: string | null;
 }
 
 function defaultsOf(meeting: MeetingDetail | undefined, me: string): MeetingFormValues {
@@ -206,7 +209,11 @@ function MeetingForm({ meeting, onClose }: { meeting?: MeetingDetail; onClose: (
   const users = useQuery(userListQuery({ pageSize: 100 }));
   // Someone archived after the meeting was set stays listed, and is not in the active list.
   const people: Person[] = [
-    ...(users.data?.items ?? []).map((user) => ({ id: user.id, name: user.name })),
+    ...(users.data?.items ?? []).map((user) => ({
+      id: user.id,
+      name: user.name,
+      imageId: user.imageId,
+    })),
     ...(meeting ? [meeting.organizer, ...meeting.attendees] : []).filter(
       (person) => person.archived,
     ),
@@ -218,11 +225,23 @@ function MeetingForm({ meeting, onClose }: { meeting?: MeetingDetail; onClose: (
     clientListQuery({ status: ['active', 'paused', 'ended'], pageSize: 100 }),
   );
   const clientItems = [
-    { value: INTERNAL, label: t('calendar.meetings.form.noClient') },
-    ...(clients.data?.items ?? []).map((item) => ({ value: item.id, label: item.tradeName })),
+    {
+      value: INTERNAL,
+      label: t('calendar.meetings.form.noClient'),
+      imageId: null as string | null,
+    },
+    ...(clients.data?.items ?? []).map((item) => ({
+      value: item.id,
+      label: item.tradeName,
+      imageId: item.imageId,
+    })),
   ];
   if (meeting?.client && !clientItems.some((item) => item.value === meeting.client?.id)) {
-    clientItems.push({ value: meeting.client.id, label: meeting.client.name });
+    clientItems.push({
+      value: meeting.client.id,
+      label: meeting.client.name,
+      imageId: meeting.client.imageId,
+    });
   }
   // No placeholder: another client's contacts must never be offered while these load.
   const picked = useQuery({ ...clientQuery(clientId ?? ''), enabled: !!clientId });
@@ -295,7 +314,7 @@ function MeetingForm({ meeting, onClose }: { meeting?: MeetingDetail; onClose: (
   const pending = form.formState.isSubmitting;
   const organizerItems = people
     .filter((person) => !attendeeIds.includes(person.id))
-    .map((person) => ({ value: person.id, label: person.name }));
+    .map((person) => ({ value: person.id, label: person.name, imageId: person.imageId }));
 
   return (
     <>
@@ -347,7 +366,12 @@ function MeetingForm({ meeting, onClose }: { meeting?: MeetingDetail; onClose: (
                         <span className="text-muted-foreground">{item.label}</span>
                       ) : (
                         <span className="flex items-center gap-2">
-                          <Avatar name={item.label} shape="square" size="sm" />
+                          <Avatar
+                            name={item.label}
+                            src={imageSrc(item.imageId, 'sm')}
+                            shape="square"
+                            size="sm"
+                          />
                           {item.label}
                         </span>
                       )}
@@ -445,7 +469,7 @@ function MeetingForm({ meeting, onClose }: { meeting?: MeetingDetail; onClose: (
                     {organizerItems.map((item) => (
                       <SelectItem key={item.value} value={item.value}>
                         <span className="flex items-center gap-2">
-                          <Avatar name={item.label} size="sm" />
+                          <Avatar name={item.label} src={imageSrc(item.imageId, 'sm')} size="sm" />
                           {item.label}
                         </span>
                       </SelectItem>

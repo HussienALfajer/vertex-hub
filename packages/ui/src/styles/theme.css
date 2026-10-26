@@ -141,6 +141,8 @@
   --destructive-text: var(--color-danger-700);
   --ring: var(--color-gold-500);
   --overlay: rgb(3 27 23 / 0.4);
+  /* Behind an avatar's image in both themes, so a transparent logo reads on it (F01C rule 12). */
+  --avatar-image: var(--color-white);
 
   --sidebar: var(--color-green-800);
   --sidebar-foreground: var(--color-neutral-100);
@@ -246,6 +248,7 @@
   --color-destructive-text: var(--destructive-text);
   --color-ring: var(--ring);
   --color-overlay: var(--overlay);
+  --color-avatar-image: var(--avatar-image);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);

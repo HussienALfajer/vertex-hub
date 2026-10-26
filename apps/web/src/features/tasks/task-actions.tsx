@@ -71,6 +71,7 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
+import { imageSrc } from '../../lib/images';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientQuery } from '../clients/clients.queries';
 import { assigneeLeaves, LeaveWarningDialog } from './leave-warning';
@@ -645,7 +646,13 @@ function EditTaskDialog({
   // The current client stays listed even when it has ended since (rule 7 keeps existing links).
   const clients = useClientOptions(
     task.client
-      ? { id: task.client.id, name: task.client.name, status: 'ended', accountManagerId: '' }
+      ? {
+          id: task.client.id,
+          name: task.client.name,
+          imageId: task.client.imageId,
+          status: 'ended',
+          accountManagerId: '',
+        }
       : null,
   );
   const request = task.clientRequest;
@@ -887,7 +894,7 @@ function ReassignDialog({
                 {members.map((member) => (
                   <SelectItem key={member.id} value={member.id}>
                     <span className="flex items-center gap-2">
-                      <Avatar name={member.name} size="sm" />
+                      <Avatar name={member.name} src={imageSrc(member.imageId, 'sm')} size="sm" />
                       {member.name}
                     </span>
                   </SelectItem>

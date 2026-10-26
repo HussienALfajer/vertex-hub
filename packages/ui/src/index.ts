@@ -33,6 +33,7 @@ export * from './components/rich-text';
 export * from './components/select';
 export * from './components/sheet';
 export * from './components/skeleton';
+export * from './components/slider';
 export * from './components/switch';
 export * from './components/table';
 export * from './components/tabs';

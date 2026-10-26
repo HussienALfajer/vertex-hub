@@ -20,8 +20,10 @@ import {
   notificationFor,
   OPEN_LINK_TOKEN,
   operationsManagerMe,
+  PORTRAIT_DATA_URL,
   PROJECTS_TODAY,
   plainAccountManagerMe,
+  portraitPng,
   screenshot,
   seedIds,
   VALID_LINK_TOKEN,
@@ -512,13 +514,78 @@ for (const colorScheme of ['light', 'dark'] as const) {
               tasksDueToday: 2,
               firstEventAt: '2026-10-21T10:00:00.000Z',
               workedMinutes: null,
-              photo: null,
+              photo: PORTRAIT_DATA_URL,
             },
           },
         });
         await page.goto('/kiosk');
-        await expect(page.getByTestId('attendance-greeting')).toBeVisible();
+        await expect(page.getByTestId('attendance-greeting').locator('img')).toBeVisible();
         await screenshot(page, testInfo, `kiosk-greeting-${size}-${colorScheme}`);
+      });
+
+      // F01C screens 1–7: the image dialog, My account, the team, client, project and task lists.
+      test(`images (${size})`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        const im = ar.images;
+        await mockApi(page, { signedIn: true, me: employeeMe });
+        await page.goto('/account');
+        await expect(page.getByRole('heading', { name: im.addPhoto.title })).toBeVisible();
+        await screenshot(page, testInfo, `images-account-card-${size}-${colorScheme}`);
+
+        await page.getByRole('button', { name: im.actions.user.add }).first().click();
+        const photo = page.getByRole('dialog', { name: im.dialog.title.user });
+        await expect(photo.getByRole('button', { name: im.dialog.choose })).toBeVisible();
+        await screenshot(page, testInfo, `images-dialog-choose-${size}-${colorScheme}`);
+        await photo.locator('input[type="file"]').setInputFiles({
+          name: 'moving.gif',
+          mimeType: 'image/gif',
+          buffer: Buffer.from('GIF89a'),
+        });
+        await expect(photo.getByRole('alert')).toBeVisible();
+        await screenshot(page, testInfo, `images-dialog-error-${size}-${colorScheme}`);
+        await photo.locator('input[type="file"]').setInputFiles({
+          name: 'portrait.png',
+          mimeType: 'image/png',
+          buffer: portraitPng(),
+        });
+        await expect(photo.getByRole('application', { name: im.dialog.frame })).toBeVisible();
+        await screenshot(page, testInfo, `images-dialog-crop-portrait-${size}-${colorScheme}`);
+        await photo.getByRole('button', { name: ar.common.save }).click();
+        await expect(photo).toBeHidden();
+        await expect(page.locator('main [data-slot="avatar"] img')).toBeVisible();
+        await screenshot(page, testInfo, `images-account-photo-${size}-${colorScheme}`);
+
+        await mockApi(page, { signedIn: true });
+        await page.goto(`/clients/${seedIds.jasmine}`);
+        await expect(page.getByRole('button', { name: im.actions.client.add })).toBeVisible();
+        await screenshot(page, testInfo, `images-client-choose-logo-${size}-${colorScheme}`);
+        await page.getByRole('button', { name: im.actions.client.add }).click();
+        const logo = page.getByRole('dialog', { name: im.dialog.title.client });
+        await logo.getByRole('tab', { name: im.dialog.tabs.brand }).click();
+        await expect(logo.getByRole('button', { name: 'شعار الياسمين' })).toBeVisible();
+        await screenshot(page, testInfo, `images-dialog-brand-files-${size}-${colorScheme}`);
+        await logo.getByRole('button', { name: 'شعار الياسمين' }).click();
+        await logo.getByRole('slider', { name: im.dialog.zoom }).focus();
+        await page.keyboard.press('Home');
+        await expect(logo.getByText(im.dialog.fitHint)).toBeVisible();
+        await screenshot(page, testInfo, `images-dialog-crop-logo-${size}-${colorScheme}`);
+
+        await mockApi(page, { signedIn: true, images: true });
+        await page.goto(`/clients/${seedIds.jasmine}`);
+        await expect(page.locator('main [data-slot="avatar"] img').first()).toBeVisible();
+        await screenshot(page, testInfo, `images-client-logo-${size}-${colorScheme}`);
+        await page.goto('/team?photo=without');
+        await expect(page.getByRole('row').filter({ hasText: 'كريم الزين' })).toBeVisible();
+        await screenshot(page, testInfo, `images-team-without-photo-${size}-${colorScheme}`);
+        await page.goto('/team');
+        await expect(page.locator('main [data-slot="avatar"] img').first()).toBeVisible();
+        await screenshot(page, testInfo, `images-team-${size}-${colorScheme}`);
+        await page.goto(`/projects/${seedIds.identityProject}`);
+        await expect(page.getByText(im.clientLogo, { exact: true })).toBeVisible();
+        await screenshot(page, testInfo, `images-project-client-logo-${size}-${colorScheme}`);
+        await page.goto('/tasks/list');
+        await expect(page.locator('main [data-slot="avatar"] img').first()).toBeVisible();
+        await screenshot(page, testInfo, `images-task-list-${size}-${colorScheme}`);
       });
 
       // F16 screens 9–14: announcements, with the home pin and the critical dialog.

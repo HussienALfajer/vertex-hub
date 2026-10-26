@@ -19,8 +19,9 @@ Three PRs, each accepted by the owner before the next starts. One session per PR
   - found: the audit screen's actor photo goes through `AuditActorPhotos`, which `auth` registers (`audit` cannot import `auth`); project and retainer details carry `ownImageId` for the A3 header
 
 ## PR A3 — web and E2E
-- [ ] `Avatar` takes `src` (white surface, initial while loading and on error); `imageSrc(imageId, size)` helper; `features/images/` dialog (choose, brand files tab, crop with fill/fit zoom, preview sizes, upload progress, errors) with crop-maths unit tests
-- [ ] My account (photo, "Add your photo" card), team profile and list ("Without photo" filter), client, project and retainer headers; `imageId` passed to every avatar (spec Screens 6); entrance screen photo; offline cache-first for image routes
-- [ ] audit screen: `imageId` and `brandVersionId` as reference fields (not shown as raw ids), `source` labelled for images
-- [ ] E2E: `f01c.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`
-- [ ] checks, reviewer, acceptance (spec steps 1–8), PR with auto-merge, `docs/ROADMAP.md`
+- [x] `Avatar` takes `src` (white surface, initial while loading and on error); `imageSrc(imageId, size)` helper; `features/images/` dialog (choose, brand files tab, crop with fill/fit zoom, preview sizes, upload progress, errors) with crop-maths unit tests
+- [x] My account (photo, "Add your photo" card), team profile and list ("Without photo" filter), client, project and retainer headers; `imageId` passed to every avatar (spec Screens 6); entrance screen photo; offline cache-first for image routes
+- [x] audit screen: `imageId` and `brandVersionId` as reference fields (not shown as raw ids), `source` labelled for images
+- [x] E2E: `f01c.spec.ts`, screenshots in both themes; mocks in `fixtures.ts`
+- [x] checks, reviewer, acceptance (spec steps 1–8, owner 2026-10-26), PR with auto-merge, `docs/ROADMAP.md`
+  - found: `Slider` added to `packages/ui` for the zoom; image routes cache-first in the service worker, erased with the offline cache on sign-out

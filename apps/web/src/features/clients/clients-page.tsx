@@ -37,6 +37,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { canAll, useMe } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { ALL, flagParam, idParam, listParam, pageParam, textParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
@@ -367,6 +368,7 @@ function ClientsTable({ clients, archived }: { clients: ClientResponse[]; archiv
                 >
                   <Avatar
                     name={client.tradeName}
+                    src={imageSrc(client.imageId)}
                     shape="square"
                     tone={archived || client.status === 'ended' ? 'muted' : 'brand'}
                   />
@@ -388,6 +390,7 @@ function ClientsTable({ clients, archived }: { clients: ClientResponse[]; archiv
                 <span className="flex items-center gap-2">
                   <Avatar
                     name={client.accountManager.name}
+                    src={imageSrc(client.accountManager.imageId, 'sm')}
                     size="sm"
                     tone={client.accountManager.archived ? 'muted' : 'brand'}
                   />

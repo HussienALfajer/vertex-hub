@@ -51,6 +51,7 @@ import { useMe } from '../../lib/auth';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { focusAfterRemoval } from '../../lib/focus-after-removal';
 import { formatCalendarDate, formatNumber, formatPeriod } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { useDebouncedValue } from '../../lib/use-search-text';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { clientListQuery, clientQuery } from '../clients/clients.queries';
@@ -279,6 +280,7 @@ export function DepartmentField({
 export interface AssigneeOption {
   id: string;
   name: string;
+  imageId: string | null;
   note: string | null;
 }
 
@@ -295,6 +297,7 @@ export function useDepartmentMembers(
   return (members.data?.items ?? []).map((user) => ({
     id: user.id,
     name: user.name,
+    imageId: user.imageId,
     note: user.title,
   }));
 }
@@ -313,7 +316,9 @@ export function useAssigneeOptions(
   if (!department) return { options: [], anyone: false };
   if (anyone) return { options: members, anyone };
   return {
-    options: memberOf(me, department) ? [{ id: me.user.id, name: me.user.name, note: null }] : [],
+    options: memberOf(me, department)
+      ? [{ id: me.user.id, name: me.user.name, imageId: me.user.imageId, note: null }]
+      : [],
     anyone,
   };
 }
@@ -350,7 +355,7 @@ export function AssigneeField({
               {options.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
                   <span className="flex items-center gap-2">
-                    <Avatar name={option.name} size="sm" />
+                    <Avatar name={option.name} src={imageSrc(option.imageId, 'sm')} size="sm" />
                     {option.name}
                     {option.note && (
                       <span className="text-sm text-muted-foreground">{option.note}</span>
@@ -374,6 +379,7 @@ export function AssigneeField({
 export interface ClientOption {
   id: string;
   name: string;
+  imageId: string | null;
   status: 'active' | 'paused' | 'ended';
   accountManagerId: string;
 }
@@ -384,6 +390,7 @@ export function useClientOptions(current?: ClientOption | null): ClientOption[] 
   const options: ClientOption[] = (clients.data?.items ?? []).map((client) => ({
     id: client.id,
     name: client.tradeName,
+    imageId: client.imageId,
     status: client.status as ClientOption['status'],
     accountManagerId: client.accountManager.id,
   }));
@@ -440,7 +447,12 @@ export function ClientField({ form, clients }: { form: TaskFormMethods; clients:
               {clients.map((client) => (
                 <SelectItem key={client.id} value={client.id}>
                   <span className="flex items-center gap-2">
-                    <Avatar name={client.name} shape="square" size="sm" />
+                    <Avatar
+                      name={client.name}
+                      src={imageSrc(client.imageId, 'sm')}
+                      shape="square"
+                      size="sm"
+                    />
                     {client.name}
                     {client.status !== 'active' && <ClientStatusBadge status={client.status} />}
                   </span>

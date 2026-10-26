@@ -14,6 +14,7 @@ import { CircleCheckBigIcon, UsersIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { useDepartmentNames } from '../projects/project-badges';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { departmentDashboardQuery } from '../reports/reports.queries';
@@ -193,7 +194,7 @@ function PeopleTable({ data }: { data: DepartmentDashboard }) {
                 <TableRow key={user.id}>
                   <TableCell>
                     <span className="flex items-center gap-3">
-                      <Avatar name={user.name} size="sm" />
+                      <Avatar name={user.name} src={imageSrc(user.imageId, 'sm')} size="sm" />
                       <span className="font-medium">{user.name}</span>
                     </span>
                   </TableCell>

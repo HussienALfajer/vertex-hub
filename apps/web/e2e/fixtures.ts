@@ -1,3 +1,4 @@
+import { deflateSync } from 'node:zlib';
 import type { Page, Route, TestInfo } from '@playwright/test';
 import {
   type AcceptPlan,
@@ -534,6 +535,62 @@ import { isDeclaredEndpoint, reportApiProblem } from './test';
  * types, and the API is exercised by its own integration tests (apps/api/test).
  */
 
+/** F01C: the stand-in pictures the image route serves, by what the image shows. */
+type ImageKind = 'portrait' | 'logo';
+
+const IMAGE_SVG: Record<ImageKind, string> = {
+  portrait:
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320"><rect width="320" height="320" fill="#c8bd9e"/><circle cx="160" cy="128" r="64" fill="#235b52"/><path d="M48 320 C48 230 104 200 160 200 C216 200 272 230 272 320 Z" fill="#235b52"/></svg>',
+  // Transparent around a wide mark, as a logo zoomed out to fit (rule 8).
+  logo: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320"><path d="M40 200 L110 110 L160 170 L200 130 L280 200 Z" fill="#004139"/><circle cx="236" cy="104" r="22" fill="#d8c3a0"/></svg>',
+};
+
+/** The greeting's photo (F01C rule 15), as the API sends it inside the greeting. */
+export const PORTRAIT_DATA_URL = `data:image/svg+xml;base64,${Buffer.from(IMAGE_SVG.portrait).toString('base64')}`;
+
+export const imageId = (n: number) => `01920000-0000-7000-a000-${n.toString().padStart(12, '0')}`;
+
+/**
+ * A portrait photo as the dialog's file input receives it: a PNG drawn row by row, a darker head
+ * on a sand background.
+ */
+export function portraitPng(width = 600, height = 800): Buffer {
+  const crc = (bytes: Buffer) => {
+    let c = ~0;
+    for (const byte of bytes) {
+      c ^= byte;
+      for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+    }
+    return ~c >>> 0;
+  };
+  const chunk = (type: string, data: Buffer) => {
+    const head = Buffer.alloc(8);
+    head.writeUInt32BE(data.length, 0);
+    head.write(type, 4, 'latin1');
+    const tail = Buffer.alloc(4);
+    tail.writeUInt32BE(crc(Buffer.concat([head.subarray(4), data])), 0);
+    return Buffer.concat([head, data, tail]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const rows = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const head = (x - width / 2) ** 2 + (y - height * 0.4) ** 2 < (width / 4) ** 2;
+      const offset = y * (width * 3 + 1) + 1 + x * 3;
+      rows.set(head ? [35, 91, 82] : [200, 189, 158], offset);
+    }
+  }
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(rows)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
 export const healthy: HealthResponse = {
   status: 'ok',
   checks: { database: 'up' },
@@ -984,6 +1041,8 @@ interface ClientRecord {
   accountManagerId: string;
   brandKit: BrandKit;
   archived: boolean;
+  /** F01C: the client's logo. */
+  imageId?: string | null;
   contacts: (Contact & { archived: boolean })[];
   platformAccounts: (PlatformAccount & { archived: boolean })[];
   billingName?: string | null;
@@ -1398,6 +1457,8 @@ interface MockOptions {
   leave?: boolean;
   /** The entrance screen this browser is (F17 part C); unpaired by default. */
   kiosk?: KioskMock;
+  /** F01C: photos for Sara, Omar and Layan and a logo for Al Yasmin; none by default. */
+  images?: boolean;
 }
 
 /** A P-256 public key as `GET /api/me/push/config` sends it (fake: no private key exists). */
@@ -1466,6 +1527,25 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   /** Rule 9: a session signed out from another device is refused at its next request. */
   const sessionOpen = () => sessions.some((s) => s.id === currentSession);
   const clients = clientsSeed();
+  /** F01C: the current images, by id; removed and replaced ones answer 404 (rule 11). */
+  const images = new Map<string, ImageKind>();
+  if (options.images) {
+    for (const [n, userId] of [id(1), id(2), id(3)].entries()) {
+      const user = users.find((u) => u.id === userId);
+      if (user) user.imageId = imageId(n + 1);
+      images.set(imageId(n + 1), 'portrait');
+    }
+    const jasmine = clients.find((c) => c.id === id(601));
+    if (jasmine) jasmine.imageId = imageId(10);
+    images.set(imageId(10), 'logo');
+  }
+  /** The session user carries their own photo (F01C). */
+  const syncMe = () => {
+    const self = users.find((u) => u.id === me.user.id);
+    if (self) me = { ...me, user: { ...me.user, imageId: self.imageId } };
+  };
+  syncMe();
+  let nextImage = 100;
   const clientsApi = clientRoutes({ users, clients, me: () => me });
   const projects = projectsSeed();
   const projectsApi = projectRoutes({ users, clients, projects, me: () => me });
@@ -1632,7 +1712,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     const head = users.find((u) => u.id === managers.get(d.id));
     return {
       ...d,
-      manager: head ? { id: head.id, name: head.name, imageId: null } : null,
+      manager: head ? { id: head.id, name: head.name, imageId: head.imageId } : null,
       memberCount: membersOf(d).length,
     };
   };
@@ -1642,7 +1722,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       .map((u) => ({
         id: u.id,
         name: u.name,
-        imageId: null,
+        imageId: u.imageId,
         title: u.title,
         isPrimary: u.departments.find((x) => x.id === d.id)?.isPrimary ?? false,
         status: u.status === 'invited' ? ('invited' as const) : ('active' as const),
@@ -1792,15 +1872,79 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       return route.fulfill({ status: 204 });
     }
 
+    // F01C: images (rule 11) and setting or removing one (rules 1 and 4).
+    const imageMatch = path.match(/^\/api\/images\/([^/]+)\/(sm|md)$/);
+    if (imageMatch && method === 'GET') {
+      const kind = images.get(imageMatch[1] ?? '');
+      if (!kind) return fail(route, 404, null);
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/svg+xml',
+        headers: { 'cache-control': 'private, max-age=31536000, immutable' },
+        body: IMAGE_SVG[kind],
+      });
+    }
+    const setMatch = path.match(/^\/api\/(users|clients|projects|retainers)\/([^/]+)\/image$/);
+    if (setMatch && (method === 'PUT' || method === 'DELETE')) {
+      const [, type, recordId] = setMatch;
+      const holds = (permission: Permission) =>
+        me.permissions.some((g) => g.permission === permission);
+      const record =
+        type === 'users'
+          ? users.find((u) => u.id === recordId)
+          : type === 'clients'
+            ? clients.find((c) => c.id === recordId)
+            : type === 'projects'
+              ? projects.find((p) => p.id === recordId)
+              : retainers.find((x) => x.id === recordId);
+      if (!record) return fail(route, 404, null);
+      const allowed =
+        type === 'users'
+          ? recordId === me.user.id ||
+            (holds('users.manage') &&
+              (!(record as UserResponse).roles?.includes('general_manager') ||
+                me.roles.includes('general_manager')))
+          : holds(type === 'clients' ? 'clients.manage' : 'projects.manage');
+      if (!allowed) return fail(route, 403, null);
+      const archived =
+        type === 'users'
+          ? (record as UserResponse).status === 'archived'
+          : (record as { archived: boolean }).archived;
+      if (archived) {
+        const codes = {
+          users: 'USER_ARCHIVED',
+          clients: 'CLIENT_ARCHIVED',
+          projects: 'PROJECT_ARCHIVED',
+          retainers: 'RETAINER_ARCHIVED',
+        } as const;
+        return fail(route, 409, codes[type as keyof typeof codes]);
+      }
+      if (record.imageId) images.delete(record.imageId);
+      if (method === 'DELETE') {
+        record.imageId = null;
+        syncMe();
+        return route.fulfill({ status: 204 });
+      }
+      const created = imageId(nextImage++);
+      images.set(created, type === 'users' ? 'portrait' : 'logo');
+      record.imageId = created;
+      syncMe();
+      return json(route, { id: created, status: 'pending' });
+    }
+
     // Users.
     if (path === '/api/users' && method === 'GET') {
       const status = url.searchParams.get('status') ?? 'active';
       const search = url.searchParams.get('search')?.toLowerCase();
       const departmentId = url.searchParams.get('departmentId');
       const role = url.searchParams.get('role');
-      // Like the API: status and assigned-role filters are for user managers only.
+      const hasImage = url.searchParams.get('hasImage');
+      // Like the API: status, assigned-role and photo filters are for user managers only.
       const userManager = me.permissions.some((g) => g.permission === 'users.manage');
-      if ((status !== 'active' || (role && role !== 'department_manager')) && !userManager) {
+      if (
+        (status !== 'active' || (role && role !== 'department_manager') || hasImage) &&
+        !userManager
+      ) {
         return fail(route, 403, null);
       }
       const items = users.filter(
@@ -1808,7 +1952,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
           u.status === status &&
           (!role || u.roles?.includes(role as NonNullable<UserResponse['roles']>[number])) &&
           (!search || u.name.toLowerCase().includes(search) || u.email?.includes(search)) &&
-          (!departmentId || u.departments.some((d) => d.id === departmentId)),
+          (!departmentId || u.departments.some((d) => d.id === departmentId)) &&
+          (!hasImage || (hasImage === 'true') === (u.imageId !== null)),
       );
       return json(route, { items, total: items.length, page: 1, pageSize: 25 });
     }
@@ -2017,6 +2162,7 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
   return {
     signInAs: (next) => {
       me = next;
+      syncMe();
       currentSession = openSession();
     },
     hardwareReports,
@@ -2062,11 +2208,11 @@ function clientRoutes({ users, clients, me }: ClientState) {
       accountManager: {
         id: c.accountManagerId,
         name: manager?.name ?? '',
-        imageId: null,
+        imageId: manager?.imageId ?? null,
         archived: manager?.status === 'archived',
       },
       hasApprovalContact: c.contacts.some((x) => !x.archived && x.hasFinalApproval),
-      imageId: null,
+      imageId: c.imageId ?? null,
     };
   };
   const strip = <T extends { archived: boolean }>({ archived: _, ...rest }: T) => rest;
@@ -2299,6 +2445,8 @@ interface ProjectRecord {
   cancelledAt: string | null;
   cancelReason: string | null;
   archived: boolean;
+  /** F01C: the project's own image; without one it shows the client's logo. */
+  imageId?: string | null;
   milestones: MilestoneRecord[];
   extraWork: ExtraWorkRecord[];
 }
@@ -2526,12 +2674,16 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
     return {
       id: p.id,
       name: p.name,
-      imageId: null,
-      client: { id: p.clientId, name: clientOf(p)?.tradeName ?? '', imageId: null },
+      imageId: p.imageId ?? clientOf(p)?.imageId ?? null,
+      client: {
+        id: p.clientId,
+        name: clientOf(p)?.tradeName ?? '',
+        imageId: clientOf(p)?.imageId ?? null,
+      },
       projectManager: {
         id: p.projectManagerId,
         name: manager?.name ?? '',
-        imageId: null,
+        imageId: manager?.imageId ?? null,
         archived: manager?.status === 'archived',
       },
       departments: p.departments,
@@ -2562,7 +2714,7 @@ function projectRoutes({ users, clients, projects, me }: ProjectState) {
       },
     }),
     permissions: permissions(p),
-    ownImageId: null,
+    ownImageId: p.imageId ?? null,
   });
   const extraWorkOf = (p: ProjectRecord, item: ExtraWorkRecord): ExtraWork => {
     const who = clientOf(p)?.contacts.find((x) => x.id === item.contactId);
@@ -2963,6 +3115,8 @@ interface RetainerRecord {
   currency: Currency;
   monthlyFeeMinor: number | null;
   archived: boolean;
+  /** F01C: the retainer's own image; without one it shows the client's logo. */
+  imageId?: string | null;
   deliverables: DeliverableRecord[];
   cycles: CycleRecord[];
   extraWork: ExtraWorkRecord[];
@@ -3512,12 +3666,12 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
     return {
       id: r.id,
       name: r.name,
-      imageId: null,
-      client: { id: r.clientId, name: client?.tradeName ?? '', imageId: null },
+      imageId: r.imageId ?? client?.imageId ?? null,
+      client: { id: r.clientId, name: client?.tradeName ?? '', imageId: client?.imageId ?? null },
       accountManager: {
         id: client?.accountManagerId ?? '',
         name: user(client?.accountManagerId ?? '')?.name ?? '',
-        imageId: null,
+        imageId: user(client?.accountManagerId ?? '')?.imageId ?? null,
       },
       departments: r.departments,
       status: r.status,
@@ -3560,7 +3714,7 @@ function retainerRoutes({ users, clients, retainers, me, contractSettings }: Ret
       },
     }),
     permissions: permissions(r),
-    ownImageId: null,
+    ownImageId: r.imageId ?? null,
   });
   const extraWorkOf = (r: RetainerRecord, item: ExtraWorkRecord): ExtraWork => {
     const who = clientOf(r)?.contacts.find((x) => x.id === item.contactId);
@@ -5173,7 +5327,7 @@ function taskRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: user(userId)?.name ?? '',
-    imageId: null,
+    imageId: user(userId)?.imageId ?? null,
   });
   const clientOf = (task: TaskRecord) => clients.find((c) => c.id === task.clientId);
   const projectOf = (task: TaskRecord) => projects.find((p) => p.id === task.projectId);
@@ -5306,7 +5460,7 @@ function taskRoutes({
         ? {
             id: assignee.id,
             name: assignee.name,
-            imageId: null,
+            imageId: assignee.imageId,
             archived: assignee.status === 'archived',
             inDepartment: assignee.departments.some((d) => d.code === task.department),
           }
@@ -5319,11 +5473,27 @@ function taskRoutes({
       overdue: overdue(task),
       blocked: blocked(task),
       client: clientOf(task)
-        ? { id: task.clientId as string, name: clientOf(task)?.tradeName ?? '', imageId: null }
+        ? {
+            id: task.clientId as string,
+            name: clientOf(task)?.tradeName ?? '',
+            imageId: clientOf(task)?.imageId ?? null,
+          }
         : null,
-      project: project ? { id: project.id, name: project.name, imageId: null } : null,
+      project: project
+        ? {
+            id: project.id,
+            name: project.name,
+            imageId: project.imageId ?? clientOf(task)?.imageId ?? null,
+          }
+        : null,
       milestone: milestoneRecord ? { id: milestoneRecord.id, name: milestoneRecord.name } : null,
-      retainer: retainer ? { id: retainer.id, name: retainer.name, imageId: null } : null,
+      retainer: retainer
+        ? {
+            id: retainer.id,
+            name: retainer.name,
+            imageId: retainer.imageId ?? clientOf(task)?.imageId ?? null,
+          }
+        : null,
       cycle: cycle
         ? { id: cycle.id, periodStart: cycle.periodStart, periodEnd: cycle.periodEnd }
         : null,
@@ -5422,7 +5592,6 @@ function taskRoutes({
       author: {
         ...person(comment.authorId),
         archived: author?.status === 'archived',
-        imageId: null,
       },
       body: comment.archived ? null : comment.body,
       mentions: mentionedUserIds(comment.body).map((userId) => ({
@@ -6324,7 +6493,7 @@ function taskRoutes({
           .map((u) => {
             const theirs = open.filter((t) => t.assigneeId === u.id);
             return {
-              user: { id: u.id, name: u.name, imageId: null },
+              user: { id: u.id, name: u.name, imageId: u.imageId },
               departments: u.departments
                 .map((d) => d.code)
                 .filter((code) => departments.includes(code)),
@@ -7035,7 +7204,7 @@ function contentRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const archivable = (userId: string) => ({
     ...person(userId),
@@ -7879,7 +8048,7 @@ function fileRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const holds = (permission: string, scope: string) =>
     me().permissions.some((g) => g.permission === permission && g.scopes.includes(scope as never));
@@ -8888,7 +9057,7 @@ function templateRunRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: user(userId)?.name ?? '',
-    imageId: null,
+    imageId: user(userId)?.imageId ?? null,
   });
   const clientScope = (clientId: string) =>
     holds('projects.manage', 'all') ||
@@ -10097,7 +10266,7 @@ function announcementRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const scopes = () =>
     me().permissions.find((granted) => granted.permission === 'announcements.manage')?.scopes ?? [];
@@ -11158,7 +11327,7 @@ function calendarRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const archivable = (userId: string) => ({
     ...person(userId),
@@ -12379,7 +12548,7 @@ function quoteRoutes({
   };
   const person = (userId: string) => {
     const user = users.find((u) => u.id === userId);
-    return { id: userId, name: user?.name ?? '', imageId: null };
+    return { id: userId, name: user?.name ?? '', imageId: user?.imageId ?? null };
   };
   const catalogPriceOf = (
     item: { priceUsdMinor: number; priceSypMinor: number | null },
@@ -13366,7 +13535,7 @@ function leadRules({ leads, quotes, clients, users, me }: LeadState) {
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   /** `leads.*` covering the lead (scope `assigned`: its owner), or the quote scopes (F03). */
   const covers = (permission: Permission, lead: LeadRecord) => {
@@ -14334,7 +14503,7 @@ function invoiceRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const named = (record: { id: string; name: string } | undefined) =>
     record ? { id: record.id, name: record.name, imageId: null } : null;
@@ -15399,7 +15568,7 @@ function campaignRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const clientName = (clientId: string) => clients.find((c) => c.id === clientId)?.tradeName ?? '';
 
@@ -15944,7 +16113,7 @@ function reportRoutes({ users, clients, projects, retainers, tasks, tasksApi, me
   const userNamed = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const open = () => tasks.filter((t) => !t.archived && isTaskOpen(t.status));
   const week = weekOf(PROJECTS_TODAY);
@@ -17212,7 +17381,7 @@ export function leaveSeed(users: UserResponse[]): LeaveState {
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const request = (
     n: number,
@@ -17374,7 +17543,7 @@ function leaveRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const scopesOf = (permission: Permission) =>
     me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
@@ -17910,7 +18079,7 @@ function attendanceRoutes({
   const person = (userId: string) => ({
     id: userId,
     name: users.find((u) => u.id === userId)?.name ?? '',
-    imageId: null,
+    imageId: users.find((u) => u.id === userId)?.imageId ?? null,
   });
   const fileOf = (userId: string) => files.find((f) => f.userId === userId);
 

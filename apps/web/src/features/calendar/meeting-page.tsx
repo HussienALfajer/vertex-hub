@@ -222,7 +222,11 @@ function MeetingHero({
             params={{ userId: meeting.organizer.id }}
             className="font-medium hover:underline"
           >
-            <PersonName name={meeting.organizer.name} archived={meeting.organizer.archived} />
+            <PersonName
+              name={meeting.organizer.name}
+              imageId={meeting.organizer.imageId}
+              archived={meeting.organizer.archived}
+            />
           </Link>
         </Fact>
         <Fact label={t('calendar.meetings.createdBy')}>
@@ -553,7 +557,7 @@ function AttendeesSection({ meeting }: { meeting: MeetingDetail }) {
               params={{ userId: person.id }}
               className="min-w-0 font-medium hover:underline"
             >
-              <PersonName name={person.name} archived={person.archived} />
+              <PersonName name={person.name} imageId={person.imageId} archived={person.archived} />
             </Link>
             {person.organizer && <Badge tone="gold">{t('calendar.meetings.organizer')}</Badge>}
           </li>

@@ -298,7 +298,11 @@ function Facts({ campaign }: { campaign: CampaignDetail }) {
         </span>
         <span className="flex items-center gap-2">
           {t('campaigns.ownerIs')}
-          <PersonName name={campaign.owner.name} archived={campaign.owner.archived} />
+          <PersonName
+            name={campaign.owner.name}
+            imageId={campaign.owner.imageId}
+            archived={campaign.owner.archived}
+          />
         </span>
       </span>
       {(engagement || task) && (
