@@ -78,12 +78,12 @@ import { assigneeLeaves, LeaveWarningDialog } from './leave-warning';
 import { TaskStatusBadge } from './task-badges';
 import {
   ApprovalFields,
-  BriefField,
   ClientField,
   ClientRequestFields,
   DueFields,
   EngagementFields,
   PriorityField,
+  RichBriefField,
   TitleField,
   taskFormFailure,
   useClientOptions,
@@ -606,6 +606,7 @@ function editValues(task: TaskDetail): CreateTaskInput {
     type: task.type,
     title: task.title,
     brief: task.brief ?? '',
+    briefDoc: task.briefDoc,
     department: task.department,
     assigneeId: task.assignee?.id ?? null,
     priority: task.priority,
@@ -673,7 +674,7 @@ function EditTaskDialog({
     const dirty = form.formState.dirtyFields;
     const changes: UpdateTask = {
       ...(dirty.title && { title: values.title }),
-      ...(dirty.brief && { brief: values.brief ?? null }),
+      ...(dirty.briefDoc && { briefDoc: values.briefDoc ?? null }),
       ...(dirty.priority && { priority: values.priority }),
       ...(dirty.dueDate && { dueDate: values.dueDate }),
       ...(dirty.dueTime && { dueTime: values.dueTime ?? null }),
@@ -723,7 +724,7 @@ function EditTaskDialog({
             <DialogTitle>{t('tasks.edit.title')}</DialogTitle>
           </DialogHeader>
           <TitleField form={form} />
-          <BriefField form={form} />
+          <RichBriefField form={form} />
           <PriorityField form={form} />
           <DueFields form={form} allowPast />
           {task.type === 'work' && <ClientField form={form} clients={clients} />}

@@ -8,6 +8,7 @@ import {
   ArrowRightIcon,
   BanIcon,
   HistoryIcon,
+  ListChecksIcon,
   LockIcon,
   ReceiptTextIcon,
   StethoscopeIcon,
@@ -27,22 +28,28 @@ import { FollowButton } from '../notifications/follow-button';
 import { PersonName, useDepartmentNames } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { TaskTemplateOrigin } from '../templates/template-runs';
-import { focusTarget, TaskActions, type TaskFocus } from './task-actions';
+import { focusTarget, TaskActions, type TaskFocus, targetsOf } from './task-actions';
 import {
   BlockedBadge,
   formatDue,
   NotInDepartmentBadge,
+  OpenQuestionsBadge,
   OverLimitBadge,
   PriorityBadge,
+  SubtaskOfBadge,
+  SubtaskProgress,
   TaskArchivedBadge,
   TaskOverdueBadge,
   TaskStatusBadge,
 } from './task-badges';
+import { BriefSection } from './task-brief';
 import { CommentsSection } from './task-comments';
+import { CriteriaSection } from './task-criteria';
 import { TaskFilesSection } from './task-files';
 import { ChecklistSection, DependenciesSection, LinksSection, TaskSection } from './task-parts';
 import { ClientResponsesSection, ClientTextSection, ReviewHistorySection } from './task-review';
 import { RevisionsSection } from './task-revisions';
+import { HandoverNoteSection, SubtasksSection } from './task-subtasks';
 import { taskQuery, useArchiveTask, useRestoreTask } from './tasks.queries';
 
 export function TaskPage({ taskId }: { taskId: string }) {
@@ -97,16 +104,21 @@ function TaskView({ task }: { task: TaskDetail }) {
     <>
       <TaskHero task={task} focus={focus} onArchive={() => setConfirming('archive')} />
       <Banners task={task} restoreRef={restoreButton} onRestore={() => setConfirming('restore')} />
+      <SubmitHint task={task} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        {/* F06B rule B12: brief, subtasks, discussion, then files, criteria and checklist. */}
         <div className="flex min-w-0 flex-col gap-6">
           <BriefSection task={task} />
+          <HandoverNoteSection task={task} />
+          <SubtasksSection task={task} />
+          <CommentsSection task={task} />
           {(task.client || task.clientText) && <ClientTextSection task={task} />}
           <TaskFilesSection task={task} />
+          <CriteriaSection task={task} />
           <ChecklistSection task={task} />
           <ReviewHistorySection task={task} />
           <ClientResponsesSection task={task} />
           <RevisionsSection task={task} />
-          <CommentsSection task={task} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
           {task.postId && <TaskPostSection postId={task.postId} />}
@@ -195,6 +207,11 @@ function TaskHero({
               </>
             )}
           </p>
+          {task.parent && (
+            <div className="flex">
+              <SubtaskOfBadge parent={task.parent} />
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <h1 ref={focus.heading} tabIndex={-1} className="text-2xl font-bold">
               {task.title}
@@ -209,7 +226,9 @@ function TaskHero({
             {task.overdue && <TaskOverdueBadge />}
             {task.blocked && <BlockedBadge />}
             {task.overLimitPending && <OverLimitBadge />}
+            <OpenQuestionsBadge open={task.openQuestions} />
             {archived && <TaskArchivedBadge />}
+            {task.progress && <SubtaskProgress progress={task.progress} bar />}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -333,16 +352,33 @@ function Banners({
   );
 }
 
-function BriefSection({ task }: { task: TaskDetail }) {
+/**
+ * F06B rules A8 and C6: the move to internal review is refused while a criterion is unticked or a
+ * subtask is not delivered; the page says so before the button is pressed.
+ */
+function SubmitHint({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
+  const submits = targetsOf(task).some(
+    (target) => target.move === 'submit' || target.move === 'resubmit',
+  );
+  if (!submits || task.readOnly) return null;
+  const criteria = task.criteria.filter((item) => !item.done).length;
+  const subtasks = task.subtasks.filter(
+    (subtask) => subtask.status !== 'delivered' && subtask.status !== 'cancelled',
+  ).length;
+  if (criteria === 0 && subtasks === 0) return null;
   return (
-    <TaskSection title={t('tasks.page.brief')}>
-      {task.brief ? (
-        <p className="max-w-prose text-base whitespace-pre-line">{task.brief}</p>
-      ) : (
-        <p className="text-sm text-muted-foreground">{t('tasks.page.noBrief')}</p>
-      )}
-    </TaskSection>
+    <Callout
+      tone="info"
+      icon={<ListChecksIcon />}
+      title={t('tasks.page.submitBlockedTitle')}
+      description={[
+        criteria > 0 && t('tasks.page.criteriaOpen', { n: formatNumber(criteria) }),
+        subtasks > 0 && t('tasks.page.subtasksOpen', { n: formatNumber(subtasks) }),
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    />
   );
 }
 

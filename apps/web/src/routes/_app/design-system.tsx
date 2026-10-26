@@ -20,6 +20,7 @@ import {
   AscentMeter,
   Autocomplete,
   Avatar,
+  Badge,
   Button,
   CalendarDay,
   CalendarGrid,
@@ -70,6 +71,7 @@ import {
   RadioGroup,
   type RichTextDoc,
   RichTextEditor,
+  type RichTextMentions,
   RichTextView,
   Select,
   SelectContent,
@@ -112,6 +114,7 @@ import {
 import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRichTextLabels } from '../../features/announcements/announcement-parts';
+import { useFileViewer } from '../../features/files/file-viewer';
 import { formatNumber, formatWeekday, formatWeekdayDate } from '../../lib/format';
 
 export const Route = createFileRoute('/_app/design-system')({
@@ -475,6 +478,8 @@ function DesignSystemPage() {
             {t('designSystem.showActionToast')}
           </Button>
 
+          <ViewerSample />
+
           <Popover>
             <PopoverTrigger render={<Button variant="outline" />}>
               {t('designSystem.openPopover')}
@@ -492,11 +497,69 @@ function DesignSystemPage() {
 
 const sampleSkills = ['figma', 'motion', 'copy', 'premiere', 'product'] as const;
 
+/** A sample picture drawn from the theme's tokens, so the page needs no image file. */
+function samplePicture(token: string, label: string): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = 960;
+  canvas.height = 640;
+  const context = canvas.getContext('2d');
+  if (!context) return '';
+  const style = getComputedStyle(document.documentElement);
+  context.fillStyle = style.getPropertyValue('--color-muted').trim();
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = style.getPropertyValue(token).trim();
+  context.fillRect(120, 120, 720, 400);
+  context.fillStyle = style.getPropertyValue('--color-primary-foreground').trim();
+  context.font = '64px sans-serif';
+  context.textAlign = 'center';
+  context.fillText(label, 480, 340);
+  return canvas.toDataURL('image/png');
+}
+
+/** The built-in viewer (F06B rule C4) over two sample pictures. */
+function ViewerSample() {
+  const { t } = useTranslation();
+  const { open, viewer } = useFileViewer();
+  return (
+    <>
+      <Button
+        variant="outline"
+        onClick={() =>
+          open(
+            ['--color-primary', '--color-accent'].map((token, index) => ({
+              key: token,
+              kind: 'image' as const,
+              src: samplePicture(token, String(index + 1)),
+              name: t('designSystem.viewerSample', { n: index + 1 }),
+              details: t('designSystem.viewerDetails'),
+            })),
+            0,
+          )
+        }
+      >
+        {t('designSystem.openViewer')}
+      </Button>
+      {viewer}
+    </>
+  );
+}
+
 /** The light rich text of announcements (ADR 0038): the editor and the same document rendered. */
 function RichTextSection() {
   const { t } = useTranslation();
   const labelId = useId();
   const labels = useRichTextLabels();
+  const people = (['figma', 'motion', 'copy'] as const).map((key, index) => ({
+    id: `0192000${index}-0000-7000-a000-000000000000`,
+    name: t(`designSystem.samplePeople.${key}`),
+  }));
+  const mentions: RichTextMentions = {
+    people,
+    nameOf: (userId) => people.find((person) => person.id === userId)?.name ?? '…',
+    label: t('tasks.comments.mention'),
+    searchLabel: t('tasks.comments.mentionSearch'),
+    empty: t('common.noMatches'),
+  };
   const [doc, setDoc] = useState<RichTextDoc>(() => ({
     type: 'doc',
     content: [
@@ -554,13 +617,17 @@ function RichTextSection() {
             defaultValue={doc}
             onChange={setDoc}
             labels={labels}
+            mentions={mentions}
             aria-labelledby={labelId}
           />
         </div>
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">{t('designSystem.richTextView')}</span>
           <div className="rounded-md border border-border bg-surface p-4">
-            <RichTextView doc={doc} />
+            <RichTextView
+              doc={doc}
+              renderMention={(userId) => <Badge tone="info">@{mentions.nameOf(userId)}</Badge>}
+            />
           </div>
         </div>
       </div>

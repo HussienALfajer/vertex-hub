@@ -9,8 +9,11 @@ import {
   ChecklistCount,
   formatDue,
   MedicalBadge,
+  OpenQuestionsBadge,
   OverLimitBadge,
   PriorityBadge,
+  SubtaskOfBadge,
+  SubtaskProgress,
   TaskOverdueBadge,
   TaskStatusBadge,
   useEngagementLabel,
@@ -62,6 +65,11 @@ export function TaskRows({
                   .filter(Boolean)
                   .join(' · ')}
               </span>
+              {task.parent && (
+                <span className="flex">
+                  <SubtaskOfBadge parent={task.parent} />
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {showAssignee &&
@@ -83,6 +91,8 @@ export function TaskRows({
               <PriorityBadge priority={task.priority} />
               {task.blocked && <BlockedBadge />}
               {task.overLimitPending && <OverLimitBadge />}
+              <OpenQuestionsBadge open={task.openQuestions} />
+              {task.progress && <SubtaskProgress progress={task.progress} />}
               <ChecklistCount checklist={task.checklist} />
               <span className="flex items-center gap-2 text-sm tabular-nums">
                 {formatDue(task)}

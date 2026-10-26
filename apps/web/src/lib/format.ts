@@ -154,3 +154,25 @@ export function toBusinessDateTimeInput(value: Date | string): string {
 export function fromBusinessDateTimeInput(value: string): string {
   return businessInstant(value.slice(0, 10), value.slice(11, 16)).toISOString();
 }
+
+/**
+ * An instant as `2026-10-26 14.05.09` in Asia/Damascus, Latin digits: the time part of a file name
+ * (a pasted screenshot, F06B rule C3), safe in every file system.
+ */
+export function formatFileTimestamp(at: Date): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: BUSINESS_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(at)
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}.${parts.minute}.${parts.second}`;
+}

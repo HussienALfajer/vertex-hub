@@ -12,6 +12,7 @@ import {
   type TaskDependency,
   type TaskDetail,
   type TaskPriority,
+  taskBriefDocSchema,
 } from '@vertex-hub/contracts';
 import {
   Avatar,
@@ -24,6 +25,8 @@ import {
   IconButton,
   Input,
   MultiCombobox,
+  type RichTextDoc,
+  RichTextEditor,
   Select,
   SelectContent,
   SelectItem,
@@ -61,6 +64,7 @@ import { lineName } from '../retainers/retainer-badges';
 import { retainerListQuery } from '../retainers/retainers.queries';
 import { userListQuery } from '../users/users.queries';
 import { canAssignIn, memberOf } from './task-access';
+import { useRichTextLabels } from './task-rich-text';
 import { taskListQuery } from './tasks.queries';
 
 export type TaskFormMethods = UseFormReturn<CreateTaskInput, unknown, CreateTask>;
@@ -146,6 +150,42 @@ export function BriefField({ form }: { form: TaskFormMethods }) {
         rows={4}
         placeholder={t('tasks.form.briefPlaceholder')}
         {...form.register('brief')}
+      />
+      <FieldError match={!!error}>{t('tasks.form.errors.brief')}</FieldError>
+    </Field>
+  );
+}
+
+/**
+ * F06B rule C1: the brief in ADR 0038's editor, as `briefDoc`; an emptied editor clears it. The
+ * editor starts from the form's value when it mounts.
+ */
+export function RichBriefField({ form }: { form: TaskFormMethods }) {
+  const { t } = useTranslation();
+  const labelId = useId();
+  const labels = useRichTextLabels();
+  const error = form.formState.errors.briefDoc;
+  return (
+    <Field invalid={!!error}>
+      <FieldLabel id={labelId} render={<span />}>
+        {t('tasks.form.brief')}
+        <Optional />
+      </FieldLabel>
+      <Controller
+        control={form.control}
+        name="briefDoc"
+        render={({ field }) => (
+          <RichTextEditor
+            aria-labelledby={labelId}
+            defaultValue={field.value as RichTextDoc | null | undefined}
+            labels={labels}
+            invalid={!!error}
+            onChange={(doc) => {
+              const parsed = taskBriefDocSchema.safeParse(doc);
+              field.onChange(parsed.success ? parsed.data : null);
+            }}
+          />
+        )}
       />
       <FieldError match={!!error}>{t('tasks.form.errors.brief')}</FieldError>
     </Field>

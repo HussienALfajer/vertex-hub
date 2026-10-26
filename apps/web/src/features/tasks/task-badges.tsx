@@ -1,5 +1,6 @@
+import { Link } from '@tanstack/react-router';
 import type { ReviewStage, Task, TaskPriority, TaskStatus } from '@vertex-hub/contracts';
-import { Badge, cn, StatusBadge } from '@vertex-hub/ui';
+import { Badge, cn, Meter, StatusBadge } from '@vertex-hub/ui';
 import {
   ArchiveIcon,
   BanIcon,
@@ -7,9 +8,12 @@ import {
   ChevronDownIcon,
   ChevronsUpIcon,
   ChevronUpIcon,
+  CircleHelpIcon,
+  CornerDownLeftIcon,
   EqualIcon,
   HourglassIcon,
   ListChecksIcon,
+  ListTreeIcon,
   MessageSquareWarningIcon,
   StethoscopeIcon,
   UserRoundXIcon,
@@ -172,4 +176,71 @@ export function useEngagementLabel(): (task: Task) => string | null {
     }
     return null;
   };
+}
+
+/** F06B rule A13: a subtask names its parent, linked. */
+export function SubtaskOfBadge({ parent }: { parent: NonNullable<Task['parent']> }) {
+  const { t } = useTranslation();
+  return (
+    <Badge tone="outline" render={<Link to="/tasks/$taskId" params={{ taskId: parent.id }} />}>
+      <CornerDownLeftIcon aria-hidden="true" className="rtl:-scale-x-100" />
+      <span className="max-w-48 truncate">{t('tasks.subtasks.of', { title: parent.title })}</span>
+    </Badge>
+  );
+}
+
+/** F06B rule A9: a parent's delivered subtasks out of its live ones, as "3/5". */
+export function SubtaskProgress({
+  progress,
+  bar,
+}: {
+  progress: NonNullable<Task['progress']>;
+  /** With a bar, as the task page's header shows it. */
+  bar?: boolean;
+}) {
+  const { t } = useTranslation();
+  const label = t('tasks.subtasks.progress', {
+    delivered: formatNumber(progress.delivered),
+    total: formatNumber(progress.total),
+  });
+  const done = progress.total > 0 && progress.delivered === progress.total;
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 text-xs',
+        done ? 'font-medium text-foreground' : 'text-muted-foreground',
+      )}
+    >
+      <ListTreeIcon aria-hidden="true" className="size-3.5" />
+      <span className="sr-only">{label}</span>
+      <span aria-hidden="true" className="tabular-nums">
+        {formatNumber(progress.delivered)}/{formatNumber(progress.total)}
+      </span>
+      {bar && (
+        <Meter
+          value={progress.total === 0 ? 0 : (progress.delivered / progress.total) * 100}
+          aria-label={label}
+          className="w-28"
+        />
+      )}
+    </span>
+  );
+}
+
+/** F06B rule B7 and edge case 13: open questions of the task and of its subtasks. */
+export function OpenQuestionsBadge({ open }: { open: Task['openQuestions'] }) {
+  const { t } = useTranslation();
+  if (open.total === 0) return null;
+  const own = open.total - open.inSubtasks;
+  return (
+    <Badge tone="gold">
+      <CircleHelpIcon aria-hidden="true" />
+      {open.inSubtasks > 0
+        ? t('tasks.questions.openWithSubtasks', {
+            own: formatNumber(own),
+            inSubtasks: formatNumber(open.inSubtasks),
+          })
+        : t('tasks.questions.openCount', { total: formatNumber(open.total) })}
+    </Badge>
+  );
 }

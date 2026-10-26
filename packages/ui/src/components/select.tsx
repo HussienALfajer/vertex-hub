@@ -85,4 +85,33 @@ function SelectItem({ className, children, ...props }: SelectPrimitive.Item.Prop
   );
 }
 
-export { Select, SelectContent, SelectItem, SelectTrigger, SelectValue };
+/** A titled group of options (people and departments in one list). */
+function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
+  return (
+    <SelectPrimitive.Group
+      data-slot="select-group"
+      className={cn('flex flex-col', className)}
+      {...props}
+    />
+  );
+}
+
+function SelectGroupLabel({ className, ...props }: SelectPrimitive.GroupLabel.Props) {
+  return (
+    <SelectPrimitive.GroupLabel
+      data-slot="select-group-label"
+      className={cn('px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground', className)}
+      {...props}
+    />
+  );
+}
+
+export {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectGroupLabel,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+};

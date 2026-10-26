@@ -44,6 +44,8 @@ interface UploadControlProps {
   multiple?: boolean;
   /** The "Link" tab: deliverables, brand files and documents, never references (rule 2). */
   allowLink?: boolean;
+  /** Files dropped or pasted before the control opened (F06B rule C3): they upload at once. */
+  initialFiles?: readonly File[];
 }
 
 /**
@@ -51,9 +53,22 @@ interface UploadControlProps {
  * button, and is attached as soon as its upload finishes. A failed file stays in the list with its
  * error until it is retried or discarded.
  */
-export function UploadControl({ onAttach, onDone, multiple, allowLink }: UploadControlProps) {
+export function UploadControl({
+  onAttach,
+  onDone,
+  multiple,
+  allowLink,
+  initialFiles,
+}: UploadControlProps) {
   const { t } = useTranslation();
-  const files = <FileQueue onAttach={onAttach} onDone={onDone} multiple={multiple} />;
+  const files = (
+    <FileQueue
+      onAttach={onAttach}
+      onDone={onDone}
+      multiple={multiple}
+      initialFiles={initialFiles}
+    />
+  );
   if (!allowLink) return files;
   return (
     <Tabs defaultValue="file" className="gap-4">
@@ -92,7 +107,8 @@ function FileQueue({
   onAttach,
   onDone,
   multiple,
-}: Pick<UploadControlProps, 'onAttach' | 'onDone' | 'multiple'>) {
+  initialFiles,
+}: Pick<UploadControlProps, 'onAttach' | 'onDone' | 'multiple' | 'initialFiles'>) {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -169,7 +185,7 @@ function FileQueue({
     }
   }
 
-  function add(list: FileList | null) {
+  function add(list: FileList | readonly File[] | null) {
     const picked = Array.from(list ?? []).slice(0, multiple ? undefined : 1);
     const added = picked.map((file): Entry => {
       const refusal =
@@ -196,6 +212,15 @@ function FileQueue({
     setEntries((all) => [...all, ...added]);
     for (const entry of added) if (entry.state === 'uploading') void send(entry);
   }
+
+  // Files the dialog opened with upload once, even when an effect runs twice.
+  const started = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, on open
+  useEffect(() => {
+    if (started.current || !initialFiles?.length) return;
+    started.current = true;
+    add(initialFiles);
+  }, []);
 
   function retry(entry: Entry, name?: string) {
     if (entry.uploadId) void attach(entry.key, entry.uploadId, name);

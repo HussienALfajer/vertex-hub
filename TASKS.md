@@ -28,10 +28,14 @@ Spec: `docs/specs/F06B-tasks-2.md` (Approved 2026-10-26) · ADR 0041 (and 0013, 
 - [x] checks (full run: only load timeouts, each file passing on its own), reviewer (3 findings fixed), acceptance (owner), PR with auto-merge
 
 ## PR 4 — Task page, lists, board and My tasks (web)
-- [ ] ui: viewer component (image zoom/pan, video, next/previous) on the design-system page; rich-text editor with mentions and attachments (drag, paste)
-- [ ] web: task page order (header badges and progress, brief + fields, Subtasks with timeline, stages, handover summaries, reorder, add, cancel, reopen dialog, handover note, Questions and discussion, Files groups with the viewer, criteria); list/board badges and filters; My tasks "Questions waiting for my answer"; `ar.json`
-- [ ] e2e: fixtures, screens (task page with subtasks, questions, reopen dialog, viewer, My tasks, list and board)
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+- [x] ui: `Viewer` (full screen, image zoom and pan, video, previous and next, download) and `SelectGroup`; `RichTextEditor` gains the mention node and picker and files dropped or pasted (`onFiles`), `RichTextView` renders mentions; both on the design-system page
+- [x] web: task page order (header: subtask-of link, progress bar, open-questions badge; brief with fields and estimate; handover note; Subtasks with run mode, timeline, stages, handover summaries, drag and Move menu, add, cancel, reopen dialog; Questions and discussion with filter, ask a person or department, replies, answered, reopen, forward, turn into subtask, attachments; Files with drop and paste, "In the discussion" and "From subtasks", the viewer; acceptance criteria; the submit hint for `CRITERIA_OPEN` and `SUBTASKS_OPEN`); list and board badges and filters (hide subtasks, open questions, parent); My tasks "Questions waiting for my answer"; `ar.json`
+- [x] web unit: pasted screenshot naming (`held-uploads.test.ts`)
+- [x] e2e: `mockApi` options `subtasks` and `questions`, `f06b-fixtures.ts` (a parent by stages with its thread), `f06b-task-page.spec.ts`, screens (task page with subtasks and questions, viewer, reopen dialog, My tasks, list and board) in both themes
+- [x] fix found on the way: `useFocusAfterChange` ignores a list's first load (the Files section scrolled the page to its heading)
+- [x] checks (full `pnpm verify` green), reviewer (7 findings fixed, plus the edit dialog's brief now rich text)
+- [x] acceptance (owner), PR with auto-merge
+- "Save as template" in the header menu moves to PR 5 with its dialog and the template editor
 
 ## PR 5 — Creation wizard, Workload, tree and templates (web)
 - [ ] web: `/tasks/new` wizard (five steps, local-storage draft, files at creation with paste, live preview per mode, readiness review, start from a template); Workload hours vs capacity; project Tasks tab and retainer "This month" Tree mode; template list kind and the task template editor, "Save as template"

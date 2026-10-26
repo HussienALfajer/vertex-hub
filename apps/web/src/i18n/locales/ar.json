@@ -258,7 +258,15 @@
     "richTextBold": "الحضور في التاسعة",
     "richTextEmphasis": "والمغادرة في الخامسة",
     "richTextItem1": "يبقى يوم الخميس كما هو.",
-    "richTextItem2": "تُسجَّل الإجازات في النظام قبل يومين."
+    "richTextItem2": "تُسجَّل الإجازات في النظام قبل يومين.",
+    "openViewer": "افتح العارض",
+    "viewerSample": "صورة تجريبية {{n}}",
+    "viewerDetails": "الإصدار 1 · مرجع · ليان الأحمد",
+    "samplePeople": {
+      "figma": "ليان الأحمد",
+      "motion": "كريم سليمان",
+      "copy": "نور حداد"
+    }
   },
   "errors": {
     "generic": "تعذّر إتمام الطلب. حاول مجددًا.",
@@ -2081,7 +2089,10 @@
       "requestedByMe": "طلباتي",
       "archived": "المؤرشفة",
       "clear": "امسح التصفية",
-      "medicalReview": "في المراجعة الطبية"
+      "medicalReview": "في المراجعة الطبية",
+      "hideSubtasks": "أخفِ المهام الفرعية",
+      "openQuestions": "بأسئلة مفتوحة",
+      "parent": "المهام الفرعية لـ«{{title}}»"
     },
     "columns": {
       "task": "المهمة",
@@ -2225,7 +2236,10 @@
       "readOnlyBody": "العميل أو المشروع أو العقد المرتبط مؤرشف.",
       "medicalTitle": "بانتظار المراجعة الطبية",
       "medicalBody": "العميل من قطاع الرعاية الصحية: يراجع قسم الاستشارات الطبية ما اعتمدته المراجعة الداخلية قبل إرساله للعميل.",
-      "medicalOwnBody": "أنت منفّذ هذه المهمة، فيراجعها طبيًا عضو آخر من الاستشارات الطبية."
+      "medicalOwnBody": "أنت منفّذ هذه المهمة، فيراجعها طبيًا عضو آخر من الاستشارات الطبية.",
+      "submitBlockedTitle": "قبل الإرسال إلى المراجعة",
+      "criteriaOpen": "بقي {{n}} من معايير القبول دون تحقيق.",
+      "subtasksOpen": "بقيت {{n}} من المهام الفرعية لم تُسلَّم."
     },
     "dependencies": {
       "title": "الارتباطات",
@@ -2316,7 +2330,8 @@
       "removed": "حُذف التعليق.",
       "errors": {
         "body": "اكتب تعليقًا (حتى 4000 حرف، و20 إشارة على الأكثر)."
-      }
+      },
+      "mentionSearch": "ابحث باسم"
     },
     "board": {
       "title": "لوحة المهام",
@@ -2386,7 +2401,16 @@
       "loadError": "تعذّر تحميل الملفات.",
       "sentToClient": "أُرسل للعميل",
       "inMedicalReview": "في المراجعة الطبية",
-      "addedAfterReview": "أُضيف بعد المراجعة"
+      "addedAfterReview": "أُضيف بعد المراجعة",
+      "dropHint": "اسحب الملفات إلى هنا أو الصقها لإضافتها مراجع.",
+      "fromSubtasks": "من المهام الفرعية",
+      "inDiscussion": "في النقاش",
+      "viewerVersion": "الإصدار {{n}}",
+      "roles": {
+        "deliverable": "مخرج",
+        "reference": "مرجع",
+        "attachment": "مرفق في النقاش"
+      }
     },
     "medicalBadge": "مراجعة طبية",
     "medicalStatus": "مراجعة داخلية · طبية",
@@ -2472,6 +2496,168 @@
       "title": "المكلّف في إجازة يوم الاستحقاق",
       "body": "لدى المكلّف إجازة معتمدة تشمل تاريخ استحقاق المهمة. أسندها رغم ذلك أو غيّر التاريخ أو المكلّف.",
       "action": "أسند رغم ذلك"
+    },
+    "attachments": {
+      "add": "أرفق ملفات",
+      "limit": "يقبل الرد حتى {{max}} مرفقات.",
+      "notReady": "انتظر حتى يكتمل رفع المرفقات، أو احذف ما تعذّر رفعه.",
+      "nothingToPaste": "لا شيء يُلصق: انسخ الصورة نفسها، لا رابط الملف.",
+      "uploading": "يُرفع {{name}}"
+    },
+    "brief": {
+      "estimate": "التقدير: {{hours}} ساعة",
+      "otherRatio": "أخرى",
+      "environments": {
+        "production": "الإنتاج",
+        "staging": "التجربة",
+        "development": "التطوير"
+      },
+      "fields": {
+        "sizes": "المقاسات",
+        "colors": "الألوان",
+        "references": "روابط مرجعية",
+        "length": "الطول",
+        "aspectRatio": "نسبة الأبعاد",
+        "music": "الموسيقى",
+        "link": "الرابط",
+        "environment": "البيئة",
+        "platforms": "المنصات",
+        "tone": "النبرة",
+        "goal": "الهدف",
+        "audience": "الجمهور",
+        "budget": "الميزانية"
+      }
+    },
+    "criteria": {
+      "title": "معايير القبول",
+      "hint": "تعريف الإنجاز: لا تُرسل المهمة إلى المراجعة قبل تحقيق كل معيار.",
+      "add": "أضف معيارًا",
+      "placeholder": "معيار يجب أن يتحقق",
+      "removeTitle": "إزالة المعيار؟"
+    },
+    "questions": {
+      "addressee": "إلى من السؤال؟",
+      "addresseePlaceholder": "اختر شخصًا أو قسمًا",
+      "addresseeArchived": "صاحب السؤال مؤرشف",
+      "answeredBy": "أجاب {{name}} · {{time}}",
+      "asked": "أُرسل السؤال",
+      "askedBy": "سأل {{name}} في «{{task}}»",
+      "departments": "الأقسام",
+      "people": "الأشخاص",
+      "errors": {
+        "addressee": "اختر من يُوجَّه إليه السؤال.",
+        "forwardTo": "اختر عضوًا من القسم."
+      },
+      "forward": "حوّل",
+      "forwardBody": "يصبح العضو المسؤول عن الإجابة، ويبقى السؤال موجّهًا إلى {{department}}.",
+      "forwardTitle": "تحويل السؤال إلى عضو",
+      "forwardTo": "العضو",
+      "forwarded": "حُوّل السؤال",
+      "label": "السؤال",
+      "markAnswered": "عُدّه مُجابًا",
+      "markedAnswered": "عُدّ السؤال مُجابًا",
+      "openCount": "أسئلة مفتوحة: {{total}}",
+      "openWithSubtasks": "أسئلة مفتوحة: {{own}} هنا و{{inSubtasks}} في المهام الفرعية",
+      "reopen": "أعد فتحه",
+      "reopened": "أُعيد فتح السؤال",
+      "reply": "ردّ",
+      "replyLabel": "الرد",
+      "toDepartment": "إلى قسم {{department}}",
+      "toForwarded": "إلى قسم {{department}} · حُوّل إلى {{name}}",
+      "toPerson": "إلى {{name}}"
+    },
+    "subtasks": {
+      "title": "المهام الفرعية",
+      "empty": "لا مهام فرعية بعد. أضف مهمة فرعية لتقسيم العمل بين أكثر من شخص.",
+      "of": "مهمة فرعية من «{{title}}»",
+      "progress": "{{delivered}} من {{total}} مسلّمة",
+      "queue": "قائمة القسم",
+      "queueHint": "بلا منفّذ: تصل إلى مديري القسم ليسندوها.",
+      "add": "أضف مهمة فرعية",
+      "addTitle": "مهمة فرعية جديدة",
+      "addBody": "تأخذ عميل المهمة الأم ومشروعها، ولا يتجاوز موعدها موعد المهمة الأم.",
+      "addAction": "أضف",
+      "added": "أُضيفت المهمة الفرعية",
+      "convertTitle": "تحويل إلى مهمة فرعية",
+      "convertAction": "حوّل",
+      "converted": "حُوّل إلى مهمة فرعية",
+      "addStage": "أضف مرحلة",
+      "addTo": "أضف مهمة فرعية إلى «{{stage}}»",
+      "renameStage": "أعد تسمية «{{stage}}»",
+      "renameStageTitle": "إعادة تسمية المرحلة",
+      "archiveStage": "احذف «{{stage}}»",
+      "archiveStageTitle": "حذف المرحلة «{{stage}}»؟",
+      "archiveStageBody": "تُحذف المرحلة الفارغة فقط، وتُحفظ في السجل.",
+      "archiveStageAction": "احذف المرحلة",
+      "stageName": "اسم المرحلة",
+      "stageEmpty": "لا مهام فرعية في هذه المرحلة.",
+      "stageFinished": "انتهت",
+      "stageHeading": "المرحلة {{position}}: {{name}}",
+      "stage": "المرحلة",
+      "cancel": "ألغِ المهمة الفرعية",
+      "cancelTitle": "إلغاء «{{title}}»؟",
+      "cancelBody": "لا تعود المهمة الفرعية تؤخر ما بعدها. اكتب السبب.",
+      "cancelled": "أُلغيت المهمة الفرعية",
+      "reopen": "أعد فتح مهام فرعية",
+      "reopenTitle": "إعادة فتح مهام فرعية",
+      "reopenBody": "اختر ما يحتاج تعديلًا واكتب لكل مهمة ما يجب تغييره. تبقى الأخرى مسلّمة.",
+      "reopenNote": "ما الذي يجب تغييره؟",
+      "reopenAction": "أعد فتح {{n}}",
+      "reopened": "أُعيد فتح المهام الفرعية",
+      "reordered": "حُفظ الترتيب",
+      "runMode": "طريقة التنفيذ",
+      "runModeChanged": "تغيّرت طريقة التنفيذ",
+      "runModes": {
+        "sequential": "بالتتابع",
+        "parallel": "بالتوازي",
+        "stages": "على مراحل"
+      },
+      "timeline": {
+        "now": "يعمل الآن",
+        "waiting": "ينتظر",
+        "done": "سُلّم",
+        "none": "لا أحد"
+      },
+      "waitsFor": "ينتظر: {{titles}}",
+      "handoverOf": "تسليم المرحلة «{{stage}}»",
+      "finals": "الملفات النهائية: {{names}}",
+      "noteExcerpt": "ملاحظة التسليم: {{note}}",
+      "moveOf": "انقل «{{title}}»",
+      "moveUp": "انقل للأعلى",
+      "moveDown": "انقل للأسفل",
+      "moveToStage": "انقل إلى مرحلة",
+      "estimate": "التقدير",
+      "noEstimate": "بلا تقدير",
+      "hours": "{{hours}} ساعة",
+      "handoverNote": "ملاحظة التسليم",
+      "writeNote": "اكتب ملاحظة",
+      "noteSaved": "حُفظت ملاحظة التسليم",
+      "notePlaceholder": "ما الذي يحتاج من يستلم بعدك أن يعرفه؟",
+      "noteHint": "اكتب ملاحظة لمن يستلم العمل بعدك قبل أن ترسل المهمة إلى المراجعة.",
+      "errors": {
+        "stageName": "اكتب اسمًا من 1 إلى 80 حرفًا.",
+        "reopenNote": "اكتب ما يجب تغييره.",
+        "reopenPick": "اختر مهمة فرعية واحدة على الأقل.",
+        "dueDate": "اختر موعدًا لا يتجاوز موعد المهمة الأم."
+      },
+      "seeInList": "اعرضها في القائمة"
+    },
+    "thread": {
+      "title": "الأسئلة والنقاش",
+      "filter": "اعرض",
+      "all": "الكل",
+      "openQuestions": "الأسئلة المفتوحة",
+      "noOpenQuestions": "لا أسئلة مفتوحة.",
+      "kind": "نوع الرسالة",
+      "comment": "تعليق",
+      "ask": "سؤال",
+      "askAction": "اسأل",
+      "convert": "حوّل إلى مهمة فرعية",
+      "converted": "حُوّل إلى المهمة الفرعية «{{title}}»"
+    },
+    "questionStatuses": {
+      "open": "مفتوح",
+      "answered": "مُجاب"
     }
   },
   "clients": {
@@ -4563,6 +4749,11 @@
     "proof": {
       "choose": "اختر ملفًا",
       "remove": "أزل {{name}}"
+    },
+    "viewer": {
+      "zoomIn": "كبّر",
+      "zoomOut": "صغّر",
+      "resetZoom": "أعد الحجم الأصلي"
     }
   },
   "images": {

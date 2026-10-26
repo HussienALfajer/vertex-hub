@@ -3,16 +3,19 @@ import { Link } from '@tanstack/react-router';
 import {
   addDays,
   businessDate,
+  commentExcerpt,
+  type MyQuestion,
   type MyTaskSummary,
   type Task,
   weekOf,
 } from '@vertex-hub/contracts';
-import { Badge, Button, cn, EmptyState, PageHeader, Skeleton } from '@vertex-hub/ui';
+import { Avatar, Badge, Button, cn, EmptyState, PageHeader, Skeleton } from '@vertex-hub/ui';
 import {
   ArrowLeftIcon,
   CalendarClockIcon,
   CalendarDaysIcon,
   CalendarRangeIcon,
+  CircleHelpIcon,
   ClipboardCheckIcon,
   HourglassIcon,
   InboxIcon,
@@ -24,15 +27,23 @@ import {
   SunIcon,
   UserRoundSearchIcon,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { useMe } from '../../lib/auth';
-import { formatNumber } from '../../lib/format';
+import { formatDateTime, formatNumber } from '../../lib/format';
+import { imageSrc } from '../../lib/images';
 import { approvalReadyQuery } from '../approvals/approvals.queries';
+import { useDepartmentNames } from '../projects/project-badges';
 import { managedDepartments } from './task-access';
 import type { TaskListSearch } from './task-list-page';
 import { TaskRows } from './task-rows';
-import { myTaskSummaryQuery, type TaskListFilters, taskListQuery } from './tasks.queries';
+import {
+  myQuestionsQuery,
+  myTaskSummaryQuery,
+  type TaskListFilters,
+  taskListQuery,
+} from './tasks.queries';
 
 type SectionKey = keyof MyTaskSummary;
 
@@ -53,6 +64,8 @@ interface Section {
   alert?: boolean;
   /** The tasks belong to other people, so rows name their assignee. */
   others?: boolean;
+  /** Questions waiting for my answer (F06B rule B7) instead of tasks. */
+  questions?: boolean;
 }
 
 /** Tasks of a section on this page; the rest are one click away in the list. */
@@ -102,6 +115,12 @@ function sectionsFor(meId: string, managed: string[]): Section[] {
       others: true,
       filters: [{ reviewer: 'me', status: ['internal_review'] }],
       listSearch: { reviewer: 'me', status: ['internal_review'] },
+    },
+    {
+      key: 'questionsWaiting',
+      icon: CircleHelpIcon,
+      filters: [],
+      questions: true,
     },
     {
       key: 'medicalReview',
@@ -262,6 +281,14 @@ function DueTiles({ summary }: { summary: MyTaskSummary }) {
 }
 
 function TaskSection({ section, count }: { section: Section; count: number }) {
+  return section.questions ? (
+    <QuestionsSection section={section} count={count} />
+  ) : (
+    <TasksSection section={section} count={count} />
+  );
+}
+
+function TasksSection({ section, count }: { section: Section; count: number }) {
   const { t } = useTranslation();
   const lists = useQueries({
     queries: section.filters.map((filters) =>
@@ -284,6 +311,112 @@ function TaskSection({ section, count }: { section: Section; count: number }) {
     .filter(section.keep ?? (() => true))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, SECTION_SIZE);
+
+  return (
+    <SectionShell section={section} count={count} shown={tasks.length}>
+      {pending ? (
+        <RowsSkeleton />
+      ) : failed ? (
+        <div className="p-4">
+          <LoadError message={t('tasks.my.loadError')} onRetry={() => failed.refetch()} />
+        </div>
+      ) : (
+        <TaskRows tasks={tasks} showAssignee={section.others} />
+      )}
+    </SectionShell>
+  );
+}
+
+/** F06B rule B7: open questions addressed to me, or to a department I manage, oldest first. */
+function QuestionsSection({ section, count }: { section: Section; count: number }) {
+  const { t } = useTranslation();
+  const questions = useQuery(myQuestionsQuery());
+  return (
+    <SectionShell section={section} count={count} shown={count}>
+      {questions.isPending ? (
+        <RowsSkeleton />
+      ) : questions.isError ? (
+        <div className="p-4">
+          <LoadError message={t('tasks.my.loadError')} onRetry={() => questions.refetch()} />
+        </div>
+      ) : (
+        <ul className="flex flex-col divide-y divide-border">
+          {questions.data.items.map((question) => (
+            <QuestionRow key={question.id} question={question} />
+          ))}
+        </ul>
+      )}
+    </SectionShell>
+  );
+}
+
+function QuestionRow({ question }: { question: MyQuestion }) {
+  const { t } = useTranslation();
+  const departmentName = useDepartmentNames();
+  const names = new Map(question.mentions.map((person) => [person.id.toLowerCase(), person.name]));
+  const text = commentExcerpt(question.body ?? '', (id) => names.get(id) ?? '…');
+  const state = question.question;
+  return (
+    <li className="flex flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:gap-4">
+      <Avatar
+        name={question.author.name}
+        src={imageSrc(question.author.imageId, 'sm')}
+        size="sm"
+        tone={question.author.archived ? 'muted' : 'brand'}
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <Link
+          to="/tasks/$taskId"
+          params={{ taskId: question.task.id }}
+          hash={`question-${question.id}`}
+          className="w-fit font-medium hover:underline"
+        >
+          {text}
+        </Link>
+        <span className="truncate text-xs text-muted-foreground">
+          {t('tasks.questions.askedBy', {
+            name: question.author.name,
+            task: question.task.title,
+          })}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {state?.department && (
+          <Badge tone="outline">
+            {t('tasks.questions.toDepartment', { department: departmentName(state.department) })}
+          </Badge>
+        )}
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {formatDateTime(question.createdAt)}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+function RowsSkeleton() {
+  return (
+    <div className="flex flex-col gap-2 p-4">
+      <Skeleton className="h-10" />
+      <Skeleton className="h-10" />
+    </div>
+  );
+}
+
+/** A section's heading, count and links around its rows. */
+function SectionShell({
+  section,
+  count,
+  shown,
+  children,
+}: {
+  section: Section;
+  count: number;
+  /** The rows on the page: "see all" shows when the count holds more. */
+  shown: number;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
   const { icon: Icon } = section;
   const titleId = `section-${section.key}`;
 
@@ -318,7 +451,7 @@ function TaskSection({ section, count }: { section: Section; count: number }) {
             <ArrowLeftIcon className="ltr:-scale-x-100" />
           </Button>
         )}
-        {section.listSearch && count > tasks.length && (
+        {section.listSearch && count > shown && (
           <Button
             variant="ghost"
             size="sm"
@@ -330,18 +463,7 @@ function TaskSection({ section, count }: { section: Section; count: number }) {
           </Button>
         )}
       </div>
-      {pending ? (
-        <div className="flex flex-col gap-2 p-4">
-          <Skeleton className="h-10" />
-          <Skeleton className="h-10" />
-        </div>
-      ) : failed ? (
-        <div className="p-4">
-          <LoadError message={t('tasks.my.loadError')} onRetry={() => failed.refetch()} />
-        </div>
-      ) : (
-        <TaskRows tasks={tasks} showAssignee={section.others} />
-      )}
+      {children}
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
+import { F06B_PARENT, mockF06b, questionsWaiting } from './f06b-fixtures';
 import {
   ANNOUNCEMENTS_NOW,
   accountManagerMe,
@@ -1134,6 +1135,79 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `task-page-${colorScheme}`);
     });
 
+    test('task page with subtasks, stages and questions (F06B)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2600 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await mockF06b(page);
+      await page.goto(`/tasks/${F06B_PARENT}`);
+      await expect(page.getByRole('heading', { name: ar.tasks.subtasks.title })).toBeVisible();
+      await expect(page.getByRole('heading', { name: ar.tasks.thread.title })).toBeVisible();
+      await expect(page.getByText('سأرسل الصور بمقاس 1080 × 1350.')).toBeVisible();
+      // Questions open, answered and forwarded (rules B4 and B5).
+      await expect(page.getByText('إلى قسم التصوير · حُوّل إلى كريم الزين')).toBeVisible();
+      await expect(page.getByText(ar.tasks.page.submitBlockedTitle)).toBeVisible();
+      await screenshot(page, testInfo, `task-subtasks-${colorScheme}`);
+
+      // The built-in viewer (rule C4) on the question's picture.
+      await page.getByRole('button', { name: /menu-cover-v2\.png/ }).click();
+      const viewer = page.locator('[data-slot="viewer"]');
+      await expect(viewer.getByText('menu-cover-v2.png')).toBeVisible();
+      await viewer.getByRole('button', { name: ar.files.viewer.zoomIn }).click();
+      await screenshot(page, testInfo, `task-viewer-${colorScheme}`);
+
+      // A video attached in the thread plays in the browser's player inside the viewer.
+      await page.keyboard.press('Escape');
+      await expect(viewer).toBeHidden();
+      await page.getByRole('button', { name: /menu-walkthrough\.mp4/ }).click();
+      await expect(viewer.locator('video')).toBeVisible();
+      await screenshot(page, testInfo, `task-viewer-video-${colorScheme}`);
+    });
+
+    test('reopen subtasks dialog (F06B)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await mockF06b(page, 'revisions');
+      await page.goto(`/tasks/${F06B_PARENT}`);
+      await page.getByRole('button', { name: ar.tasks.subtasks.reopen }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('checkbox', { name: /تصميم صفحات المنيو/ }).click();
+      await dialog.getByLabel(ar.tasks.subtasks.reopenNote).fill('تكبير صور الأطباق.');
+      await screenshot(page, testInfo, `task-reopen-subtasks-${colorScheme}`);
+    });
+
+    test('my tasks with questions waiting (F06B)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1600 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, {
+        signedIn: true,
+        me: accountManagerMe,
+        subtasks: true,
+        questions: questionsWaiting(),
+      });
+      await page.goto('/tasks');
+      await expect(
+        page.getByRole('heading', { name: ar.tasks.my.sections.questionsWaiting }),
+      ).toBeVisible();
+      await expect(page.getByRole('link', { name: /ما المقاسات المطلوبة/ })).toBeVisible();
+      await screenshot(page, testInfo, `my-tasks-questions-${colorScheme}`);
+    });
+
+    test('task list and board with subtask badges (F06B)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1600, height: 1100 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe, subtasks: true });
+      await page.goto('/tasks/list');
+      await expect(
+        page.getByRole('link', { name: /مهمة فرعية من «تصاميم منيو الخريف»/ }).first(),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `task-list-subtasks-${colorScheme}`);
+      await page.goto('/tasks/board');
+      await expect(page.getByRole('button', { name: ar.tasks.filters.hideSubtasks })).toBeVisible();
+      await screenshot(page, testInfo, `task-board-subtasks-${colorScheme}`);
+    });
+
     test('task files, preview and upload', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 1600 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
@@ -1149,12 +1223,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await files.scrollIntoViewIfNeeded();
       await screenshot(page, testInfo, `task-files-${colorScheme}`);
 
+      // Images open in the built-in viewer (F06B rule C4); a PDF keeps the browser's viewer.
       await files.getByRole('button', { name: 'عاين صور الأطباق' }).click();
       await expect(
         page.getByRole('dialog', { name: 'صور الأطباق' }).getByRole('img', { name: 'صور الأطباق' }),
       ).toBeVisible();
       await screenshot(page, testInfo, `file-preview-image-${colorScheme}`);
-      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('Escape');
+      await files.getByRole('button', { name: 'عاين دليل الهوية' }).click();
       await expect(
         page.getByRole('dialog', { name: 'دليل الهوية' }).locator('iframe'),
       ).toBeVisible();
