@@ -279,7 +279,7 @@ F06's status machine and rules stay. What changes is listed here.
    - "Create now" on the basics step saves a simple task at once. The readiness check still runs first, as a confirmation dialog when it warns.
    - The other steps are optional. The subtasks step chooses the run mode, the stages and the subtasks, with suggested dates (rule A5).
    - A **live preview** beside the steps (below them on a phone) draws the flow: the parent, its subtasks as lanes by mode (one line for sequential, side by side for parallel, columns for stages), assignees' avatars, dates, and warnings in place.
-   - The wizard keeps its draft in the browser while open (local storage), so a reload does not lose it. It is saved to the server only at the end.
+   - The wizard keeps its draft in the browser while open (local storage), so a reload does not lose it. It is saved to the server only at the end. A draft is kept per user and comes back only with the same presets (project, client, line); "Start over" discards it (settled at PR 5).
 2. **One transaction.** Saving creates, in one transaction:
    - the task, its stages and subtasks with their dependencies;
    - criteria and checklist;
@@ -403,7 +403,7 @@ All Arabic RTL with logical CSS, `packages/ui` components and tokens, every stri
 4. **Task list and board** (changed): the "subtask of …" badge, the parent's progress, the open-questions badge; filters: hide subtasks, open questions, parent.
 5. **Workload** (changed): estimated hours against capacity per person, with the count of tasks without an estimate.
 6. **Project Tasks tab** (changed): a List / Tree switch; the tree with the bottleneck highlighted and a legend. The retainer page's "This month" gets the same switch.
-7. **Templates** (F07, changed): the kind "Task" in the list and its filter; the editor for the root task and its sub-steps, stages and order; "Saved from …" on templates saved from a task.
+7. **Templates** (F07, changed): the kind "Task" in the list and its filter; the editor for the root task and its sub-steps, stages and order; "Saved from …" on templates saved from a task (`savedFrom` on the template detail, from `work_templates.source_task_id`; settled at PR 5).
 8. **Viewer**: a full-screen component in `packages/ui`, reused by tasks, content (F08B) and files.
 
 What roles see differently:

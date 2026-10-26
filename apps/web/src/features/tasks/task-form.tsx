@@ -39,7 +39,7 @@ import {
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
 import { LinkIcon, PlusIcon, ReceiptTextIcon, XIcon } from 'lucide-react';
-import { useId, useRef, useState } from 'react';
+import { type Ref, useId, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
   Controller,
@@ -63,6 +63,7 @@ import { projectListQuery, projectQuery } from '../projects/projects.queries';
 import { lineName } from '../retainers/retainer-badges';
 import { retainerListQuery } from '../retainers/retainers.queries';
 import { userListQuery } from '../users/users.queries';
+import { BriefFieldsEditor } from './brief-fields-editor';
 import { canAssignIn, memberOf } from './task-access';
 import { useRichTextLabels } from './task-rich-text';
 import { taskListQuery } from './tasks.queries';
@@ -982,91 +983,123 @@ export function DependenciesField({ form }: { form: TaskFormMethods }) {
   );
 }
 
-/** Checklist items to start with: typed one by one, removable, at most `TASK_LIMITS.checklist`. */
-export function ChecklistField({ form }: { form: TaskFormMethods }) {
+/**
+ * Short items typed one by one, removable, at most `limit`: a checklist, or the acceptance
+ * criteria ticked before review (F06B rule C6).
+ */
+export function ItemsEditor({
+  label,
+  placeholder,
+  hint,
+  limit,
+  value,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  hint?: string;
+  limit: number;
+  value: string[];
+  onChange: (items: string[]) => void;
+}) {
   const { t } = useTranslation();
   const id = useId();
   const [draft, setDraft] = useState('');
   const list = useRef<HTMLOListElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const full = value.length >= limit;
+  const add = () => {
+    const text = draft.trim();
+    if (!text || full) return;
+    onChange([...value, text.slice(0, 200)]);
+    setDraft('');
+    // "Add" turns off with the empty field: the focus goes back to typing the next one.
+    input.current?.focus();
+  };
+  /** The next row's remove button takes the focus, the previous one's, or the field. */
+  const remove = (index: number) => {
+    flushSync(() => onChange(value.filter((_, other) => other !== index)));
+    focusAfterRemoval(list.current, index, input.current);
+  };
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>
+        {label}
+        <Optional />
+      </FieldLabel>
+      {value.length > 0 && (
+        <ol ref={list} className="flex flex-col gap-1.5">
+          {value.map((item, index) => (
+            <li
+              // biome-ignore lint/suspicious/noArrayIndexKey: items are plain strings that may repeat
+              key={index}
+              className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm"
+            >
+              <span className="text-muted-foreground tabular-nums">{formatNumber(index + 1)}.</span>
+              <span className="flex-1">{item}</span>
+              <IconButton
+                data-focus="remove"
+                label={t('common.remove', { label: item })}
+                onClick={() => remove(index)}
+              >
+                <XIcon />
+              </IconButton>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="flex items-center gap-2">
+        <Input
+          ref={input}
+          id={id}
+          value={draft}
+          maxLength={200}
+          disabled={full}
+          placeholder={placeholder}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              add();
+            }
+          }}
+        />
+        <Button type="button" variant="outline" onClick={add} disabled={full || !draft.trim()}>
+          <PlusIcon />
+          {t('tasks.form.addItem')}
+        </Button>
+      </div>
+      {hint && <FieldDescription>{hint}</FieldDescription>}
+    </Field>
+  );
+}
+
+/** The checklist to start with, or with `criteria` the acceptance criteria (F06B rule C6). */
+export function ChecklistField({
+  form,
+  name = 'checklist',
+}: {
+  form: TaskFormMethods;
+  name?: 'checklist' | 'criteria';
+}) {
+  const { t } = useTranslation();
+  const criteria = name === 'criteria';
   return (
     <Controller
       control={form.control}
-      name="checklist"
-      render={({ field }) => {
-        const items = field.value ?? [];
-        const full = items.length >= TASK_LIMITS.checklist;
-        const add = () => {
-          const text = draft.trim();
-          if (!text || full) return;
-          field.onChange([...items, text.slice(0, 200)]);
-          setDraft('');
-          // "Add" turns off with the empty field: the focus goes back to typing the next one.
-          input.current?.focus();
-        };
-        /** The next row's remove button takes the focus, the previous one's, or the field. */
-        const remove = (index: number) => {
-          flushSync(() => field.onChange(items.filter((_, other) => other !== index)));
-          focusAfterRemoval(list.current, index, input.current);
-        };
-        return (
-          <Field>
-            <FieldLabel htmlFor={id}>
-              {t('tasks.form.checklist')}
-              <Optional />
-            </FieldLabel>
-            {items.length > 0 && (
-              <ol ref={list} className="flex flex-col gap-1.5">
-                {items.map((item, index) => (
-                  <li
-                    // biome-ignore lint/suspicious/noArrayIndexKey: items are plain strings that may repeat
-                    key={index}
-                    className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm"
-                  >
-                    <span className="text-muted-foreground tabular-nums">
-                      {formatNumber(index + 1)}.
-                    </span>
-                    <span className="flex-1">{item}</span>
-                    <IconButton
-                      data-focus="remove"
-                      label={t('common.remove', { label: item })}
-                      onClick={() => remove(index)}
-                    >
-                      <XIcon />
-                    </IconButton>
-                  </li>
-                ))}
-              </ol>
-            )}
-            <div className="flex items-center gap-2">
-              <Input
-                ref={input}
-                id={id}
-                value={draft}
-                maxLength={200}
-                disabled={full}
-                placeholder={t('tasks.form.checklistPlaceholder')}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    add();
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={add}
-                disabled={full || !draft.trim()}
-              >
-                <PlusIcon />
-                {t('tasks.form.addItem')}
-              </Button>
-            </div>
-          </Field>
-        );
-      }}
+      name={name}
+      render={({ field }) => (
+        <ItemsEditor
+          label={criteria ? t('tasks.form.criteria') : t('tasks.form.checklist')}
+          placeholder={
+            criteria ? t('tasks.form.criteriaPlaceholder') : t('tasks.form.checklistPlaceholder')
+          }
+          hint={criteria ? t('tasks.form.criteriaHint') : undefined}
+          limit={criteria ? TASK_LIMITS.criteria : TASK_LIMITS.checklist}
+          value={field.value ?? []}
+          onChange={field.onChange}
+        />
+      )}
     />
   );
 }
@@ -1133,5 +1166,101 @@ export function LinksField({ form }: { form: TaskFormMethods }) {
         {t('tasks.links.add')}
       </Button>
     </div>
+  );
+}
+
+/** Hours with halves up to a day, then whole days (F06B rule C8). */
+const ESTIMATE_HOURS = [
+  ...Array.from({ length: 16 }, (_, index) => (index + 1) / 2),
+  10,
+  12,
+  16,
+  20,
+  24,
+  32,
+  40,
+];
+
+/** F06B rule C8: an estimate in hours, stored in minutes; empty for none. */
+export function EstimateSelect({
+  value,
+  onChange,
+  labelledBy,
+  triggerRef,
+}: {
+  value: number | null | undefined;
+  onChange: (minutes: number | null) => void;
+  labelledBy?: string;
+  triggerRef?: Ref<HTMLButtonElement>;
+}) {
+  const { t } = useTranslation();
+  const hours = value && !ESTIMATE_HOURS.includes(value / 60) ? [value / 60] : [];
+  const items = [
+    { value: '', label: t('tasks.subtasks.noEstimate') },
+    ...[...ESTIMATE_HOURS, ...hours]
+      .sort((a, b) => a - b)
+      .map((h) => ({
+        value: String(h * 60),
+        label: t('tasks.subtasks.hours', { hours: formatNumber(h) }),
+      })),
+  ];
+  return (
+    <Select
+      items={items}
+      value={value ? String(value) : ''}
+      onValueChange={(next) => onChange(next ? Number(next) : null)}
+    >
+      <SelectTrigger ref={triggerRef} aria-labelledby={labelledBy}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** F06B rule C8: the task's estimate. */
+export function EstimateField({ form }: { form: TaskFormMethods }) {
+  const { t } = useTranslation();
+  const id = useId();
+  return (
+    <Field>
+      <FieldLabel id={id} render={<span />}>
+        {t('tasks.subtasks.estimate')}
+        <Optional />
+      </FieldLabel>
+      <Controller
+        control={form.control}
+        name="estimateMinutes"
+        render={({ field }) => (
+          <EstimateSelect
+            value={field.value}
+            onChange={field.onChange}
+            labelledBy={id}
+            triggerRef={field.ref}
+          />
+        )}
+      />
+      <FieldDescription>{t('tasks.form.estimateHint')}</FieldDescription>
+    </Field>
+  );
+}
+
+/** F06B rule C7: the brief fields of the chosen department; a change of kind clears them. */
+export function BriefFieldsField({ form }: { form: TaskFormMethods }) {
+  const department = useWatch({ control: form.control, name: 'department' });
+  return (
+    <Controller
+      control={form.control}
+      name="briefFields"
+      render={({ field }) => (
+        <BriefFieldsEditor department={department} value={field.value} onChange={field.onChange} />
+      )}
+    />
   );
 }

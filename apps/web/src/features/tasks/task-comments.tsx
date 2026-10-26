@@ -255,12 +255,63 @@ function ConvertDialog({
   );
 }
 
-type Addressee = `user:${string}` | `department:${string}`;
+export type Addressee = `user:${string}` | `department:${string}`;
+
+/** Rule B1: who a question goes to, a department or a person other than the caller. */
+export function AddresseeSelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: Addressee | null;
+  onChange: (value: Addressee | null) => void;
+}) {
+  const { t } = useTranslation();
+  const me = useMe();
+  const users = useActiveUsers().filter((user) => user.id !== me.user.id);
+  const departments = useDepartments();
+  const items = [
+    ...users.map((user) => ({ value: `user:${user.id}`, label: user.name })),
+    ...departments.map(({ code, name }) => ({ value: `department:${code}`, label: name })),
+  ];
+  return (
+    <Select
+      items={items}
+      value={value}
+      onValueChange={(next) => onChange((next as Addressee | null) ?? null)}
+    >
+      <SelectTrigger id={id}>
+        <SelectValue placeholder={t('tasks.questions.addresseePlaceholder')} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectGroupLabel>{t('tasks.questions.departments')}</SelectGroupLabel>
+          {departments.map(({ code, name }) => (
+            <SelectItem key={code} value={`department:${code}`}>
+              {name}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+        <SelectGroup>
+          <SelectGroupLabel>{t('tasks.questions.people')}</SelectGroupLabel>
+          {users.map((user) => (
+            <SelectItem key={user.id} value={`user:${user.id}`}>
+              <span className="flex items-center gap-2">
+                <Avatar name={user.name} src={imageSrc(user.imageId, 'sm')} size="sm" />
+                {user.name}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
 
 /** The thread's editor: a comment, or a question to a person or a department (rule B1). */
 function NewMessage({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
-  const me = useMe();
   const kindId = useId();
   const addresseeId = useId();
   const [kind, setKind] = useState<'comment' | 'question'>('comment');
@@ -268,12 +319,6 @@ function NewMessage({ task }: { task: TaskDetail }) {
   const [addresseeMissing, setAddresseeMissing] = useState(false);
   const add = useAddComment(task.id);
   const ask = useAskQuestion(task.id);
-  const users = useActiveUsers().filter((user) => user.id !== me.user.id);
-  const departments = useDepartments();
-  const items = [
-    ...users.map((user) => ({ value: `user:${user.id}`, label: user.name })),
-    ...departments.map(({ code, name }) => ({ value: `department:${code}`, label: name })),
-  ];
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -299,39 +344,14 @@ function NewMessage({ task }: { task: TaskDetail }) {
             <FieldLabel htmlFor={addresseeId} className="sr-only">
               {t('tasks.questions.addressee')}
             </FieldLabel>
-            <Select
-              items={items}
+            <AddresseeSelect
+              id={addresseeId}
               value={addressee}
-              onValueChange={(value) => {
+              onChange={(value) => {
                 setAddresseeMissing(false);
-                setAddressee((value as Addressee | null) ?? null);
+                setAddressee(value);
               }}
-            >
-              <SelectTrigger id={addresseeId}>
-                <SelectValue placeholder={t('tasks.questions.addresseePlaceholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectGroupLabel>{t('tasks.questions.departments')}</SelectGroupLabel>
-                  {departments.map(({ code, name }) => (
-                    <SelectItem key={code} value={`department:${code}`}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectGroupLabel>{t('tasks.questions.people')}</SelectGroupLabel>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={`user:${user.id}`}>
-                      <span className="flex items-center gap-2">
-                        <Avatar name={user.name} src={imageSrc(user.imageId, 'sm')} size="sm" />
-                        {user.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            />
             <FieldError match={addresseeMissing}>
               {t('tasks.questions.errors.addressee')}
             </FieldError>

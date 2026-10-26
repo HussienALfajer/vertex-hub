@@ -774,6 +774,10 @@ export async function removeTasks(db: Database, given: string[]): Promise<void> 
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(attendancePunches).where(inArray(attendancePunches.fieldTaskId, ids));
   await db.update(tasks).set({ stageId: null }).where(inArray(tasks.id, ids));
+  await db
+    .update(workTemplates)
+    .set({ sourceTaskId: null })
+    .where(inArray(workTemplates.sourceTaskId, ids));
   await db.delete(taskStages).where(inArray(taskStages.taskId, ids));
   await db.delete(tasks).where(inArray(tasks.id, ids));
 }

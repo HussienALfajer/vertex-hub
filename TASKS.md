@@ -38,7 +38,8 @@ Spec: `docs/specs/F06B-tasks-2.md` (Approved 2026-10-26) · ADR 0041 (and 0013, 
 - "Save as template" in the header menu moves to PR 5 with its dialog and the template editor
 
 ## PR 5 — Creation wizard, Workload, tree and templates (web)
-- [ ] web: `/tasks/new` wizard (five steps, local-storage draft, files at creation with paste, live preview per mode, readiness review, start from a template); Workload hours vs capacity; project Tasks tab and retainer "This month" Tree mode; template list kind and the task template editor, "Save as template"
-- [ ] web unit tests: draft storage, paste handler, preview layout
-- [ ] e2e: `f06b.spec.ts` flow (stages → handover → deliver → client → reopen one); screens of each wizard step and preview mode, Workload, tree, template editor
+- [x] web: `/tasks/new` wizard (five steps, local-storage draft, files at creation with paste, live preview per mode, readiness review and "Create now" confirmation, start from a template); brief fields editor and estimate (wizard, edit dialog); Workload hours vs capacity; project Tasks tab and retainer "This month" Tree mode; task template editor, "Save as template" in the task menu
+- [x] found on the way: "Saved from …" (screen 7) had no data: `work_templates.source_task_id` (0090, expand only), `savedFrom` on the template detail, API test
+- [x] web unit tests: draft storage and moves (`task-wizard-draft.test.ts`), paste handler (`held-uploads.test.ts`), preview layout (`task-wizard-preview.test.ts`)
+- [ ] e2e: mocks (readiness, tree, create with subtasks, task templates), `f06b.spec.ts` flow (stages → handover → deliver → client → reopen one); screens of each wizard step and preview mode, Workload, tree, template editor
 - [ ] checks, reviewer, acceptance, PR with auto-merge; `docs/ROADMAP.md` F06B done

@@ -1,15 +1,22 @@
 import type { Page, Route } from '@playwright/test';
 import {
+  bottleneck,
+  type CreateTaskInput,
   type DepartmentCode,
+  isTaskOpen,
   type MyQuestion,
+  type ReadinessWarning,
   richTextFromPlain,
   type Subtask,
   type Task,
   type TaskComment,
   type TaskCommentDoc,
   type TaskDetail,
+  type TaskReadinessInput,
   type TaskReply,
   type TaskStage,
+  type TaskTree,
+  type TemplateDetail,
 } from '@vertex-hub/contracts';
 import { seedIds } from './fixtures';
 
@@ -528,4 +535,125 @@ export async function mockF06b(page: Page, variant: Variant = 'working'): Promis
     },
   );
   return api;
+}
+
+/** The wizard's requests (F06B part C): readiness, then the one create request. */
+export interface F06bCreateApi {
+  /** The create request's body, once sent. */
+  created: () => CreateTaskInput | null;
+  readinessChecks: TaskReadinessInput[];
+}
+
+/**
+ * Readiness answers `warnings` for every check; the create request answers the autumn menu's
+ * detail, so the page then opens it (with `mockF06b`).
+ */
+export async function mockF06bCreate(
+  page: Page,
+  warnings: (input: TaskReadinessInput) => ReadinessWarning[] = () => [],
+): Promise<F06bCreateApi> {
+  let created: CreateTaskInput | null = null;
+  const readinessChecks: TaskReadinessInput[] = [];
+  await page.route(
+    (url) => url.pathname === '/api/tasks/readiness',
+    (route, request) => {
+      const input = request.postDataJSON() as TaskReadinessInput;
+      readinessChecks.push(input);
+      return route.fulfill({ status: 200, json: { warnings: warnings(input) } });
+    },
+  );
+  await page.route(
+    (url) => url.pathname === '/api/tasks',
+    (route, request) => {
+      if (request.method() !== 'POST') return route.fallback();
+      created = request.postDataJSON() as CreateTaskInput;
+      return route.fulfill({ status: 201, json: parentDetail('working') });
+    },
+  );
+  return { created: () => created, readinessChecks };
+}
+
+/**
+ * Rule D4: the identity project as a tree, the autumn menu's subtasks indented under its stages,
+ * the run's arrows, and its bottleneck by the contracts' own rule.
+ */
+export function projectTree(): TaskTree {
+  const detail = parentDetail('working');
+  const node = (task: Task) => ({
+    id: task.id,
+    title: task.title,
+    department: task.department,
+    assignee: task.assignee,
+    status: task.status,
+    dueDate: task.dueDate,
+    dueTime: task.dueTime,
+    overdue: task.overdue,
+    blocked: task.blocked,
+    estimateMinutes: task.estimateMinutes,
+  });
+  const live = detail.subtasks;
+  const edges = [
+    { taskId: F06B_SUBTASKS.photos, dependsOnId: F06B_SUBTASKS.copy, source: 'run' as const },
+    { taskId: F06B_SUBTASKS.pages, dependsOnId: F06B_SUBTASKS.copy, source: 'run' as const },
+    { taskId: F06B_SUBTASKS.print, dependsOnId: F06B_SUBTASKS.photos, source: 'run' as const },
+    { taskId: F06B_SUBTASKS.print, dependsOnId: F06B_SUBTASKS.pages, source: 'run' as const },
+  ];
+  const nodes = [detail, ...live].map((task) => ({
+    id: task.id,
+    open: isTaskOpen(task.status),
+    blocked: task.blocked,
+    dueDate: task.dueDate,
+    dueTime: task.dueTime,
+    overdue: task.overdue,
+  }));
+  return {
+    groups: [
+      {
+        milestone: { id: uuid(19801), name: 'تصميم الهوية' },
+        tasks: [{ ...node(detail), runMode: 'stages', subtasks: live.map(node) }],
+      },
+    ],
+    edges,
+    outside: [],
+    bottleneckId: bottleneck(nodes, edges),
+  };
+}
+
+/** The tree of the identity project (rule D4); other trees fall back to the main mock. */
+export async function mockF06bTree(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === '/api/tasks/tree',
+    (route) => route.fulfill({ status: 200, json: projectTree() }),
+  );
+}
+
+/** Rule D1: "Save as template" from the autumn menu answers a template like the API's. */
+export async function mockF06bSaveTemplate(page: Page): Promise<{ sent: () => unknown }> {
+  let sent: unknown = null;
+  await page.route(
+    (url) => url.pathname === `/api/templates/from-task/${F06B_PARENT}`,
+    (route, request) => {
+      sent = request.postDataJSON();
+      const { name } = sent as { name: string };
+      const template: TemplateDetail = {
+        id: uuid(19901),
+        name,
+        kind: 'task',
+        description: null,
+        runMode: 'stages',
+        stages: [],
+        steps: [],
+        assignees: [],
+        warnings: [],
+        linkedRetainers: [],
+        savedFrom: { id: F06B_PARENT, title: 'تصاميم منيو الخريف' },
+        createdAt: '2026-10-10T09:00:00.000Z',
+        updatedAt: '2026-10-10T09:00:00.000Z',
+        archivedAt: null,
+        permissions: { canEdit: true, canArchive: true },
+      };
+      return route.fulfill({ status: 201, json: template });
+    },
+  );
+  return { sent: () => sent };
 }

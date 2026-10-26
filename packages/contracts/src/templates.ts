@@ -379,6 +379,8 @@ export const templateDetailSchema = z
     ),
     /** Monthly templates: the non-archived retainers linked to it. */
     linkedRetainers: z.array(namedSchema.extend({ client: clientRefSchema })),
+    /** `task` templates saved from a task (F06B rule D1): "Saved from …". */
+    savedFrom: z.object({ id: z.uuid(), title: z.string() }).nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
     archivedAt: z.iso.datetime().nullable(),

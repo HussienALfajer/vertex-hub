@@ -321,6 +321,7 @@ import {
   notificationBox,
   notificationInbox,
   notificationPriority,
+  nthWorkDay,
   OPEN_AD_CAMPAIGN_STATUSES,
   OPEN_INVOICE_STATUSES,
   OPEN_LEAD_STAGES,
@@ -468,6 +469,7 @@ import {
   type TaskRights,
   type TaskStatus,
   type TaskStatusChange,
+  type TaskTemplateDraft,
   type TaskType,
   type TaskWorkload,
   TEMPLATE_KIND_BY_BILLING,
@@ -6120,6 +6122,10 @@ function taskRoutes({
         pageSize: 50,
       });
     }
+    // F06B rule C5: no warnings by default; `f06b-fixtures.ts` answers with some.
+    if (path === '/api/tasks/readiness' && method === 'POST') {
+      return json(route, { warnings: [] });
+    }
     if (path === '/api/tasks' && method === 'GET') {
       const q = url.searchParams;
       const sort = q.get('sort') ?? 'dueDate';
@@ -6596,10 +6602,11 @@ function taskRoutes({
               overdue: theirs.filter(overdue).length,
               dueThisWeek,
               open: theirs.length,
-              // The mocks have no estimates: two hours each, and no employee files.
+              // The mocks have no estimates: two hours each. Six days of eight hours, but Layan
+              // is mostly on leave (over capacity) and Karim has no schedule (edge case 21).
               estimatedMinutes: dueThisWeek * DEFAULT_ESTIMATE_MINUTES,
               unestimatedCount: dueThisWeek,
-              capacityMinutes: null,
+              capacityMinutes: u.id === id(4) ? null : u.id === id(3) ? 60 : 2880,
             };
           }),
         unassigned: departments.map((department) => ({
@@ -7831,6 +7838,9 @@ interface TemplateRecord {
   linkedRetainerIds: string[];
   archived: boolean;
   updatedAt: string;
+  /** `task` templates (F06B part D). */
+  runMode?: TemplateDetail['runMode'];
+  savedFrom?: TemplateDetail['savedFrom'];
 }
 
 type StepSeed = Partial<TemplateStep> & Pick<TemplateStep, 'title' | 'department'>;
@@ -8913,6 +8923,46 @@ export function templatesSeed(): TemplateRecord[] {
       updatedAt: '2026-09-20T08:00:00.000Z',
     },
     {
+      // F06B part D: a task template saved from the autumn menu, by stages.
+      id: id(2400),
+      name: 'حملة سوشيال على مراحل',
+      kind: 'task',
+      description: 'نصوص، ثم تصميم وريل معًا.',
+      runMode: 'stages',
+      savedFrom: { id: id(1001), title: 'تصاميم منيو الخريف' },
+      stages: [stage(2401, 'النصوص', 1), stage(2402, 'التصميم', 2)],
+      steps: templateSteps(2410, [
+        {
+          title: 'حملة الشتاء',
+          department: 'marketing',
+          dueDay: 8,
+          estimateMinutes: 240,
+          criteria: ['الشعار في كل تصميم'],
+          briefFields: { goal: 'زيادة الحجوزات في الشتاء' },
+        },
+        {
+          title: 'نصوص الحملة',
+          department: 'content_management',
+          dueDay: 3,
+          stageId: id(2401),
+          estimateMinutes: 180,
+        },
+        {
+          title: 'تصاميم الحملة',
+          department: 'design',
+          dueDay: 6,
+          stageId: id(2402),
+          estimateMinutes: 360,
+          briefFields: { sizes: ['1080 × 1350'] },
+        },
+        { title: 'ريل الحملة', department: 'photography', dueDay: 7, stageId: id(2402) },
+      ]).map((step, index) => (index === 0 ? step : { ...step, parentStepId: id(2410) })),
+      assignees: [{ department: 'design', userId: id(3) }],
+      linkedRetainerIds: [],
+      archived: false,
+      updatedAt: '2026-10-08T09:00:00.000Z',
+    },
+    {
       id: id(2300),
       name: 'حملة موسمية قديمة',
       kind: 'project',
@@ -8966,7 +9016,7 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
       name: t.name,
       kind: t.kind,
       description: t.description,
-      runMode: null,
+      runMode: t.runMode ?? null,
       stages: t.stages,
       steps: t.steps,
       assignees,
@@ -8988,6 +9038,7 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
       createdAt: '2026-09-01T08:00:00.000Z',
       updatedAt: t.updatedAt,
       archivedAt: t.archived ? '2026-09-15T08:00:00.000Z' : null,
+      savedFrom: t.savedFrom ?? null,
       permissions: { canEdit: manages() && !t.archived, canArchive: manages() },
     };
   };
@@ -9023,6 +9074,7 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
     };
     t.name = doc.name;
     t.description = doc.description;
+    t.runMode = doc.runMode;
     t.stages = doc.stages.map((s, i) => ({ id: idOf(s.key), name: s.name, position: i + 1 }));
     t.steps = doc.steps.map(({ key, stageKey, parentKey, dependsOn, ...step }, i) => ({
       ...step,
@@ -9084,6 +9136,49 @@ function templateRoutes({ users, clients, retainers, templates, me }: TemplateSt
       save(created, input);
       templates.push(created);
       return json(route, detail(created), 201);
+    }
+    // F06B rule D2: a task template as the wizard's draft, in work days from the start date.
+    const draft = path.match(/^\/api\/templates\/([^/]+)\/task-draft$/);
+    if (draft && method === 'POST') {
+      const t = templates.find((item) => item.id === draft[1] && !item.archived);
+      if (!t) return fail(route, 404, null);
+      if (t.kind !== 'task') return fail(route, 409, 'TEMPLATE_KIND_MISMATCH');
+      const start = (request.postDataJSON() as { startDate?: string }).startDate ?? PROJECTS_TODAY;
+      const [root, ...subs] = t.steps;
+      if (!root) return fail(route, 404, null);
+      const assigneeOf = (department: DepartmentCode) => {
+        const userId = t.assignees.find((a) => a.department === department)?.userId ?? null;
+        return userId && isMember(userId, department) ? userId : null;
+      };
+      const item = (step: TemplateStep) => ({
+        title: step.title,
+        brief: step.brief,
+        briefDoc: step.briefDoc,
+        briefFields: step.briefFields,
+        department: step.department,
+        assigneeId: assigneeOf(step.department),
+        dueDate: nthWorkDay(start, step.dueDay ?? 1),
+        priority: step.priority,
+        estimateMinutes: step.estimateMinutes,
+        checklist: step.checklist,
+        criteria: step.criteria,
+      });
+      const body: TaskTemplateDraft = {
+        ...item(root),
+        templateId: t.id,
+        needsClientApproval: root.needsClientApproval,
+        revisionLimit: root.revisionLimit,
+        runMode: t.runMode ?? null,
+        stages: t.stages.map((stage) => ({ name: stage.name })),
+        subtasks: subs.map((step) => ({
+          ...item(step),
+          stageIndex:
+            t.runMode === 'stages'
+              ? t.stages.findIndex((stage) => stage.id === step.stageId)
+              : null,
+        })),
+      };
+      return json(route, body);
     }
     const match = path.match(/^\/api\/templates\/([^/]+)(?:\/(archive|restore))?$/);
     if (!match) return undefined;
@@ -16845,6 +16940,7 @@ export const seedIds = {
   openingShoot: id(1753),
   coffeeShoot: id(1754),
   websiteTemplate: id(2000),
+  socialTaskTemplate: id(2400),
   monthlyTemplate: id(2100),
   designService: id(9001),
   brandService: id(9004),

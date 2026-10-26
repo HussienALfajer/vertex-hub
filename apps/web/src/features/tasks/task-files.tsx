@@ -33,7 +33,7 @@ import {
   filePreviewUrl,
   useRestoreFileItem,
 } from '../files/files.queries';
-import { namedFiles } from '../files/held-uploads';
+import { namedFiles, pastedFiles } from '../files/held-uploads';
 import { TaskSection } from './task-parts';
 import { reviewSnapshot } from './task-review';
 
@@ -95,12 +95,8 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
   receiveRef.current = receive;
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (event.defaultPrevented || target?.closest('input, textarea, [contenteditable="true"]')) {
-        return;
-      }
-      const pasted = [...(event.clipboardData?.files ?? [])];
-      if (pasted.length === 0) return;
+      const pasted = pastedFiles(event);
+      if (!pasted || pasted.length === 0) return;
       event.preventDefault();
       receiveRef.current(pasted, true);
     };

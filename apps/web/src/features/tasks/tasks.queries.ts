@@ -3,6 +3,7 @@ import {
   keepPreviousData,
   type QueryKey,
   queryOptions,
+  skipToken,
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
@@ -25,6 +26,7 @@ import type {
   TaskCommentUpdate,
   TaskDependenciesInput,
   TaskQuestionInput,
+  TaskReadinessInput,
   TaskStatusChange,
   UpdateTask,
   UpdateTaskChecklistItem,
@@ -42,6 +44,8 @@ export type TaskWorkloadFilters = NonNullable<
   paths['/api/tasks/workload']['get']['parameters']['query']
 >;
 
+export type TaskTreeFilters = NonNullable<paths['/api/tasks/tree']['get']['parameters']['query']>;
+
 export const tasksKeys = {
   all: ['tasks'] as const,
   list: (filters: TaskListFilters) => ['tasks', 'list', filters] as const,
@@ -52,6 +56,7 @@ export const tasksKeys = {
   summary: ['tasks', 'summary'] as const,
   board: (filters: TaskBoardFilters) => ['tasks', 'board', filters] as const,
   workload: (filters: TaskWorkloadFilters) => ['tasks', 'workload', filters] as const,
+  tree: (filters: TaskTreeFilters) => ['tasks', 'tree', filters] as const,
 };
 
 export const taskListQuery = (filters: TaskListFilters) =>
@@ -133,6 +138,22 @@ export const taskWorkloadQuery = (filters: TaskWorkloadFilters) =>
     queryKey: tasksKeys.workload(filters),
     queryFn: () => call(api.GET('/api/tasks/workload', { params: { query: filters } })),
     placeholderData: keepPreviousData,
+  });
+
+/** F06B rule D4: a project's or a retainer cycle's tasks as a tree, with the bottleneck. */
+export const taskTreeQuery = (filters: TaskTreeFilters) =>
+  queryOptions({
+    queryKey: tasksKeys.tree(filters),
+    queryFn: () => call(api.GET('/api/tasks/tree', { params: { query: filters } })),
+  });
+
+/** F06B rule C5: the readiness warnings of a draft (none until it has one); they never block. */
+export const taskReadinessQuery = (input: TaskReadinessInput | null) =>
+  queryOptions({
+    queryKey: ['tasks', 'readiness', input] as const,
+    queryFn: input ? () => call(api.POST('/api/tasks/readiness', { body: input })) : skipToken,
+    placeholderData: keepPreviousData,
+    retry: false,
   });
 
 /**

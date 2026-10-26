@@ -10,7 +10,7 @@ import {
   type TaskPriority,
 } from '@vertex-hub/contracts';
 import { type Database, taskChecklistItems, tasks } from '@vertex-hub/db';
-import { and, asc, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
@@ -65,6 +65,15 @@ export class TaskTemplates {
    * Rule D1: the task the actor saves as a template. 404 unless readable, `INVALID_LINK` for a
    * subtask, 403 without assign scope on it (not a project manager alone).
    */
+  /** "Saved from …" on a template (F06B screen 7): the task's title, archived or not. */
+  async source(taskId: string): Promise<{ id: string; title: string } | null> {
+    const [task] = await this.db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(eq(tasks.id, taskId));
+    return task ?? null;
+  }
+
   async snapshot(actor: CurrentUserInfo, taskId: string): Promise<TaskSnapshot> {
     const task = await readableTask(
       this.db,

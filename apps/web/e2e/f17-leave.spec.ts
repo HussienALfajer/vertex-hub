@@ -246,7 +246,7 @@ test('a new task for someone on leave that day asks before assigning', async ({ 
   await page.getByLabel(ar.tasks.form.dueDate).fill('2026-10-25');
   await page.getByRole('combobox', { name: ar.tasks.form.assignee }).click();
   await page.getByRole('option', { name: 'كريم الزين' }).click();
-  await page.getByRole('button', { name: ar.tasks.form.create }).click();
+  await page.getByRole('button', { name: ar.tasks.wizard.createNow }).click();
   const warning = page.getByRole('alertdialog', { name: ar.tasks.leaveWarning.title });
   await warning.getByRole('button', { name: ar.tasks.leaveWarning.action }).click();
   // Created once and opened, without the unsaved-changes question.

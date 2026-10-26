@@ -79,6 +79,7 @@ import { ApiError } from '../../lib/api/client';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { formatCalendarDate, formatDateTime, formatNumber, formatPeriod } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
+import { TaskTreeView, type TaskView, TaskViewSwitch } from '../tasks/task-tree';
 import { LineTemplateTasks, RetainerTemplatePanel } from '../templates/retainer-template-panel';
 import { retainerTemplateQuery } from '../templates/templates.queries';
 import { BehindBadge, DeliverableIcon, lineName, OverDeliveredBadge } from './retainer-badges';
@@ -113,6 +114,7 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
   // F07: the lines' task counts against the linked monthly template (rule 18).
   const template = useQuery(retainerTemplateQuery(retainer.id)).data;
   const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<TaskView>('list');
   const addButton = useRef<HTMLButtonElement>(null);
   const editable = retainer.permissions.canManage;
   const templateLines =
@@ -161,12 +163,19 @@ function OpenCycle({ retainer, cycleId }: { retainer: RetainerDetail; cycleId: s
       />
       <CycleSummary cycle={cycle.data} />
       <RetainerTemplatePanel retainer={retainer} />
+      {cycle.data.lines.length > 0 && (
+        <div className="flex justify-end">
+          <TaskViewSwitch value={view} onChange={setView} />
+        </div>
+      )}
       {cycle.data.lines.length === 0 ? (
         <EmptyState
           icon={<ListPlusIcon />}
           title={t('retainers.cycle.emptyTitle')}
           description={editable ? t('retainers.cycle.emptyHint') : undefined}
         />
+      ) : view === 'tree' ? (
+        <TaskTreeView filters={{ retainerCycleId: cycle.data.id }} />
       ) : (
         <ul aria-label={t('retainers.cycle.lines')} className="flex flex-col gap-3">
           {cycle.data.lines.map((line) => (

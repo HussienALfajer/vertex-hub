@@ -2,6 +2,7 @@ import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@ta
 import type {
   CreateTemplate,
   TemplateDetail,
+  TemplateFromTask,
   TemplateRunInput,
   UpdateTemplate,
 } from '@vertex-hub/contracts';
@@ -162,5 +163,33 @@ export function useRestoreTemplate(id: string) {
   return useMutation({
     mutationFn: () => call(api.POST('/api/templates/{id}/restore', { params: { path: { id } } })),
     onSuccess: invalidate,
+  });
+}
+
+/** F06B rule D1: "Save as template" on a task. */
+export function useSaveTaskAsTemplate(taskId: string) {
+  const invalidate = useInvalidateTemplates();
+  return useMutation({
+    mutationFn: (input: TemplateFromTask) =>
+      call(
+        api.POST('/api/templates/from-task/{taskId}', {
+          params: { path: { taskId } },
+          body: input,
+        }),
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+/** F06B rule D2: a task template as the wizard's draft, dated from `startDate`. */
+export function useTaskTemplateDraft() {
+  return useMutation({
+    mutationFn: ({ id, startDate }: { id: string; startDate?: string }) =>
+      call(
+        api.POST('/api/templates/{id}/task-draft', {
+          params: { path: { id } },
+          body: { startDate },
+        }),
+      ),
   });
 }

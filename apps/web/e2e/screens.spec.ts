@@ -1,5 +1,11 @@
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
-import { F06B_PARENT, mockF06b, questionsWaiting } from './f06b-fixtures';
+import {
+  F06B_PARENT,
+  mockF06b,
+  mockF06bCreate,
+  mockF06bTree,
+  questionsWaiting,
+} from './f06b-fixtures';
 import {
   ANNOUNCEMENTS_NOW,
   accountManagerMe,
@@ -1122,6 +1128,137 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.goto('/tasks/new?mode=request');
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(ar.tasks.new.requestTitle);
       await screenshot(page, testInfo, `new-task-request-${colorScheme}`);
+    });
+
+    test('new task wizard, every step and preview mode', async ({ page }, testInfo) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize({ width: 1280, height: 1500 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await mockF06bCreate(page, (input) => [
+        { subtaskIndex: null, code: 'due_on_day_off', suggestedDate: '2026-10-17' },
+        ...(input.subtasks.length > 1
+          ? [
+              {
+                subtaskIndex: 1,
+                code: 'assignee_overloaded' as const,
+                estimatedMinutes: 2700,
+                capacityMinutes: 2400,
+              },
+            ]
+          : []),
+      ]);
+      await page.goto(`/tasks/new?clientId=${seedIds.jasmine}`);
+      const form = page.locator('form');
+      const choose = async (scope: typeof form, label: string, option: string) => {
+        await scope.getByRole('combobox', { name: label, exact: true }).click();
+        await page
+          .getByRole('option', { name: new RegExp(`^${option}`) })
+          .first()
+          .click();
+      };
+      await choose(form, ar.tasks.form.department, 'التسويق');
+      await choose(form, ar.tasks.form.assignee, 'ليان الأحمد');
+      await page.getByLabel(ar.tasks.form.title).fill('حملة منيو الشتاء');
+      await page.getByLabel(ar.tasks.brief.fields.goal).fill('زيادة الحجوزات في أمسيات الشتاء');
+      await page.getByLabel(ar.tasks.form.dueDate).fill('2026-10-16');
+      await screenshot(page, testInfo, `wizard-basics-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.tasks.wizard.next }).click();
+      const rows = page.locator('li[draggable="true"]');
+      const addRow = async (title: string, department: string) => {
+        await page.getByRole('button', { name: ar.tasks.wizard.subtasks.add }).click();
+        const row = rows.last();
+        await row.getByLabel(ar.tasks.form.title).fill(title);
+        await choose(row, ar.tasks.form.department, department);
+      };
+      await addRow('نصوص المنيو', 'إدارة المحتوى');
+      await addRow('تصميم صفحات المنيو', 'التصميم');
+      await addRow('ريل الأطباق', 'التصوير');
+      await page.getByRole('button', { name: ar.tasks.wizard.subtasks.suggest }).click();
+      await screenshot(page, testInfo, `wizard-subtasks-sequential-${colorScheme}`);
+      await page
+        .getByRole('radio', { name: new RegExp(ar.tasks.subtasks.runModes.parallel) })
+        .click();
+      await screenshot(page, testInfo, `wizard-subtasks-parallel-${colorScheme}`);
+      await page
+        .getByRole('radio', { name: new RegExp(ar.tasks.subtasks.runModes.stages) })
+        .click();
+      await page.getByRole('button', { name: ar.tasks.subtasks.addStage }).click();
+      // Rows list by stage: the last one first, so the others keep their place.
+      await rows.nth(2).getByRole('combobox', { name: ar.tasks.subtasks.stage }).click();
+      await page.getByRole('option', { name: 'المرحلة 2' }).click();
+      await rows.nth(1).getByRole('combobox', { name: ar.tasks.subtasks.stage }).click();
+      await page.getByRole('option', { name: 'المرحلة 2' }).click();
+      await expect(page.getByTestId('preview-lane')).toHaveCount(2);
+      await screenshot(page, testInfo, `wizard-subtasks-stages-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.tasks.wizard.next }).click();
+      await page.locator('input[type="file"]').setInputFiles([
+        { name: 'moodboard.png', mimeType: 'image/png', buffer: portraitPng() },
+        { name: 'menu-brief.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF') },
+      ]);
+      await expect(page.getByText('menu-brief.pdf', { exact: true })).toBeVisible();
+      await screenshot(page, testInfo, `wizard-files-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.tasks.wizard.next }).click();
+      await page.getByRole('button', { name: ar.tasks.wizard.questions.add }).click();
+      await choose(form, ar.tasks.questions.addressee, 'التصميم');
+      const question = page.getByRole('textbox', { name: ar.tasks.questions.label });
+      await question.click();
+      await question.pressSequentially('ما المقاسات المطلوبة لنسخة إنستغرام؟');
+      await screenshot(page, testInfo, `wizard-questions-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.tasks.wizard.next }).click();
+      await expect(page.getByText(/المكلّف مشغول/)).toBeVisible();
+      await screenshot(page, testInfo, `wizard-review-${colorScheme}`);
+
+      // A phone: one step per screen, the preview folded under it.
+      await page.setViewportSize({ width: 390, height: 1400 });
+      await page
+        .getByRole('navigation', { name: ar.tasks.wizard.stepsLabel })
+        .getByRole('button', { name: ar.tasks.wizard.steps.subtasks })
+        .click();
+      await page.getByRole('button', { name: ar.tasks.wizard.preview.title }).click();
+      await screenshot(page, testInfo, `wizard-phone-${colorScheme}`);
+    });
+
+    test('project tasks as a tree', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1300 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await mockF06bTree(page);
+      await page.goto(`/projects/${seedIds.identityProject}?tab=tasks`);
+      await page.getByRole('button', { name: ar.tasks.tree.tree }).click();
+      await expect(page.locator('[data-bottleneck]')).toBeVisible();
+      await screenshot(page, testInfo, `project-tree-${colorScheme}`);
+    });
+
+    test('task template editor', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1400 });
+      await mockApi(page, { signedIn: true, me: manager });
+      await page.goto(`/templates/${seedIds.socialTaskTemplate}`);
+      await expect(page.getByText(ar.templates.task.savedFrom)).toBeVisible();
+      await screenshot(page, testInfo, `task-template-${colorScheme}`);
+      await page
+        .getByRole('button', {
+          name: ar.templates.task.edit.replace('{{title}}', 'تصاميم الحملة'),
+        })
+        .click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `task-template-step-${colorScheme}`);
+    });
+
+    test('save a task as a template', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe });
+      await mockF06b(page);
+      await page.goto(`/tasks/${F06B_PARENT}`);
+      await page.getByRole('button', { name: ar.tasks.actions.more }).click();
+      await page.getByRole('menuitem', { name: ar.tasks.wizard.template.saveTitle }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `save-as-template-${colorScheme}`);
     });
 
     test('task page', async ({ page }, testInfo) => {
