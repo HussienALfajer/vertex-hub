@@ -1,5 +1,5 @@
 # 0042 — Content: captions per platform group, a media layout on the post, and planning data owned by content
-Status: Proposed · Date: 2026-10-26
+Status: Accepted · Date: 2026-10-26
 
 ## Context
 F08B (Content 2.0, `docs/specs/F08B-content-2.md`) changes the F08 post (ADR 0021) in three ways. A post gets a caption per platform instead of one. Its media becomes an ordered set of slides with captions. The content calendar gains planning data: pillars, occasions, best publishing times, snippets and ideas. Today a post's caption and hashtags are two columns. Its media order is computed (own files, then linked tasks' finals), and the snapshot a client approves copies that caption and those versions.

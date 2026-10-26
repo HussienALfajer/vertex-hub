@@ -1,6 +1,6 @@
 # F08B — Content 2.0
 
-Status: Draft · Date: 2026-10-26 · Scope: `docs/product/v2-scope.md` §F08B (and the rules shared by F01C, F06B and F08B) · ADRs: 0013, 0014, 0019, 0020, 0021, 0037, 0040, 0041, 0042
+Status: Approved · Date: 2026-10-26 · Scope: `docs/product/v2-scope.md` §F08B (and the rules shared by F01C, F06B and F08B) · ADRs: 0013, 0014, 0019, 0020, 0021, 0037, 0040, 0041, 0042
 
 ## Summary
 F08 made the post the unit of content, but a post still has one caption for every platform, its media and tasks are added one by one after it exists, and planning happens in people's heads: nobody sees that next Tuesday has no post, that Eid has nothing planned, or that a client's month is all promotion.
@@ -372,7 +372,7 @@ What roles see differently: everyone reads every calendar, preview, idea and set
 16. **A video uploaded from a browser that cannot read its metadata**: no `mediaInfo`, so no length or ratio warning.
 
 ## Open questions
-- None block F08B. The owner decided the interview's questions on 2026-10-26 (ADR 0042).
+- None block F08B. The owner decided the interview's questions on 2026-10-26 and approved the spec, including the two derived rules (A2: adding a platform of a new caption group after approval needs "Reopen content"; A3: more than 30 Instagram hashtags blocks the submission) (ADR 0042).
 - Not asked, chosen as the simplest reading and easy to change before implementation: the 15-point pillar tolerance with at least 4 posts; "too close" at 3 hours; the default rhythm of 3 days; the starting occasions, best times and media rules (starting values the Content Management manager or a code change corrects); Instagram's 30-hashtag cap blocking like the character limits; the pack only for approved, scheduled and published posts; a client-less idea covered by every `content.manage` holder.
 - Could not confirm: the platform limits in `PLATFORM_TEXT_LIMITS` and `PLATFORM_MEDIA_RULES` were taken from the platforms' help pages as known in 2026-10, not checked live in this session.
 

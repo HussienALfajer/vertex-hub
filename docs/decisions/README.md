@@ -45,7 +45,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0039](0039-hr-attendance-proof-and-leave-ledger.md) | HR: one module, attendance proved by a rotating code, a passkey and the office network, leave as a ledger | Accepted |
 | [0040](0040-profile-images.md) | Profile images: one current image per record, cropped in the browser, served by immutable id | Accepted |
 | [0041](0041-subtasks-and-task-questions.md) | Subtasks as tasks under a parent, run modes through dependencies, questions in the task thread | Accepted |
-| [0042](0042-content-captions-per-platform-and-planning.md) | Content: captions per platform group, a media layout on the post, and planning data owned by content | Proposed |
+| [0042](0042-content-captions-per-platform-and-planning.md) | Content: captions per platform group, a media layout on the post, and planning data owned by content | Accepted |
 
 Template:
 
