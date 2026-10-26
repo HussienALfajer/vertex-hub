@@ -100,6 +100,7 @@ export class FileAttachments {
       sha256: upload.sha256,
       width: upload.width,
       height: upload.height,
+      durationMs: upload.durationMs,
       previewStatus: previewable ? 'pending' : 'none',
       uploadedById: actor.id,
     });
@@ -231,6 +232,7 @@ export class FileAttachments {
         sha256: version.sha256,
         width: version.width,
         height: version.height,
+        durationMs: version.durationMs,
         url: version.url,
         linkLabel: version.linkLabel,
         // The preview is stored per version: the copy renders its own.

@@ -132,6 +132,7 @@ export class FileContentService implements OnModuleInit {
     size: ImageSize,
     request: IncomingMessage,
     response: ServerResponse,
+    access: 'session' | 'link' = 'session',
   ): Promise<void> {
     const [image] = await this.db
       .select({ storageKey: images.storageKey, mimeType: images.mimeType, status: images.status })
@@ -142,14 +143,18 @@ export class FileContentService implements OnModuleInit {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Content-Type', ready ? 'image/webp' : image.mimeType);
     response.setHeader('Content-Disposition', 'inline');
+    // F09 rule 23: nothing an approval link shows is cached, and it goes out through the
+    // public location (F08B: the client's image on the post previews).
+    const cached = ready && access === 'session';
     response.setHeader(
       'Cache-Control',
-      ready ? 'private, max-age=31536000, immutable' : 'no-store',
+      cached ? 'private, max-age=31536000, immutable' : 'no-store',
     );
     await this.send(
       ready ? imageRenditionKey(image.storageKey, size) : image.storageKey,
       request,
       response,
+      access === 'link' ? PUBLIC_ACCEL_PREFIX : ACCEL_PREFIX,
     );
   }
 

@@ -27,6 +27,7 @@ export const shownPost = (snapshot: PostSnapshot) => ({
   publishTime: snapshot.publishTime,
   caption: snapshot.caption,
   hashtags: snapshot.hashtags,
+  captions: snapshot.captions,
 });
 
 /** SHA-256 of a token: all that is stored of a link (ADR 0002). */

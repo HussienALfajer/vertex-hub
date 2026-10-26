@@ -61,6 +61,7 @@ import {
   notificationSettings,
   notifications,
   payments,
+  postCaptions,
   postClientResponses,
   postReviews,
   projectExpenses,
@@ -848,6 +849,7 @@ export async function removePosts(db: Database, ids: string[]): Promise<void> {
   await removeRequests(db, inArray(approvalItems.postId, ids));
   await removePostResponses(db, inArray(postClientResponses.postId, ids));
   await db.delete(postReviews).where(inArray(postReviews.postId, ids));
+  await db.delete(postCaptions).where(inArray(postCaptions.postId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(notifications).where(inArray(notifications.subjectId, ids));
   await db.delete(contentPosts).where(inArray(contentPosts.id, ids));

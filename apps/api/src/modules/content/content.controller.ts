@@ -1,3 +1,4 @@
+import type { ServerResponse } from 'node:http';
 import {
   Body,
   Controller,
@@ -10,9 +11,11 @@ import {
   Post,
   Put,
   Query,
+  Res,
   SerializeOptions,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNoContentResponse,
@@ -53,13 +56,16 @@ import {
   returnPostTaskSchema,
   type UpdateFollowing,
   type UpdatePost,
+  type UpdatePostLayout,
   updateFollowingSchema,
+  updatePostLayoutSchema,
   updatePostSchema,
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
 import { ContentService } from './content.service.js';
 import { PostLinksService } from './post-links.service.js';
+import { PostPack } from './post-pack.js';
 import { PostWorkflowService } from './post-workflow.service.js';
 
 @ApiTags('content')
@@ -69,6 +75,7 @@ export class ContentController {
     private readonly content: ContentService,
     private readonly workflow: PostWorkflowService,
     private readonly links: PostLinksService,
+    private readonly pack: PostPack,
   ) {}
 
   @Get('content/calendar')
@@ -176,6 +183,7 @@ export class ContentController {
       'The updated post (edit scope): the content in idea and in production, the schedule in any open status, the publish time and links once published',
     standardSchema: postDetailSchema,
   })
+  @ApiBadRequestResponse({ description: '`INVALID_CAPTION_GROUP`' })
   @ApiConflictResponse({
     description:
       '`POST_LOCKED`, `POST_ARCHIVED`, `INVALID_TRANSITION`, `CYCLE_CLOSED`, `POST_COUNTED_BY_TASK`',
@@ -188,6 +196,41 @@ export class ContentController {
     return this.content.update(actor, id, input);
   }
 
+  @Put('content/posts/:id/layout')
+  @RequirePermissions('content.manage')
+  @SerializeOptions({ schema: postDetailSchema })
+  @ApiOkResponse({
+    description:
+      'The post with its media in the given slide order and slide captions (edit scope, idea and in production)',
+    standardSchema: postDetailSchema,
+  })
+  @ApiBadRequestResponse({ description: '`INVALID_ORDER`: not every current medium once' })
+  @ApiConflictResponse({ description: '`POST_LOCKED`, `POST_ARCHIVED`' })
+  setLayout(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: updatePostLayoutSchema }) input: UpdatePostLayout,
+  ): Promise<PostDetail> {
+    return this.content.setLayout(actor, id, input);
+  }
+
+  @Get('content/posts/:id/pack')
+  @RequirePermissions('content.manage')
+  @ApiOkResponse({
+    description:
+      'The publishing pack, a zip: the media in slide order, a captions file per caption group and the links (edit scope)',
+  })
+  @ApiConflictResponse({
+    description: '`INVALID_TRANSITION`: not approved, scheduled or published',
+  })
+  async downloadPack(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() response: ServerResponse,
+  ): Promise<void> {
+    await this.pack.send(actor, id, response);
+  }
+
   @Post('content/posts/:id/status')
   @HttpCode(200)
   @RequirePermissions('content.read')
@@ -198,7 +241,7 @@ export class ContentController {
   })
   @ApiConflictResponse({
     description:
-      '`INVALID_TRANSITION`, `NOTHING_TO_APPROVE`, `POST_TASKS_NOT_READY`, `REVIEW_CONTENT_CHANGED`, `PUBLISH_TIME_REQUIRED`, `POST_ARCHIVED`',
+      '`INVALID_TRANSITION`, `NOTHING_TO_APPROVE`, `POST_TASKS_NOT_READY`, `REVIEW_CONTENT_CHANGED`, `PUBLISH_TIME_REQUIRED`, `POST_ARCHIVED`, `CAPTION_TOO_LONG` (`details.checks`)',
   })
   changeStatus(
     @CurrentUser() actor: CurrentUserInfo,

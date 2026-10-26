@@ -104,9 +104,10 @@ export class PostLinksService implements OnModuleInit {
   /** Rule 8: the task is free for another post, with its client approval back unless approved. */
   async unlink(actor: CurrentUserInfo, id: string, taskId: string): Promise<PostDetail> {
     await this.db.transaction(async (tx) => {
-      await this.editablePost(tx, actor, id);
+      const post = await this.editablePost(tx, actor, id);
       const task = await this.tasks.unlink(tx, id, taskId, actorOf(actor));
       await this.auditTask(tx, actorOf(actor), 'post.task_unlinked', id, task);
+      await this.content.pruneLayout(tx, actor, post);
     });
     return this.content.detail(actor, id);
   }

@@ -10,10 +10,12 @@ import { ContentController } from './content.controller.js';
 import { ContentService } from './content.service.js';
 import { ContentReports } from './content-reports.js';
 import { PostApprovals } from './post-approvals.js';
+import { PostCaptions } from './post-captions.js';
 import { PostHooksService } from './post-hooks.service.js';
 import { PostLinksService } from './post-links.service.js';
 import { PostMedia } from './post-media.js';
 import { PostNotices } from './post-notices.js';
+import { PostPack } from './post-pack.js';
 import { PostReminders } from './post-reminders.js';
 import { PostReviewHooks } from './post-review-hooks.js';
 import { PostReviews } from './post-reviews.js';
@@ -21,8 +23,8 @@ import { PostTeams } from './post-teams.js';
 import { PostWorkflowService } from './post-workflow.service.js';
 
 /**
- * The content calendar (F08, ADR 0021). Owns `content_posts`, `post_reviews` and
- * `post_client_responses`. Reads users through `auth`'s `UserDirectory` and feeds open posts
+ * The content calendar (F08, ADR 0021; F08B, ADR 0042). Owns `content_posts`, `post_captions`,
+ * `post_reviews` and `post_client_responses`. Reads users through `auth`'s `UserDirectory` and feeds open posts
  * into its `ResponsibilityRegistry`; reads clients through `ClientDirectory` and registers into
  * `ClientFlagHooks` for healthcare flag changes; reads cycle lines through `projects`'
  * `EngagementDirectory` and adds the posts counted directly to `WorkProgress`; registers the
@@ -58,6 +60,8 @@ import { PostWorkflowService } from './post-workflow.service.js';
     PostReviewHooks,
     ContentReports,
     PostTeams,
+    PostCaptions,
+    PostPack,
   ],
   exports: [PostApprovals, PostReviewHooks, ContentReports, PostTeams],
 })

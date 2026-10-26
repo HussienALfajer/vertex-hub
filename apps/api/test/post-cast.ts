@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   type CreatePostInput,
+  captionGroupsOf,
   type FileItem,
   fileItemSchema,
   type NotificationType,
@@ -30,18 +31,28 @@ export async function seedPostCast(db: Database, client: Api) {
     departments: [{ code: 'medical_consultation' }],
   });
 
-  /** Creates a post as `cookie`; an Instagram post with a caption, due in 5 days, unless told. */
+  /**
+   * Creates a post as `cookie`; an Instagram post with a caption, due in 5 days, unless told.
+   * `caption` and `hashtags` are the first caption group's, unless `captions` are given.
+   */
   async function createPost(
     cookie: string,
-    input: Partial<CreatePostInput> & { clientId: string },
+    input: Partial<CreatePostInput> & {
+      clientId: string;
+      caption?: string | null;
+      hashtags?: string | null;
+    },
   ) {
+    const { caption = `نص المنشور ${cast.run}`, hashtags = null, ...fields } = input;
+    const platforms = fields.platforms ?? ['instagram'];
+    const [group] = captionGroupsOf(platforms);
     const response = await client.post('/api/content/posts', cookie, {
       title: `منشور ${cast.run}`,
       type: 'post',
-      platforms: ['instagram'],
+      platforms,
       publishDate: cast.inDays(5),
-      caption: `نص المنشور ${cast.run}`,
-      ...input,
+      captions: group ? [{ group, caption, hashtags }] : [],
+      ...fields,
     });
     if (response.status !== 201) {
       throw new Error(`Post creation failed: ${response.status} ${await response.text()}`);
@@ -89,7 +100,7 @@ export async function seedPostCast(db: Database, client: Api) {
    */
   async function postAt(
     status: PostStatus,
-    input: Partial<CreatePostInput> & { clientId: string },
+    input: Parameters<typeof createPost>[1],
   ): Promise<PostDetail> {
     let current = await createPost(cast.writer.cookie, { publishTime: '10:30', ...input });
     const cleared = current.needsClientApproval ? 'awaiting_client' : 'approved';

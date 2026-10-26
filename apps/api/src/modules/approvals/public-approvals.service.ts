@@ -64,6 +64,7 @@ const toFile = (version: SentVersion): PublicApprovalFile => ({
   previewAvailable: version.previewStatus === 'ready',
   linkUrl: version.url,
   linkLabel: version.linkLabel,
+  slideCaption: null,
 });
 
 /**
@@ -101,6 +102,7 @@ export class PublicApprovalsService {
       item.post ? `${item.post.publishDate} ${item.post.publishTime ?? '99'}` : '9';
     return {
       clientName: client.name,
+      clientImage: !!client.imageId,
       contactName: contact.name,
       accountManagerName: people.get(client.accountManagerId)?.name ?? '',
       message: request.message,
@@ -214,6 +216,17 @@ export class PublicApprovalsService {
    * Rule 22: the bytes of a version, only when it belongs to a snapshot the link still shows
    * (items the agency withdrew show nothing).
    */
+  /** F08B: the client's image for the post previews, to the holder of a live link. */
+  async clientImage(
+    token: string,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
+    const { client } = await this.open(this.db, token);
+    if (!client.imageId) throw new NotFoundException();
+    await this.files.serveClientImage(client.imageId, request, response);
+  }
+
   async serve(
     token: string,
     versionId: string,
@@ -377,10 +390,13 @@ export class PublicApprovalsService {
         text: snapshot?.clientText ?? null,
         post: postSnapshot ? shownPost(postSnapshot) : null,
         files: item.postId
-          ? // F08 rule 27: the client never sees the internal titles of a post's files.
+          ? // F08 rule 27: the client never sees the internal titles of a post's files; F08B
+            // rule A8: they see each slide's caption.
             sent(postSnapshot?.versionIds ?? []).map((version) => ({
               ...toFile(version),
               name: '',
+              slideCaption:
+                postSnapshot?.slideCaptions[postSnapshot.versionIds.indexOf(version.id)] ?? null,
             }))
           : sent(snapshot?.versionIds ?? [])
               .sort((a, b) => a.name.localeCompare(b.name, 'ar'))

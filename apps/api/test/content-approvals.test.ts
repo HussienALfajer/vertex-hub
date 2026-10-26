@@ -223,6 +223,14 @@ describe('posts in approval requests (F08 rules 20–27)', () => {
             publishTime: post.publishTime,
             caption: post.caption,
             hashtags: '#خريف',
+            captions: [
+              {
+                group: 'facebook_instagram',
+                caption: post.caption,
+                hashtags: '#خريف',
+                title: null,
+              },
+            ],
           },
           text: null,
           status: 'pending',
@@ -391,8 +399,11 @@ describe('posts in approval requests (F08 rules 20–27)', () => {
           publishTime: '09:00',
           caption: later.caption,
           hashtags: null,
+          captions: [
+            { group: 'facebook_instagram', caption: later.caption, hashtags: null, title: null },
+          ],
         },
-        files: [{ versionId, kind: 'upload', display: 'download' }],
+        files: [{ versionId, kind: 'upload', display: 'download', slideCaption: null }],
         status: 'pending',
       });
       expect(shown.items[0]?.post).toBeNull();

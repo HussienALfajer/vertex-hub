@@ -161,6 +161,12 @@ describe('post workflow (F08 rules 1, 10–15, 17–19, 24, 26)', () => {
         reviewer: { id: cast.contentManager.id },
         caption: post.caption,
         hashtags: '#وسم',
+        // F08B rule A7: every group of the snapshot's platforms.
+        captions: [
+          { group: 'facebook_instagram', caption: post.caption, hashtags: '#وسم', title: null },
+          { group: 'tiktok', caption: null, hashtags: null, title: null },
+        ],
+        slideCaptions: [],
         type: 'post',
         platforms: ['instagram', 'tiktok'],
         publishDate: post.publishDate,

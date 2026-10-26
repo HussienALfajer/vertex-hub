@@ -58,6 +58,8 @@ const REFERENCE_FIELDS = new Set([
   'briefDoc',
   // F06B part D: the task a template was saved from.
   'fromTaskId',
+  // F08B: the approved review a publishing pack was read from.
+  'fromReviewId',
 ]);
 
 /** The fields an entry shows: the changed ones, without links and references to other records. */

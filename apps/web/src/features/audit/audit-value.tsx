@@ -10,6 +10,7 @@ import {
   APPROVAL_WITHDRAWN_REASONS,
   type AuditEntityType,
   BRAND_FILE_KINDS,
+  CAPTION_GROUPS,
   CATALOG_BILLINGS,
   CHECKLIST_ITEM_KINDS,
   CLIENT_DECISIONS,
@@ -312,6 +313,11 @@ function enumLabel(
     const role = find(ROLES);
     if (role) return t(`roles.${role}`);
   }
+  // F08B: the caption groups a publishing pack held.
+  if (field === 'groups') {
+    const group = find(CAPTION_GROUPS);
+    if (group) return t(`content.captionGroups.${group}`);
+  }
   if (field === 'platform' || field === 'platforms') {
     const platform = find(CLIENT_PLATFORMS);
     if (platform) return t(`clients.platforms.names.${platform}`);
@@ -608,6 +614,27 @@ function ListItem({
     return (
       <Badge tone="outline" dir="auto">
         {t(`calendar.conflicts.${item.kind}`, { name: conflictUser, title: conflictTitle })}
+      </Badge>
+    );
+  }
+  // A post's caption group (F08B): its lengths, never its text.
+  const group = CAPTION_GROUPS.find((known) => known === item.group);
+  if (group && typeof item.caption === 'number') {
+    return (
+      <Badge tone="outline">
+        {t('audit.captionLengths', {
+          group: t(`content.captionGroups.${group}`),
+          caption: formatNumber(item.caption),
+          hashtags: formatNumber(typeof item.hashtags === 'number' ? item.hashtags : 0),
+        })}
+      </Badge>
+    );
+  }
+  // A slide of a post's layout (F08B): the length of its caption.
+  if (text(item, 'fileItemId') && typeof item.captionLength === 'number') {
+    return (
+      <Badge tone="outline">
+        {t('audit.slideCaption', { length: formatNumber(item.captionLength) })}
       </Badge>
     );
   }

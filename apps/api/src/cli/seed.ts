@@ -689,7 +689,7 @@ async function seedData(http: Http, people: Record<string, string>) {
   await post({
     clientId: clinic.id,
     title: 'نصائح العناية بالأسنان',
-    caption: 'خمس عادات يومية لابتسامة صحية.',
+    captions: [{ group: 'facebook_instagram', caption: 'خمس عادات يومية لابتسامة صحية.' }],
     responsibleId: people.writer1,
   });
   await post({
@@ -698,7 +698,7 @@ async function seedData(http: Http, people: Record<string, string>) {
     type: 'reel',
     platforms: ['instagram', 'facebook'],
     publishDate: day(2),
-    caption: 'جربوا طبقنا الجديد!',
+    captions: [{ group: 'facebook_instagram', caption: 'جربوا طبقنا الجديد!' }],
     responsibleId: people.writer2,
   });
   const inProduction = await post({
@@ -706,7 +706,7 @@ async function seedData(http: Http, people: Record<string, string>) {
     title: 'عرض القهوة الصباحي',
     publishDate: day(1),
     publishTime: '09:00',
-    caption: 'قهوتك الأولى علينا.',
+    captions: [{ group: 'facebook_instagram', caption: 'قهوتك الأولى علينا.' }],
     responsibleId: people.writer1,
   });
   await http.post(`/content/posts/${inProduction.id}/status`, { to: 'in_production' });
@@ -715,7 +715,7 @@ async function seedData(http: Http, people: Record<string, string>) {
     title: 'تشكيلة الخريف',
     type: 'carousel',
     publishDate: day(7),
-    caption: 'وصلت تشكيلة الخريف.',
+    captions: [{ group: 'facebook_instagram', caption: 'وصلت تشكيلة الخريف.' }],
     responsibleId: people.writer2,
   });
   log('content posts: 4');

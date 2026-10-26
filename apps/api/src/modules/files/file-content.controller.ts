@@ -22,7 +22,12 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { type FileUpload, fileUploadSchema } from '@vertex-hub/contracts';
+import {
+  type FileUpload,
+  fileUploadSchema,
+  type UploadMediaInfo,
+  uploadMediaInfoSchema,
+} from '@vertex-hub/contracts';
 import { RequireSession } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
 import { FileContentService } from './file-content.service.js';
@@ -50,7 +55,8 @@ export class FileContentController {
     },
   })
   @ApiCreatedResponse({
-    description: 'Stored, waiting to be attached for 24 hours',
+    description:
+      'Stored, waiting to be attached for 24 hours. A video may carry the `width`, `height` and `durationMs` the browser read (F08B), as query parameters',
     standardSchema: fileUploadSchema,
   })
   @ApiBadRequestResponse({ description: '`FILE_EMPTY`, `FILE_TYPE_BLOCKED`' })
@@ -59,8 +65,9 @@ export class FileContentController {
   upload(
     @CurrentUser() actor: CurrentUserInfo,
     @Req() request: IncomingMessage,
+    @Query({ schema: uploadMediaInfoSchema }) mediaInfo: UploadMediaInfo,
   ): Promise<FileUpload> {
-    return this.uploads.upload(actor, request);
+    return this.uploads.upload(actor, request, mediaInfo);
   }
 
   @Get('versions/:id/content')

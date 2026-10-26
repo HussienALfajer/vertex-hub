@@ -31,6 +31,7 @@ export * from './lists.js';
 export * from './money.js';
 export * from './notifications.js';
 export * from './permissions.js';
+export * from './post-checks.js';
 export * from './post-values.js';
 export * from './projects.js';
 export * from './push.js';

@@ -13,11 +13,16 @@ import {
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { clientRefSchema, personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryBooleanSchema, queryListSchema } from './lists.js';
+import { MEDIA_LAYOUT_LIMIT, postCheckSchema, YOUTUBE_TITLE_LIMIT } from './post-checks.js';
 import {
+  CAPTION_GROUPS,
+  captionGroupSchema,
   POST_PLATFORMS,
   POST_STATUSES,
+  type PostCaption,
   type PostStatus,
   type PostType,
+  postCaptionSchema,
   postPlatformSchema,
   postStatusSchema,
   postTypeSchema,
@@ -64,9 +69,11 @@ export const POST_LIMITS = {
   title: 160,
   caption: 5000,
   hashtags: 1000,
+  /** A slide's caption (F08B rule A6). */
+  slideCaption: 300,
   notes: 2000,
-  /** Non-archived files of the post itself (edge case 14). */
-  files: 10,
+  /** Non-archived files of the post itself (edge case 14; F08B). */
+  files: 20,
   /** Tasks linked to one post (rule 6). */
   tasks: 5,
   /** Tasks the link-task dialog is offered at once. */
@@ -198,12 +205,25 @@ export function allowedPostTransitions(post: PostState, rights: PostRights): Pos
   });
 }
 
-/** The fields that change only in `idea` and `in_production` (rule 3, `POST_LOCKED`). */
-export const POST_CONTENT_FIELDS = ['caption', 'hashtags', 'type'] as const;
+/**
+ * The fields that change only in `idea` and `in_production` (rule 3, `POST_LOCKED`); with the
+ * media layout and a platform of a new caption group (F08B rules A1–A2).
+ */
+export const POST_CONTENT_FIELDS = ['captions', 'type'] as const;
 
 export function isPostContentEditable(status: PostStatus): boolean {
   return status === 'idea' || status === 'in_production';
 }
+
+/** F08B rule A11: the statuses whose publishing pack edit-scope users download. */
+export const POST_PACK_STATUSES = [
+  'approved',
+  'scheduled',
+  'published',
+] as const satisfies readonly PostStatus[];
+
+export const hasPostPack = (status: PostStatus): boolean =>
+  (POST_PACK_STATUSES as readonly PostStatus[]).includes(status);
 
 /** Approved or scheduled with a publish date before today in Asia/Damascus. */
 export function isPostOverdue(
@@ -217,15 +237,22 @@ export function isPostOverdue(
 }
 
 /**
- * Rule 11: a token of what a review looks at: the media versions, the caption and the hashtags.
+ * Rule 11 and F08B rule A7: a token of what a review looks at: the media versions in layout
+ * order with their slide captions, and the captions of the post's groups with the YouTube title.
  * The same hash as F09's `reviewContentToken`.
  */
 export function postContentToken(
   versionIds: readonly string[],
-  caption: string | null,
-  hashtags: string | null,
+  captions: readonly PostCaption[],
+  slideCaptions: readonly (string | null)[],
 ): string {
-  return reviewContentToken(versionIds, JSON.stringify([caption ?? '', hashtags ?? '']));
+  const texts = [...captions]
+    .sort((a, b) => CAPTION_GROUPS.indexOf(a.group) - CAPTION_GROUPS.indexOf(b.group))
+    .map((text) => [text.group, text.caption ?? '', text.hashtags ?? '', text.title ?? '']);
+  return reviewContentToken(
+    versionIds,
+    JSON.stringify([texts, versionIds, slideCaptions.map((caption) => caption ?? '')]),
+  );
 }
 
 /** The latest thing that sent a post back, as "Send back for changes" reads it (rule 12). */
@@ -294,15 +321,44 @@ const publishedLinksSchema = z
     message: 'One link per platform',
   });
 
+/** One caption group's text (F08B rule A1); the title is YouTube's only. */
+export const postCaptionInputSchema = z
+  .object({
+    group: captionGroupSchema,
+    /** Plain text with line breaks. */
+    caption: optionalText(POST_LIMITS.caption).default(null),
+    hashtags: optionalText(POST_LIMITS.hashtags).default(null),
+    title: optionalText(YOUTUBE_TITLE_LIMIT).default(null),
+  })
+  .refine((caption) => caption.group === 'youtube' || caption.title === null, {
+    message: 'Only YouTube has a title',
+    path: ['title'],
+  })
+  .meta({ id: 'PostCaptionInput' });
+
+export type PostCaptionInput = z.infer<typeof postCaptionInputSchema>;
+
+/**
+ * Captions of distinct groups; the API answers `INVALID_CAPTION_GROUP` for a group outside the
+ * post's platforms. An update writes the groups given and keeps the others.
+ */
+const postCaptionsInputSchema = z
+  .array(postCaptionInputSchema)
+  .max(CAPTION_GROUPS.length)
+  .refine(
+    (captions) => new Set(captions.map((caption) => caption.group)).size === captions.length,
+    {
+      message: 'One caption per group',
+    },
+  );
+
 const postFieldsSchema = z.object({
   title: postTitleSchema,
   type: postTypeSchema,
   platforms: postPlatformsSchema,
   publishDate: calendarDateSchema,
   publishTime: timeOfDaySchema.nullable(),
-  /** Plain text with line breaks. */
-  caption: optionalText(POST_LIMITS.caption),
-  hashtags: optionalText(POST_LIMITS.hashtags),
+  captions: postCaptionsInputSchema,
   /** The internal brief for the team, never shown to the client. */
   notes: optionalText(POST_LIMITS.notes),
   needsClientApproval: z.boolean(),
@@ -323,8 +379,9 @@ export const createPostSchema = postFieldsSchema
     /** The caller when left out. */
     responsibleId: z.uuid().optional(),
     cycleLineId: z.uuid().nullable().default(null),
+    captions: postCaptionsInputSchema.default([]),
   })
-  .partial({ publishTime: true, caption: true, hashtags: true, notes: true })
+  .partial({ publishTime: true, notes: true })
   .meta({ id: 'CreatePost' });
 
 export type CreatePost = z.infer<typeof createPostSchema>;
@@ -373,6 +430,30 @@ export const postStatusChangeSchema = z
 export type PostStatusChange = z.infer<typeof postStatusChangeSchema>;
 
 export type PostStatusChangeInput = z.input<typeof postStatusChangeSchema>;
+
+/**
+ * F08B rule A6: the slide order of every current medium of the post, each once, with an optional
+ * caption; `INVALID_ORDER` otherwise.
+ */
+export const updatePostLayoutSchema = z
+  .object({
+    items: z
+      .array(
+        z.object({
+          fileItemId: z.uuid(),
+          caption: optionalText(POST_LIMITS.slideCaption).default(null),
+        }),
+      )
+      .max(MEDIA_LAYOUT_LIMIT)
+      .refine((items) => new Set(items.map((item) => item.fileItemId)).size === items.length, {
+        message: 'Each medium once',
+      }),
+  })
+  .meta({ id: 'UpdatePostLayout' });
+
+export type UpdatePostLayout = z.infer<typeof updatePostLayoutSchema>;
+
+export type UpdatePostLayoutInput = z.input<typeof updatePostLayoutSchema>;
 
 /** Rule 4: the copy keeps the publish date unless another is given. */
 export const duplicatePostSchema = z
@@ -457,9 +538,16 @@ export const postReviewSchema = z
     reviewer: personSchema.nullable(),
     /** Passes only: the media in display order. */
     versions: z.array(reviewVersionSchema),
-    /** Passes only: the post as it was approved. */
+    /** Passes only: the post as it was approved; `caption` and `hashtags` of its first group. */
     caption: z.string().nullable(),
     hashtags: z.string().nullable(),
+    /**
+     * Passes only: the captions of the snapshot's groups (F08B rule A7); a pass from before
+     * F08B shows its single caption under every group.
+     */
+    captions: z.array(postCaptionSchema),
+    /** Passes only: aligned with `versions`. */
+    slideCaptions: z.array(z.string().nullable()),
     type: postTypeSchema.nullable(),
     platforms: z.array(postPlatformSchema),
     publishDate: calendarDateSchema.nullable(),
@@ -493,6 +581,12 @@ export const postMediaSchema = approvalVersionSchema
   .extend({
     /** The linked task the version comes from; null for a file of the post itself. */
     task: z.object({ id: z.uuid(), title: z.string() }).nullable(),
+    /** F08B rule A6. */
+    slideCaption: z.string().nullable(),
+    /** Measured at upload; null for links and files measured before (F08B rule A4). */
+    width: z.number().int().nullable(),
+    height: z.number().int().nullable(),
+    durationMs: z.number().int().nullable(),
   })
   .meta({ id: 'PostMedia' });
 
@@ -546,6 +640,8 @@ export const postPermissionsSchema = z
     /** Client scope on a post waiting for the client, cleared for them (rule 24). */
     canRecordResponse: z.boolean(),
     canArchive: z.boolean(),
+    /** Edit scope on an approved, scheduled or published post (F08B rule A11). */
+    canDownloadPack: z.boolean(),
   })
   .meta({ id: 'PostPermissions', description: 'What the caller may do, for the UI' });
 
@@ -556,12 +652,20 @@ export const postDetailSchema = postSchema
     client: clientRefSchema.extend({ healthcare: z.boolean() }),
     /** `inScope` is false after the person lost edit scope on the client (rule 28). */
     responsible: archivablePersonSchema.extend({ inScope: z.boolean() }),
+    /** The plain extract of the first caption group (search, notification texts). */
     caption: z.string().nullable(),
     hashtags: z.string().nullable(),
+    /** One per group of the post's platforms, in their order (F08B rule A1). */
+    captions: z.array(postCaptionSchema),
     notes: z.string().nullable(),
     needsClientApproval: z.boolean(),
-    /** Rule 5, in display order: the post's own files, then the linked tasks' final versions. */
+    /**
+     * In slide order (F08B rule A6): the layout first, then media it does not list in rule 5's
+     * order (the post's own files, then the linked tasks' final versions).
+     */
     media: z.array(postMediaSchema),
+    /** F08B rules A3–A4, for the client's settings. */
+    checks: z.array(postCheckSchema),
     /** By link time. */
     linkedTasks: z.array(postTaskSchema),
     cycleLine: z
@@ -572,7 +676,7 @@ export const postDetailSchema = postSchema
         retainer: namedSchema,
       })
       .nullable(),
-    /** Of the media versions, the caption and the hashtags (rule 11). */
+    /** Of the media in slide order, the slide captions and the captions (F08B rule A7). */
     contentToken: z.string(),
     /** The pass that put the post in `awaiting_client` or `approved`: what was sent. */
     clearedReview: postReviewSchema.nullable(),

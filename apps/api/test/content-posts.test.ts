@@ -8,6 +8,7 @@ import {
   type ErrorResponse,
   fileItemListSchema,
   myContentSummarySchema,
+  POST_LIMITS,
   postDetailSchema,
   postPageSchema,
 } from '@vertex-hub/contracts';
@@ -95,8 +96,7 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
       const response = await client.post(posts, cast.writer.cookie, {
         ...base(),
         title: `  عرض الخريف ${cast.run} `,
-        caption: 'سطر أول\nسطر ثانٍ',
-        hashtags: '#خريف',
+        captions: [{ group: 'facebook_instagram', caption: 'سطر أول\nسطر ثانٍ', hashtags: '#خريف' }],
         notes: 'ملاحظة داخلية',
         publishTime: '18:30',
       });
@@ -111,7 +111,18 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
         needsClientApproval: true,
         responsible: { id: cast.writer.id, archived: false, inScope: true },
         client: { id: clientId, healthcare: false },
+        caption: 'سطر أول\nسطر ثانٍ',
+        hashtags: '#خريف',
+        captions: [
+          {
+            group: 'facebook_instagram',
+            caption: 'سطر أول\nسطر ثانٍ',
+            hashtags: '#خريف',
+            title: null,
+          },
+        ],
         media: [],
+        checks: [],
         cycleLine: null,
         clearedReview: null,
         publishedLinks: [],
@@ -124,7 +135,10 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
         action: 'post.created',
         entityType: 'post',
         actorId: cast.writer.id,
-        after: { captionLength: 16, hashtagsLength: 5, publishDate: post.publishDate },
+        after: {
+          captions: [{ group: 'facebook_instagram', caption: 16, hashtags: 5, title: 0 }],
+          publishDate: post.publishDate,
+        },
       });
       expect(JSON.stringify(entry?.after)).not.toContain('سطر أول');
       // The creator is not notified of their own post.
@@ -149,7 +163,7 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
         { title: ' ' },
         { type: 'video' },
         { publishTime: '9:00' },
-        { caption: 'x'.repeat(5001) },
+        { captions: [{ group: 'facebook_instagram', caption: 'x'.repeat(5001) }] },
       ]) {
         expect((await client.post(posts, cookie, { ...base(), ...bad })).status).toBe(400);
       }
@@ -263,7 +277,7 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
       const post = await cast.createPost(cast.writer.cookie, { clientId });
       const response = await patch(post.id, cast.am.cookie, {
         title: 'عنوان جديد',
-        caption: 'نص جديد',
+        captions: [{ group: 'tiktok', caption: 'نص جديد' }],
         type: 'carousel',
         platforms: ['tiktok'],
         publishDate: addDays(businessDate(), -3),
@@ -283,10 +297,18 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
       expect(entry).toMatchObject({
         action: 'post.updated',
         actorId: cast.am.id,
-        before: { title: post.title, type: 'post', captionLength: post.caption?.length },
-        after: { title: 'عنوان جديد', type: 'carousel', captionLength: 7 },
+        before: {
+          title: post.title,
+          type: 'post',
+          captions: [{ group: 'tiktok', caption: 0, hashtags: 0, title: 0 }],
+        },
+        after: {
+          title: 'عنوان جديد',
+          type: 'carousel',
+          captions: [{ group: 'tiktok', caption: 7, hashtags: 0, title: 0 }],
+        },
       });
-      expect(entry?.after).not.toHaveProperty('caption');
+      expect(JSON.stringify(entry?.after)).not.toContain('نص جديد');
       expect(entry?.after).not.toHaveProperty('notes');
 
       // Nothing changed: no new entry.
@@ -302,13 +324,20 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
 
     it('locks the content after production and keeps the schedule free', async () => {
       const post = await cast.postAt('approved', { clientId });
-      for (const content of [{ caption: 'x' }, { hashtags: '#x' }, { type: 'reel' }]) {
+      for (const content of [
+        { captions: [{ group: 'facebook_instagram', caption: 'x' }] },
+        { captions: [{ group: 'facebook_instagram', hashtags: '#x' }] },
+        { type: 'reel' },
+        // F08B rule A2: a platform of a new caption group.
+        { platforms: ['instagram', 'x'] },
+      ]) {
         await expectError(await patch(post.id, cast.writer.cookie, content), 409, 'POST_LOCKED');
       }
       const response = await patch(post.id, cast.writer.cookie, {
         publishDate: cast.inDays(9),
         publishTime: null,
-        platforms: ['instagram', 'x'],
+        // F08B rule A2: Facebook shares Instagram's caption group.
+        platforms: ['instagram', 'facebook'],
         notes: 'تأجيل',
         title: 'عنوان بعد الاعتماد',
         responsibleId: cast.contentManager.id,
@@ -321,7 +350,7 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
         status: 'approved',
         publishDate: cast.inDays(9),
         publishTime: null,
-        platforms: ['instagram', 'x'],
+        platforms: ['instagram', 'facebook'],
         responsible: { id: cast.contentManager.id },
       });
       expect(moved.clearedReview?.publishDate).toBe(post.publishDate);
@@ -755,10 +784,13 @@ describe('content posts (F08 rules 1–5, 16, 28)', () => {
       });
     });
 
-    it('holds at most 10 files', async () => {
+    it('holds at most 20 files (F08B)', async () => {
       const post = await cast.createPost(cast.writer.cookie, { clientId });
-      for (let index = 1; index <= 10; index++) await cast.addFileOk(post.id, `ملف ${index}`);
-      await expectError(await cast.addFile(post.id, 'ملف 11'), 409, 'LIMIT_REACHED');
+      for (let index = 1; index <= POST_LIMITS.files; index++) {
+        await cast.addFileOk(post.id, `ملف ${index}`);
+      }
+      expect(POST_LIMITS.files).toBe(20);
+      await expectError(await cast.addFile(post.id, 'ملف 21'), 409, 'LIMIT_REACHED');
     });
   });
 

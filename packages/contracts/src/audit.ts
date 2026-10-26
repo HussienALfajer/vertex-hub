@@ -152,6 +152,8 @@ export const AUDIT_ACTIONS = [
   'post.duplicated',
   'post.archived',
   'post.restored',
+  'post.layout_changed',
+  'post.pack_downloaded',
   'shoot.created',
   'shoot.updated',
   'shoot.shots_changed',

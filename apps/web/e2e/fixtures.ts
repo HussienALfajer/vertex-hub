@@ -134,6 +134,7 @@ import {
   type CycleStatus,
   calendarDay,
   canChangeCampaignStatus,
+  captionGroupsOf,
   changeInvoiceDueDateSchema,
   computeDay,
   conversionRate,
@@ -224,6 +225,7 @@ import {
   type HrRequestPreview,
   type HrRequestWarning,
   type HrSettings,
+  hasPostPack,
   holidayRangeValid,
   hrSettingsSchema,
   type Invoice,
@@ -339,6 +341,7 @@ import {
   type PollResultsVisibility,
   type PollVote,
   type Post,
+  type PostCaption,
   type PostClientResponse,
   type PostDetail,
   type PostMedia,
@@ -376,6 +379,7 @@ import {
   periodsOverlap,
   permissionMinutes,
   planTemplateRun,
+  postChecks,
   postMove,
   postTaskDueDate,
   postTaskTitle,
@@ -5830,6 +5834,7 @@ function taskRoutes({
           publishTime: snapshot.publishTime,
           caption: snapshot.caption,
           hashtags: snapshot.hashtags,
+          captions: snapshot.captions,
         }
       : null;
   };
@@ -6448,6 +6453,7 @@ function taskRoutes({
         const client = requestClient(linked);
         const shown: PublicApproval = {
           clientName: client.tradeName,
+          clientImage: false,
           contactName: requestContact(linked).name,
           accountManagerName: person(client.accountManagerId).name,
           message: linked.message,
@@ -6899,6 +6905,20 @@ function taskRoutes({
 
 // Content (F08)
 
+/**
+ * F08B: a mock post keeps one caption, under the first caption group of its platforms; the other
+ * groups are empty (the caption editor per platform arrives with F08B PR 3).
+ */
+const mockCaptions = (
+  post: Pick<PostRecord, 'platforms' | 'caption' | 'hashtags'>,
+): PostCaption[] =>
+  captionGroupsOf(post.platforms).map((group, index) => ({
+    group,
+    caption: index === 0 ? post.caption : null,
+    hashtags: index === 0 ? post.hashtags : null,
+    title: null,
+  }));
+
 interface PostRecord {
   id: string;
   clientId: string;
@@ -7019,6 +7039,8 @@ export function contentSeed(): {
     versions,
     caption,
     hashtags: '#مطعم_الياسمين',
+    captions: [{ group: 'facebook_instagram', caption, hashtags: '#مطعم_الياسمين', title: null }],
+    slideCaptions: versions.map(() => null),
     type: 'post',
     platforms: ['instagram'],
     publishDate: '2026-10-12',
@@ -7387,12 +7409,18 @@ function contentRoutes({
       responsible: { ...archivable(post.responsibleId), inScope: true, imageId: null },
       caption: post.caption,
       hashtags: post.hashtags,
+      captions: mockCaptions(post),
       notes: post.notes,
       needsClientApproval: post.needsClientApproval,
       media: mediaOf(post).map(({ taskId, ...version }) => {
         const task = tasks.find((t) => t.id === taskId);
         return { ...version, task: task ? { id: task.id, title: task.title } : null };
       }),
+      checks: postChecks(
+        { type: post.type, platforms: post.platforms, captions: mockCaptions(post) },
+        mediaOf(post),
+        { xLongPosts: false },
+      ),
       linkedTasks: linked(post).map((task): PostTask => {
         const listed = taskSummary(task);
         return {
@@ -7440,6 +7468,7 @@ function contentRoutes({
         canSendForApproval: live && approval.ready(post),
         canRecordResponse: live && r.client && post.status === 'awaiting_client',
         canArchive: holds('content.review', 'all'),
+        canDownloadPack: live && r.edit && hasPostPack(post.status),
       },
       allowedTransitions: allowed(post),
     };
@@ -7469,6 +7498,8 @@ function contentRoutes({
         : [],
       caption: passed ? post.caption : null,
       hashtags: passed ? post.hashtags : null,
+      captions: passed ? mockCaptions(post) : [],
+      slideCaptions: passed ? mediaOf(post).map(() => null) : [],
       type: passed ? post.type : null,
       platforms: passed ? post.platforms : [],
       publishDate: passed ? post.publishDate : null,
@@ -7579,8 +7610,8 @@ function contentRoutes({
         title: input.title,
         type: input.type,
         platforms: input.platforms,
-        caption: input.caption ?? null,
-        hashtags: input.hashtags ?? null,
+        caption: input.captions[0]?.caption ?? null,
+        hashtags: input.captions[0]?.hashtags ?? null,
         notes: input.notes ?? null,
         publishDate: input.publishDate,
         publishTime: input.publishTime ?? null,
@@ -7607,13 +7638,15 @@ function contentRoutes({
     if (action !== 'restore' && readOnly(post)) return fail(route, 409, 'POST_ARCHIVED');
     if (!action && method === 'PATCH') {
       if (!r.edit) return fail(route, 403, null);
-      const input = body<UpdatePost>();
-      const content = input.caption !== undefined || input.hashtags !== undefined || input.type;
+      const { captions, ...input } = body<UpdatePost>();
+      const content = captions !== undefined || input.type;
       if (content && !isPostContentEditable(post.status)) return fail(route, 409, 'POST_LOCKED');
       if (input.cycleLineId && linked(post).some((t) => t.cycleLineId)) {
         return fail(route, 409, 'POST_COUNTED_BY_TASK');
       }
       Object.assign(post, input);
+      const [first] = captions ?? [];
+      if (first) Object.assign(post, { caption: first.caption, hashtags: first.hashtags });
       return json(route, detail(post));
     }
     if (action === 'status') {
@@ -7882,6 +7915,7 @@ const uploadVersion = (
   previewStatus: file.mimeType.startsWith('image/') ? 'ready' : 'none',
   width: null,
   height: null,
+  durationMs: null,
   url: null,
   linkLabel: null,
   note: null,
@@ -8649,6 +8683,11 @@ function fileRoutes({
         type: fileTypeOf(v.kind, v.mimeType),
         previewStatus: v.previewStatus,
         taskId,
+        // F08B: no layout in the mocks yet: rule 5's order, without slide captions.
+        slideCaption: null,
+        width: v.width,
+        height: v.height,
+        durationMs: v.durationMs,
       });
       const own = files
         .filter((f) => f.ownerType === 'post' && f.ownerId === postId && !f.archivedAt)
@@ -8707,6 +8746,7 @@ function fileRoutes({
         previewAvailable: version.previewStatus === 'ready',
         linkUrl: version.url,
         linkLabel: version.linkLabel,
+        slideCaption: null,
       };
     },
     /** Rule 13: the versions the client approved become their deliverables' finals. */
