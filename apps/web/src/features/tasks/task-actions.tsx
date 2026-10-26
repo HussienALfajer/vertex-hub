@@ -55,6 +55,7 @@ import {
   CornerUpLeftIcon,
   EllipsisIcon,
   EyeIcon,
+  LayersIcon,
   type LucideIcon,
   MessageSquareReplyIcon,
   PackageCheckIcon,
@@ -74,14 +75,17 @@ import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { imageSrc } from '../../lib/images';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientQuery } from '../clients/clients.queries';
+import { SaveAsTemplateDialog } from '../templates/task-template-dialogs';
 import { assigneeLeaves, LeaveWarningDialog } from './leave-warning';
 import { TaskStatusBadge } from './task-badges';
 import {
   ApprovalFields,
+  BriefFieldsField,
   ClientField,
   ClientRequestFields,
   DueFields,
   EngagementFields,
+  EstimateField,
   PriorityField,
   RichBriefField,
   TitleField,
@@ -213,7 +217,7 @@ export function focusTarget(focus: TaskFocus, first: 'move' | 'menu' = 'move'): 
   return focus.heading.current ?? true;
 }
 
-type ActionDialog = Target | 'edit' | 'reassign';
+type ActionDialog = Target | 'edit' | 'reassign' | 'template';
 
 /**
  * The header's actions: the workflow moves the caller may make now (`allowedTransitions`), then
@@ -263,8 +267,8 @@ export function TaskActions({
   const targets = targetsOf(task);
   const moves = targets.filter((target) => target.move !== 'cancel');
   const cancel = targets.find((target) => target.move === 'cancel');
-  const { canEdit, canAssign, canArchive, canMedicalReview } = task.permissions;
-  const menu = canEdit || canAssign || canArchive || cancel;
+  const { canEdit, canAssign, canArchive, canMedicalReview, canSaveTemplate } = task.permissions;
+  const menu = canEdit || canAssign || canArchive || cancel || canSaveTemplate;
 
   async function run(target: Target) {
     if (needsDialog(task, target)) {
@@ -337,6 +341,12 @@ export function TaskActions({
                 {t('tasks.actions.reassign')}
               </DropdownMenuItem>
             )}
+            {canSaveTemplate && (
+              <DropdownMenuItem onClick={() => open('template', true)}>
+                <LayersIcon />
+                {t('tasks.wizard.template.saveTitle')}
+              </DropdownMenuItem>
+            )}
             {cancel && (
               <DropdownMenuItem variant="destructive" onClick={() => open(cancel, true)}>
                 <BanIcon />
@@ -345,7 +355,7 @@ export function TaskActions({
             )}
             {canArchive && (
               <>
-                {(canEdit || canAssign || cancel) && <DropdownMenuSeparator />}
+                {(canEdit || canAssign || cancel || canSaveTemplate) && <DropdownMenuSeparator />}
                 <DropdownMenuItem variant="destructive" onClick={onArchive}>
                   <ArchiveIcon />
                   {t('tasks.actions.archive')}
@@ -379,6 +389,14 @@ export function TaskActions({
         <EditTaskDialog
           task={task}
           open={dialog === 'edit'}
+          onClose={() => setDialog(null)}
+          finalFocus={finalFocus}
+        />
+      )}
+      {shownDialog === 'template' && (
+        <SaveAsTemplateDialog
+          task={task}
+          open={dialog === 'template'}
           onClose={() => setDialog(null)}
           finalFocus={finalFocus}
         />
@@ -607,6 +625,8 @@ function editValues(task: TaskDetail): CreateTaskInput {
     title: task.title,
     brief: task.brief ?? '',
     briefDoc: task.briefDoc,
+    briefFields: task.briefFields,
+    estimateMinutes: task.estimateMinutes,
     department: task.department,
     assigneeId: task.assignee?.id ?? null,
     priority: task.priority,
@@ -675,6 +695,8 @@ function EditTaskDialog({
     const changes: UpdateTask = {
       ...(dirty.title && { title: values.title }),
       ...(dirty.briefDoc && { briefDoc: values.briefDoc ?? null }),
+      ...(dirty.briefFields && { briefFields: values.briefFields }),
+      ...(dirty.estimateMinutes && { estimateMinutes: values.estimateMinutes }),
       ...(dirty.priority && { priority: values.priority }),
       ...(dirty.dueDate && { dueDate: values.dueDate }),
       ...(dirty.dueTime && { dueTime: values.dueTime ?? null }),
@@ -725,6 +747,8 @@ function EditTaskDialog({
           </DialogHeader>
           <TitleField form={form} />
           <RichBriefField form={form} />
+          <BriefFieldsField form={form} />
+          <EstimateField form={form} />
           <PriorityField form={form} />
           <DueFields form={form} allowPast />
           {task.type === 'work' && <ClientField form={form} clients={clients} />}

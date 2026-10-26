@@ -86,7 +86,7 @@ import { clientQuery } from '../clients/clients.queries';
 import { useDepartmentNames } from '../projects/project-badges';
 import { assigneeLeaves, LeaveWarningDialog } from './leave-warning';
 import { BlockedBadge, formatDue, TaskOverdueBadge, TaskStatusBadge } from './task-badges';
-import { useAssigneeOptions, useDepartments } from './task-form';
+import { EstimateInput, useAssigneeOptions, useDepartments } from './task-form';
 import { TaskSection } from './task-parts';
 import { useRichTextLabels } from './task-rich-text';
 import {
@@ -964,9 +964,6 @@ export interface SubtaskPrefill {
   fromCommentId: string;
 }
 
-/** Hours with halves (rule C8), as the estimate field shows them. */
-const ESTIMATE_HOURS = Array.from({ length: 16 }, (_, index) => (index + 1) / 2);
-
 /**
  * Rule A2: one subtask added to an open parent, or a question or comment turned into one (rule
  * B11). It takes the parent's client and engagement; its due date is not after the parent's.
@@ -1132,29 +1129,11 @@ export function AddSubtaskDialog({
                   control={form.control}
                   name="estimateMinutes"
                   render={({ field }) => (
-                    <Select
-                      items={[
-                        { value: '', label: t('tasks.subtasks.noEstimate') },
-                        ...ESTIMATE_HOURS.map((hours) => ({
-                          value: String(hours * 60),
-                          label: t('tasks.subtasks.hours', { hours: formatNumber(hours) }),
-                        })),
-                      ]}
-                      value={field.value ? String(field.value) : ''}
-                      onValueChange={(value) => field.onChange(value ? Number(value) : null)}
-                    >
-                      <SelectTrigger ref={field.ref}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">{t('tasks.subtasks.noEstimate')}</SelectItem>
-                        {ESTIMATE_HOURS.map((hours) => (
-                          <SelectItem key={hours} value={String(hours * 60)}>
-                            {t('tasks.subtasks.hours', { hours: formatNumber(hours) })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <EstimateInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      inputRef={field.ref}
+                    />
                   )}
                 />
               </Field>

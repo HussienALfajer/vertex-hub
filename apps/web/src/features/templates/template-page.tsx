@@ -20,6 +20,7 @@ import { ApiError } from '../../lib/api/client';
 import { formatDateTime, formatList, formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
 import { useDepartmentNames } from '../projects/project-badges';
+import { TaskTemplateSteps } from './task-template-editor';
 import { TemplateKindBadge } from './template-badges';
 import { templateFormValues } from './template-document';
 import {
@@ -137,7 +138,25 @@ function Template({
             <TemplateKindBadge kind={template.kind} />
           </span>
         }
-        description={template.description ?? undefined}
+        description={
+          template.savedFrom ? (
+            <span className="flex flex-col gap-1">
+              {template.description}
+              <span>
+                {t('templates.task.savedFrom')}{' '}
+                <Link
+                  to="/tasks/$taskId"
+                  params={{ taskId: template.savedFrom.id }}
+                  className="font-medium text-foreground hover:underline"
+                >
+                  {template.savedFrom.title}
+                </Link>
+              </span>
+            </span>
+          ) : (
+            (template.description ?? undefined)
+          )
+        }
         actions={
           template.permissions.canArchive &&
           (template.archivedAt ? (
@@ -205,10 +224,16 @@ function Template({
           hint={
             template.kind === 'project'
               ? t('templates.form.stepsHint')
-              : t('templates.form.stepsCycleHint')
+              : template.kind === 'task'
+                ? t('templates.task.stepsHint')
+                : t('templates.form.stepsCycleHint')
           }
         >
-          <StepsEditor form={form} readOnly={readOnly} />
+          {template.kind === 'task' ? (
+            <TaskTemplateSteps form={form} readOnly={readOnly} />
+          ) : (
+            <StepsEditor form={form} readOnly={readOnly} />
+          )}
         </FormSection>
         <FormSection title={t('templates.form.assignees')} hint={t('templates.form.assigneesHint')}>
           <AssigneesEditor form={form} stored={template.assignees} readOnly={readOnly} />

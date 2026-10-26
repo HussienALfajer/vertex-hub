@@ -55,7 +55,7 @@ test('request → assign → work → internal return → client changes over th
   await page.getByRole('combobox', { name: ar.tasks.form.engagement }).click();
   await page.getByRole('option', { name: 'الهوية البصرية الجديدة' }).click();
   await page.getByLabel(ar.tasks.form.revisionLimit).fill('1');
-  await page.getByRole('button', { name: ar.tasks.form.sendRequest }).click();
+  await page.getByRole('button', { name: ar.tasks.wizard.sendNow }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('بانر الافتتاح');
   await expect(page.getByText(ar.tasks.unassigned).first()).toBeVisible();
   const bannerUrl = page.url();
@@ -86,7 +86,7 @@ test('request → assign → work → internal return → client changes over th
   const dependencies = page.getByLabel(ar.tasks.form.dependencies);
   await dependencies.fill('بانر');
   await page.getByRole('option', { name: 'بانر الافتتاح' }).click();
-  await page.getByRole('button', { name: ar.tasks.form.sendRequest }).click();
+  await page.getByRole('button', { name: ar.tasks.wizard.sendNow }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('نشر البانر');
   await expect(page.getByText(ar.tasks.blocked).first()).toBeVisible();
   const publishUrl = page.url();

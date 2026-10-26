@@ -193,10 +193,11 @@ export class TemplatesService {
       this.assigneeRows([id]),
       this.linkedRetainers([id]),
     ]);
-    const [people, valid, clients] = await Promise.all([
+    const [people, valid, clients, savedFrom] = await Promise.all([
       this.users.summaries(assignees.map((a) => a.userId)),
       this.validAssignments(assignees),
       this.clients.summaries(links.map((link) => link.clientId)),
+      row.sourceTaskId ? this.taskTemplates.source(row.sourceTaskId) : null,
     ]);
     return {
       id: row.id,
@@ -219,6 +220,7 @@ export class TemplatesService {
         name: link.name,
         client: clientRef(clients, link.clientId),
       })),
+      savedFrom,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       archivedAt: row.archivedAt?.toISOString() ?? null,
@@ -382,6 +384,7 @@ export class TemplatesService {
       description: input.description,
       runMode: input.runMode,
       createdById: actor.id,
+      sourceTaskId: origin.fromTaskId ?? null,
     });
     await this.saveDocument(tx, id, input, []);
     const assignees = await this.saveAssignees(tx, id, input.assignees, []);

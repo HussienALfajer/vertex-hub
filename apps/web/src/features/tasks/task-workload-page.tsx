@@ -58,8 +58,8 @@ export function parseTaskWorkloadSearch(search: Record<string, unknown>): TaskWo
 
 /**
  * Who carries what this week (spec screen 4): per person of the chosen departments, overdue,
- * due in the week and open tasks, each a link to those tasks in the list; and the requests
- * nobody holds yet, per department.
+ * due in the week and open tasks, each a link to those tasks in the list, and the estimated hours
+ * against capacity (F06B screen 5); and the requests nobody holds yet, per department.
  */
 export function TaskWorkloadPage({ search }: { search: TaskWorkloadSearch }) {
   const { t } = useTranslation();
@@ -248,7 +248,6 @@ function UnassignedTiles({ workload }: { workload: TaskWorkload }) {
 function PeopleTable({ workload }: { workload: TaskWorkload }) {
   const { t } = useTranslation();
   const departmentName = useDepartmentNames();
-  const most = Math.max(1, ...workload.people.map((person) => person.open));
   const { from, to } = workload.week;
 
   return (
@@ -260,53 +259,99 @@ function PeopleTable({ workload }: { workload: TaskWorkload }) {
             <TableHead className="text-end">{t('tasks.workload.overdue')}</TableHead>
             <TableHead className="text-end">{t('tasks.workload.dueThisWeek')}</TableHead>
             <TableHead className="text-end">{t('tasks.workload.open')}</TableHead>
-            <TableHead className="w-1/4">
-              <span className="sr-only">{t('tasks.workload.load')}</span>
-            </TableHead>
+            <TableHead className="w-1/4">{t('tasks.workload.hours')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {workload.people.map(({ user, departments, overdue, dueThisWeek, open }) => (
-            <TableRow key={user.id}>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <Avatar name={user.name} src={imageSrc(user.imageId, 'sm')} size="sm" />
-                  <div className="flex min-w-0 flex-col">
-                    <span className="font-medium">{user.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {departments.map(departmentName).join(' · ')}
-                    </span>
+          {workload.people.map((person) => {
+            const { user, departments, overdue, dueThisWeek, open } = person;
+            return (
+              <TableRow key={user.id}>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <Avatar name={user.name} src={imageSrc(user.imageId, 'sm')} size="sm" />
+                    <div className="flex min-w-0 flex-col">
+                      <span className="font-medium">{user.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {departments.map(departmentName).join(' · ')}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </TableCell>
-              <CountCell
-                count={overdue}
-                alert
-                search={{ assignee: user.id, overdue: true }}
-                label={t('tasks.workload.overdueOf', { name: user.name })}
-              />
-              <CountCell
-                count={dueThisWeek}
-                search={{ assignee: user.id, dueFrom: from, dueTo: to }}
-                label={t('tasks.workload.dueThisWeekOf', { name: user.name })}
-              />
-              <CountCell
-                count={open}
-                search={{ assignee: user.id }}
-                label={t('tasks.workload.openOf', { name: user.name })}
-              />
-              <TableCell>
-                <Meter
-                  value={open}
-                  max={most}
-                  tone={overdue > 0 ? 'danger' : 'brand'}
-                  aria-label={t('tasks.workload.openOf', { name: user.name })}
+                </TableCell>
+                <CountCell
+                  count={overdue}
+                  alert
+                  search={{ assignee: user.id, overdue: true }}
+                  label={t('tasks.workload.overdueOf', { name: user.name })}
                 />
-              </TableCell>
-            </TableRow>
-          ))}
+                <CountCell
+                  count={dueThisWeek}
+                  search={{ assignee: user.id, dueFrom: from, dueTo: to }}
+                  label={t('tasks.workload.dueThisWeekOf', { name: user.name })}
+                />
+                <CountCell
+                  count={open}
+                  search={{ assignee: user.id }}
+                  label={t('tasks.workload.openOf', { name: user.name })}
+                />
+                <TableCell>
+                  <HoursAgainstCapacity person={person} />
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
+    </div>
+  );
+}
+
+/**
+ * F06B rule C8: the estimated hours of the week's open tasks against the person's capacity; the
+ * bar turns to the warning tone above it. Without a schedule there is no capacity (edge case 21).
+ */
+function HoursAgainstCapacity({ person }: { person: TaskWorkload['people'][number] }) {
+  const { t } = useTranslation();
+  const hours = (minutes: number) => formatNumber(minutes / 60);
+  const { estimatedMinutes, capacityMinutes, unestimatedCount, user } = person;
+  const over = capacityMinutes !== null && estimatedMinutes > capacityMinutes;
+  return (
+    <div className="flex min-w-40 flex-col gap-1">
+      <p className="text-sm tabular-nums">
+        {capacityMinutes === null
+          ? t('tasks.workload.hoursNoSchedule', { hours: hours(estimatedMinutes) })
+          : t('tasks.workload.hoursOf', {
+              hours: hours(estimatedMinutes),
+              capacity: hours(capacityMinutes),
+            })}
+      </p>
+      {capacityMinutes !== null && (
+        <Meter
+          value={Math.min(estimatedMinutes, Math.max(capacityMinutes, 1))}
+          max={Math.max(capacityMinutes, 1)}
+          tone={over ? 'warning' : 'brand'}
+          aria-label={t('tasks.workload.hoursLabel', { name: user.name })}
+          aria-valuetext={t('tasks.workload.hoursOf', {
+            hours: hours(estimatedMinutes),
+            capacity: hours(capacityMinutes),
+          })}
+        />
+      )}
+      {(over || capacityMinutes === null || unestimatedCount > 0) && (
+        <p className="text-xs text-muted-foreground">
+          {[
+            over && t('tasks.workload.overCapacity'),
+            capacityMinutes === null && t('tasks.workload.noSchedule'),
+            unestimatedCount > 0 &&
+              t('tasks.workload.unestimated', {
+                count: unestimatedCount,
+                n: formatNumber(unestimatedCount),
+              }),
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+      )}
     </div>
   );
 }

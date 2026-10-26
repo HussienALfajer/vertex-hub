@@ -28,3 +28,27 @@ export function namedFiles(files: readonly File[], at: Date, pasted: boolean): F
     });
   });
 }
+
+/** What a paste event carries, as `pastedFiles` reads it. */
+export interface PasteLike {
+  defaultPrevented: boolean;
+  target: EventTarget | null;
+  clipboardData: { files: ArrayLike<File>; types: readonly string[] } | null;
+}
+
+/**
+ * The files a paste on the page brings, outside a field (a field or an editor takes its own
+ * paste). Null when the paste is not a file paste, or not ours: text, or handled already. An empty
+ * list is a copied file reference the browser cannot read (edge case 18: "Nothing to paste").
+ */
+export function pastedFiles(event: PasteLike): File[] | null {
+  const target = event.target as { closest?: (selector: string) => unknown } | null;
+  if (event.defaultPrevented || target?.closest?.('input, textarea, [contenteditable="true"]')) {
+    return null;
+  }
+  const data = event.clipboardData;
+  if (!data) return null;
+  const files = Array.from(data.files);
+  if (files.length > 0) return files;
+  return data.types.includes('Files') ? [] : null;
+}

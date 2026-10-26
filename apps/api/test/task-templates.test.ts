@@ -139,6 +139,8 @@ describe('task templates (F06B part D)', () => {
     expect(template).toMatchObject({
       kind: 'task',
       runMode: 'stages',
+      // Screen 7: "Saved from …".
+      savedFrom: { id: task.id, title: task.title },
       permissions: { canEdit: true, canArchive: true },
     });
     expect(template.stages.map((stage) => stage.name)).toEqual(['Sketch', 'Final']);

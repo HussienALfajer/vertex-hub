@@ -3,6 +3,7 @@ import {
   keepPreviousData,
   type QueryKey,
   queryOptions,
+  skipToken,
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
@@ -25,6 +26,7 @@ import type {
   TaskCommentUpdate,
   TaskDependenciesInput,
   TaskQuestionInput,
+  TaskReadinessInput,
   TaskStatusChange,
   UpdateTask,
   UpdateTaskChecklistItem,
@@ -32,6 +34,7 @@ import type {
 } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
+import { warningsOnDraft } from './task-wizard-draft';
 
 /** The list endpoint's query string as the API reads it: flags are `'true'` or `'false'`. */
 export type TaskListFilters = NonNullable<paths['/api/tasks']['get']['parameters']['query']>;
@@ -41,6 +44,8 @@ export type TaskBoardFilters = NonNullable<paths['/api/tasks/board']['get']['par
 export type TaskWorkloadFilters = NonNullable<
   paths['/api/tasks/workload']['get']['parameters']['query']
 >;
+
+export type TaskTreeFilters = NonNullable<paths['/api/tasks/tree']['get']['parameters']['query']>;
 
 export const tasksKeys = {
   all: ['tasks'] as const,
@@ -52,6 +57,7 @@ export const tasksKeys = {
   summary: ['tasks', 'summary'] as const,
   board: (filters: TaskBoardFilters) => ['tasks', 'board', filters] as const,
   workload: (filters: TaskWorkloadFilters) => ['tasks', 'workload', filters] as const,
+  tree: (filters: TaskTreeFilters) => ['tasks', 'tree', filters] as const,
 };
 
 export const taskListQuery = (filters: TaskListFilters) =>
@@ -133,6 +139,33 @@ export const taskWorkloadQuery = (filters: TaskWorkloadFilters) =>
     queryKey: tasksKeys.workload(filters),
     queryFn: () => call(api.GET('/api/tasks/workload', { params: { query: filters } })),
     placeholderData: keepPreviousData,
+  });
+
+/** F06B rule D4: a project's or a retainer cycle's tasks as a tree, with the bottleneck. */
+export const taskTreeQuery = (filters: TaskTreeFilters) =>
+  queryOptions({
+    queryKey: tasksKeys.tree(filters),
+    queryFn: () => call(api.GET('/api/tasks/tree', { params: { query: filters } })),
+  });
+
+/**
+ * F06B rule C5: the readiness warnings of a draft (none until it has one); they never block. Each
+ * warning names its subtask by its place in the draft (`warningsOnDraft`), so the last answer
+ * shown while the next one loads still points at the right subtasks.
+ */
+export const taskReadinessQuery = (
+  check: { input: TaskReadinessInput; subtaskIndexes: number[] } | null,
+) =>
+  queryOptions({
+    queryKey: ['tasks', 'readiness', check] as const,
+    queryFn: check
+      ? async () => {
+          const answer = await call(api.POST('/api/tasks/readiness', { body: check.input }));
+          return { warnings: warningsOnDraft(answer.warnings, check.subtaskIndexes) };
+        }
+      : skipToken,
+    placeholderData: keepPreviousData,
+    retry: false,
   });
 
 /**

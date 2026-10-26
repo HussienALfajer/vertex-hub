@@ -45,6 +45,8 @@ export const workTemplates = pgTable(
     runMode: subtaskRunModeEnum('run_mode'),
     /** Null for the seed templates. */
     createdById: uuid('created_by_id').references(() => users.id),
+    /** `task` templates saved from a task (F06B rule D1): "Saved from …". */
+    sourceTaskId: uuid('source_task_id').references(() => tasks.id),
     ...timestamps(),
     archivedAt: archivedAt(),
   },
@@ -54,6 +56,7 @@ export const workTemplates = pgTable(
       .where(sql`${table.archivedAt} is null`),
     index('work_templates_kind_idx').on(table.kind),
     index('work_templates_created_by_id_idx').on(table.createdById),
+    index('work_templates_source_task_id_idx').on(table.sourceTaskId),
     // The kind is compared as text: the enum value is added in the same migration.
     check(
       'work_templates_run_mode_check',

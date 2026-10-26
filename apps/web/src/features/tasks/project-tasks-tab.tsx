@@ -19,6 +19,7 @@ import { GenerateTasksDialog } from '../templates/generate-dialog';
 import { ProjectRunLines } from '../templates/template-runs';
 import type { TaskListSearch } from './task-list-page';
 import { TaskRows } from './task-rows';
+import { TaskTreeView, type TaskView, TaskViewSwitch } from './task-tree';
 import { taskListQuery } from './tasks.queries';
 
 /** A project holds far fewer tasks than this; more are one click away in the list. */
@@ -26,7 +27,7 @@ const TAB_SIZE = 100;
 
 /**
  * The Tasks tab of the project page (spec screen 7): the project's tasks grouped by milestone,
- * in milestone order, then those without one. "New task" comes preset with the project (and the
+ * in milestone order, then those without one, or as a tree with the bottleneck (F06B rule D4). "New task" comes preset with the project (and the
  * milestone, from its group) while the project is running; managers of a running project can
  * generate tasks from a template (F07 screen 5), with a line per run above the tasks.
  */
@@ -42,6 +43,7 @@ export function ProjectTasksTab({
 }) {
   const { t } = useTranslation();
   const [generating, setGenerating] = useState(false);
+  const [view, setView] = useState<TaskView>('list');
   // Opened after creating the project, the dialog has no button to give the focus back to.
   const generateButton = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -147,6 +149,11 @@ export function ProjectTasksTab({
           )
         }
       />
+      {items.length > 0 && (
+        <div className="flex justify-end">
+          <TaskViewSwitch value={view} onChange={setView} />
+        </div>
+      )}
       <ProjectRunLines projectId={project.id} />
       {dialog}
       {items.length === 0 ? (
@@ -163,6 +170,8 @@ export function ProjectTasksTab({
             )
           }
         />
+      ) : view === 'tree' ? (
+        <TaskTreeView filters={{ projectId: project.id }} />
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map((group) => (

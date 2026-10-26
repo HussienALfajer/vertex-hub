@@ -20963,6 +20963,11 @@ export interface components {
                 name: string;
                 client: components["schemas"]["ClientRef"];
             }[];
+            savedFrom: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
