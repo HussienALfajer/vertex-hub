@@ -1,0 +1,1 @@
+ALTER TYPE "public"."notification_reminder_kind" ADD VALUE 'subtask_holding_next';

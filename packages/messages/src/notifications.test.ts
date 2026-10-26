@@ -294,6 +294,21 @@ const SAMPLES: Record<NotificationType, unknown> = {
   client_logo_changed: { client: 'مطعم الشام', removed: false },
   project_image_changed: { project: 'إطلاق المنيو', client: 'مطعم الشام', removed: true },
   retainer_image_changed: { retainer: 'عقد شهري', client: 'مطعم الشام', removed: false },
+  subtask_turn: {
+    task,
+    parent: 'حملة رمضان',
+    previous: { title: 'كتابة النص', by: 'سامر', note: 'النص في الملفات' },
+  },
+  subtask_handover: {
+    task,
+    parent: 'حملة رمضان',
+    stage: 'النص',
+    handover: [{ title: 'كتابة النص', by: 'سامر', note: null }],
+  },
+  subtask_stage_finished: { task, stage: 'النص' },
+  subtasks_all_finished: { task },
+  subtask_holding_next: { task, parent: 'حملة رمضان', waiting: 'تصميم البوستر', forParent: true },
+  task_blocked: { task },
 };
 
 const SUBJECT_ID = '0192a5a0-0000-7000-8000-000000000001';
@@ -803,5 +818,55 @@ describe('HR attendance (F17 part C)', () => {
     expect(linkPath(notificationLink(sample('client_logo_changed')))).toBe(
       `/clients/${SUBJECT_ID}`,
     );
+  });
+});
+
+describe('subtasks (F06B part A)', () => {
+  const render = (type: NotificationType, data?: object) =>
+    notificationText(
+      data ? sample(type, { data } as Partial<Notification>) : sample(type),
+      departmentName,
+    ).text;
+
+  it('names the parent of an assigned subtask', () => {
+    expect(render('task_assigned')).toBe('أُسندت إليك «تصميم منيو» بواسطة رنا');
+    expect(render('task_assigned', { task: { ...task, parent: 'حملة رمضان' } })).toBe(
+      'أُسندت إليك «تصميم منيو»، مهمة فرعية من «حملة رمضان»، بواسطة رنا',
+    );
+  });
+
+  it('names the turn after the previous subtask, with its handover note (rule A12)', () => {
+    expect(render('subtask_turn')).toBe(
+      'حان دورك في «تصميم منيو» من «حملة رمضان» بعد تسليم «كتابة النص». ملاحظة التسليم: النص في الملفات',
+    );
+    expect(render('subtask_turn', { task, parent: 'حملة رمضان', previous: null })).toBe(
+      'حان دورك في «تصميم منيو» من «حملة رمضان»',
+    );
+  });
+
+  it('names the finished stage, the parent and the waiting subtask', () => {
+    expect(render('subtask_handover')).toBe(
+      'انتهت مرحلة «النص» في «حملة رمضان»: حان دورك في «تصميم منيو»',
+    );
+    expect(render('subtask_stage_finished')).toBe('انتهت مرحلة «النص» في «تصميم منيو»');
+    expect(render('subtasks_all_finished')).toBe(
+      'سُلّمت كل المهام الفرعية لـ«تصميم منيو»: أرسلها للمراجعة',
+    );
+    expect(render('subtask_holding_next')).toBe(
+      '«تصميم منيو» متأخرة وتؤخّر «تصميم البوستر» في «حملة رمضان»',
+    );
+    expect(
+      render('subtask_holding_next', {
+        task,
+        parent: 'حملة رمضان',
+        waiting: 'تصميم البوستر',
+        forParent: false,
+      }),
+    ).toBe('«تصميم البوستر» تنتظر «تصميم منيو» المتأخرة');
+    expect(render('task_blocked')).toBe('«تصميم منيو» عادت بانتظار مهام أخرى');
+  });
+
+  it('opens the task', () => {
+    expect(linkPath(notificationLink(sample('subtask_turn')))).toBe(`/tasks/${SUBJECT_ID}`);
   });
 });

@@ -2356,6 +2356,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/{id}/subtasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskSubtasksController_add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/subtasks/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["TaskSubtasksController_order"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/subtasks/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskSubtasksController_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/run-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["TaskSubtasksController_setRunMode"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/stages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskSubtasksController_createStage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/stages/{stageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["TaskSubtasksController_updateStage"];
+        trace?: never;
+    };
+    "/api/tasks/{id}/stages/{stageId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaskSubtasksController_archiveStage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/handover-note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["TaskSubtasksController_setHandoverNote"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hr/employees": {
         parameters: {
             query?: never;
@@ -5897,9 +6025,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings" | "hr_request" | "hr_opinion" | "leave_balance" | "attendance_passkey" | "attendance_kiosk" | "attendance" | "attendance_item" | "attendance_punch" | "attendance_month";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings" | "hr_request" | "hr_opinion" | "leave_balance" | "attendance_passkey" | "attendance_kiosk" | "attendance" | "attendance_item" | "attendance_punch" | "attendance_month" | "task_stage";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "user.image_set" | "user.image_removed" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client.image_set" | "client.image_removed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project.image_set" | "project.image_removed" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer.image_set" | "retainer.image_removed" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated" | "hr_request.created" | "hr_request.approved" | "hr_request.rejected" | "hr_request.cancelled" | "hr_request.recounted" | "hr_opinion.created" | "leave_balance.adjusted" | "leave_balance.opening" | "task.leave_accepted" | "attendance_passkey.registered" | "attendance_passkey.activated" | "attendance_passkey.revoked" | "attendance_kiosk.created" | "attendance_kiosk.pairing_started" | "attendance_kiosk.paired" | "attendance_kiosk.archived" | "attendance.punch_refused" | "attendance_item.justified" | "attendance_item.decided" | "attendance_item.voided" | "attendance_punch.rejected" | "attendance_month.closed" | "attendance_month.reopened";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "user.image_set" | "user.image_removed" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client.image_set" | "client.image_removed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project.image_set" | "project.image_removed" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer.image_set" | "retainer.image_removed" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated" | "hr_request.created" | "hr_request.approved" | "hr_request.rejected" | "hr_request.cancelled" | "hr_request.recounted" | "hr_opinion.created" | "leave_balance.adjusted" | "leave_balance.opening" | "task.leave_accepted" | "attendance_passkey.registered" | "attendance_passkey.activated" | "attendance_passkey.revoked" | "attendance_kiosk.created" | "attendance_kiosk.pairing_started" | "attendance_kiosk.paired" | "attendance_kiosk.archived" | "attendance.punch_refused" | "attendance_item.justified" | "attendance_item.decided" | "attendance_item.voided" | "attendance_punch.rejected" | "attendance_month.closed" | "attendance_month.reopened" | "task.run_mode_changed" | "task.subtasks_reordered" | "task.subtasks_reopened" | "task.handover_noted" | "task_stage.created" | "task_stage.updated" | "task_stage.archived" | "task_stage.finished";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -6330,6 +6458,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
             };
         } | {
@@ -6391,6 +6520,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 excerpt: string;
             };
@@ -6453,6 +6583,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 /** @enum {string} */
                 source: "internal" | "client" | "medical";
@@ -6516,6 +6647,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
             };
         } | {
@@ -6577,6 +6709,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
             };
         } | {
@@ -6638,6 +6771,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
             };
         } | {
@@ -6699,6 +6833,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
             };
         } | {
@@ -6933,6 +7068,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 /** @enum {string} */
                 change: "due" | "cancelled" | "archived" | "taken_away";
@@ -7006,6 +7142,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 excerpt: string;
             };
@@ -7068,6 +7205,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 file: string;
             };
@@ -7130,6 +7268,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
             };
         } | {
@@ -7253,6 +7392,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 /** @enum {string} */
                 source: "internal" | "client" | "medical";
@@ -7316,6 +7456,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
             };
         } | {
@@ -7377,6 +7518,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 /** @enum {string} */
                 outcome: "delivered" | "cancelled";
@@ -7440,6 +7582,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
             };
         } | {
@@ -8392,6 +8535,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 /** Format: date */
                 dueDate: string;
@@ -8456,6 +8600,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 /** Format: date */
                 dueDate: string;
@@ -8520,6 +8665,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 /** Format: date */
                 dueDate: string;
@@ -8585,6 +8731,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 revisionNumber: number;
                 /** Format: date */
@@ -10108,6 +10255,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
             };
         } | {
@@ -10169,6 +10317,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 decision: components["schemas"]["RevisionDecision"];
             };
@@ -10231,6 +10380,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 /** Format: date */
                 dueDate: string;
@@ -14311,6 +14461,395 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** @enum {string} */
+            type: "subtask_turn";
+            data: {
+                task: {
+                    title: string;
+                    department: components["schemas"]["DepartmentCode"];
+                    client: string | null;
+                    project: string | null;
+                    parent?: string | null;
+                };
+                parent: string;
+                previous: {
+                    title: string;
+                    by: string | null;
+                    note: string | null;
+                } | null;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "subtask_handover";
+            data: {
+                task: {
+                    title: string;
+                    department: components["schemas"]["DepartmentCode"];
+                    client: string | null;
+                    project: string | null;
+                    parent?: string | null;
+                };
+                parent: string;
+                stage: string;
+                handover: {
+                    title: string;
+                    by: string | null;
+                    note: string | null;
+                }[];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "subtask_stage_finished";
+            data: {
+                task: {
+                    title: string;
+                    department: components["schemas"]["DepartmentCode"];
+                    client: string | null;
+                    project: string | null;
+                    parent?: string | null;
+                };
+                stage: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "subtasks_all_finished";
+            data: {
+                task: {
+                    title: string;
+                    department: components["schemas"]["DepartmentCode"];
+                    client: string | null;
+                    project: string | null;
+                    parent?: string | null;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "subtask_holding_next";
+            data: {
+                task: {
+                    title: string;
+                    department: components["schemas"]["DepartmentCode"];
+                    client: string | null;
+                    project: string | null;
+                    parent?: string | null;
+                };
+                parent: string;
+                waiting: string;
+                forParent: boolean;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "task_blocked";
+            data: {
+                task: {
+                    title: string;
+                    department: components["schemas"]["DepartmentCode"];
+                    client: string | null;
+                    project: string | null;
+                    parent?: string | null;
+                };
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
             type: "task_progressed";
             data: {
                 task: {
@@ -14318,6 +14857,7 @@ export interface components {
                     department: components["schemas"]["DepartmentCode"];
                     client: string | null;
                     project: string | null;
+                    parent?: string | null;
                 };
                 status: components["schemas"]["TaskStatus"];
             };
@@ -14424,7 +14964,7 @@ export interface components {
         /** @enum {string} */
         PunchDirection: "in" | "out";
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "invoice_draft_created" | "invoice_due_soon" | "payment_recorded" | "payment_voided" | "invoice_voided" | "ad_deposit_recorded" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "campaign_assigned" | "campaign_status_changed" | "campaign_end_passed" | "department_manager_assigned" | "member_moved" | "member_archived_open_work" | "security_new_device" | "security_notice" | "push_device_lost" | "announcement" | "announcement_ack_reminder" | "announcement_ack_summary" | "poll_closing" | "poll_results" | "contract_ending" | "probation_ending" | "employee_leaving" | "salary_changed" | "holiday_changed" | "hr_request_submitted" | "hr_request_decided" | "colleague_on_leave" | "leave_balance_adjusted" | "attendance_item_raised" | "attendance_items_pending" | "attendance_item_decided" | "attendance_check_in_missing" | "attendance_check_out_missing" | "field_punch_recorded" | "field_punch_rejected" | "shoot_check_in_missing" | "kiosk_offline" | "attendance_month_closed" | "action_reminder" | "action_escalated" | "action_escalated_top" | "profile_changed" | "client_logo_changed" | "project_image_changed" | "retainer_image_changed" | "task_progressed" | "post_progressed";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "invoice_draft_created" | "invoice_due_soon" | "payment_recorded" | "payment_voided" | "invoice_voided" | "ad_deposit_recorded" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "campaign_assigned" | "campaign_status_changed" | "campaign_end_passed" | "department_manager_assigned" | "member_moved" | "member_archived_open_work" | "security_new_device" | "security_notice" | "push_device_lost" | "announcement" | "announcement_ack_reminder" | "announcement_ack_summary" | "poll_closing" | "poll_results" | "contract_ending" | "probation_ending" | "employee_leaving" | "salary_changed" | "holiday_changed" | "hr_request_submitted" | "hr_request_decided" | "colleague_on_leave" | "leave_balance_adjusted" | "attendance_item_raised" | "attendance_items_pending" | "attendance_item_decided" | "attendance_check_in_missing" | "attendance_check_out_missing" | "field_punch_recorded" | "field_punch_rejected" | "shoot_check_in_missing" | "kiosk_offline" | "attendance_month_closed" | "action_reminder" | "action_escalated" | "action_escalated_top" | "profile_changed" | "client_logo_changed" | "project_image_changed" | "retainer_image_changed" | "subtask_turn" | "subtask_handover" | "subtask_stage_finished" | "subtasks_all_finished" | "subtask_holding_next" | "task_blocked" | "task_progressed" | "post_progressed";
         /** @enum {string} */
         ProfileChange: "photo" | "name" | "title" | "phone" | "skills";
         /** @enum {string} */
@@ -16106,6 +16646,15 @@ export interface components {
             overLimitPending: boolean;
             /** Format: uuid */
             postId: string | null;
+            parent: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+            progress: {
+                delivered: number;
+                total: number;
+            } | null;
         };
         /** @enum {string} */
         TaskType: "work" | "client_request";
@@ -16221,6 +16770,16 @@ export interface components {
             overLimitPending: boolean;
             /** Format: uuid */
             postId: string | null;
+            parent: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+                status: components["schemas"]["TaskStatus"];
+            } | null;
+            progress: {
+                delivered: number;
+                total: number;
+            } | null;
             brief: string | null;
             needsClientApproval: boolean;
             clientRequest: {
@@ -16263,6 +16822,10 @@ export interface components {
                 /** Format: date-time */
                 expiresAt: string;
             } | null;
+            runMode: components["schemas"]["SubtaskRunMode"] | null;
+            stages: components["schemas"]["TaskStage"][];
+            subtasks: components["schemas"]["Subtask"][];
+            handoverNote: string | null;
             createdBy: components["schemas"]["PersonRef"] | null;
             /** Format: date-time */
             createdAt: string;
@@ -16291,6 +16854,8 @@ export interface components {
             status: components["schemas"]["TaskStatus"];
             finished: boolean;
             archived: boolean;
+            /** @enum {string} */
+            source: "manual" | "run";
         };
         TaskChecklistItem: {
             /** Format: uuid */
@@ -16385,6 +16950,103 @@ export interface components {
         ResponseChannel: "link" | "manual";
         /** @enum {string} */
         ApprovalRequestState: "open" | "expired" | "completed" | "revoked";
+        /** @enum {string} */
+        SubtaskRunMode: "sequential" | "parallel" | "stages";
+        TaskStage: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            position: number;
+            finished: boolean;
+            handover: components["schemas"]["HandoverEntry"][] | null;
+        };
+        HandoverEntry: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            assignee: components["schemas"]["PersonRef"] | null;
+            note: string | null;
+            finals: {
+                /** Format: uuid */
+                fileItemId: string;
+                name: string;
+            }[];
+        };
+        Subtask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            type: components["schemas"]["TaskType"];
+            department: components["schemas"]["DepartmentCode"];
+            assignee: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** Format: uuid */
+                imageId: string | null;
+                archived: boolean;
+                inDepartment: boolean;
+            } | null;
+            status: components["schemas"]["TaskStatus"];
+            reviewStage: components["schemas"]["ReviewStage"] | null;
+            priority: components["schemas"]["TaskPriority"];
+            /** Format: date */
+            dueDate: string;
+            dueTime: string | null;
+            overdue: boolean;
+            blocked: boolean;
+            client: components["schemas"]["ClientRef"] | null;
+            project: components["schemas"]["EngagementRef"] | null;
+            milestone: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            retainer: components["schemas"]["EngagementRef"] | null;
+            cycle: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+            } | null;
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+            } | null;
+            checklist: {
+                done: number;
+                total: number;
+            };
+            revisions: {
+                clientCount: number;
+                limit: number;
+            };
+            overLimitPending: boolean;
+            /** Format: uuid */
+            postId: string | null;
+            parent: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+            progress: {
+                delivered: number;
+                total: number;
+            } | null;
+            position: number;
+            /** Format: uuid */
+            stageId: string | null;
+            waitingOn: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            }[];
+            handoverNote: string | null;
+        };
         /** @description What the caller may do, for the UI */
         TaskPermissions: {
             canEdit: boolean;
@@ -16400,6 +17062,9 @@ export interface components {
             canCancel: boolean;
             canReopen: boolean;
             canArchive: boolean;
+            canManageSubtasks: boolean;
+            canReopenSubtasks: boolean;
+            canWriteHandover: boolean;
         };
         CreateTask: {
             title: string;
@@ -16488,6 +17153,7 @@ export interface components {
             requestedOn?: string;
             requestScope?: components["schemas"]["RequestScope"];
             acceptLeave?: boolean;
+            moveSubtasks?: boolean;
         };
         TaskStatusChange: {
             status: components["schemas"]["TaskStatus"];
@@ -16569,6 +17235,61 @@ export interface components {
         };
         TaskCommentInput: {
             body: string;
+        };
+        CreateSubtask: {
+            title: string;
+            department: components["schemas"]["DepartmentCode"];
+            /** @default normal */
+            priority: components["schemas"]["TaskPriority"];
+            /** Format: date */
+            dueDate: string;
+            brief?: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            assigneeId: string | null;
+            dueTime?: string | null;
+            /** @default [] */
+            checklist: string[];
+            position?: number;
+            /** Format: uuid */
+            stageId?: string | null;
+            acceptLeave?: boolean;
+        };
+        SubtaskOrder: {
+            items: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                stageId: string | null;
+            }[];
+        };
+        TaskSubtasks: {
+            runMode: components["schemas"]["SubtaskRunMode"] | null;
+            stages: components["schemas"]["TaskStage"][];
+            subtasks: components["schemas"]["Subtask"][];
+        };
+        ReopenSubtasks: {
+            items: {
+                /** Format: uuid */
+                id: string;
+                note: string;
+            }[];
+        };
+        SubtaskRunModeInput: {
+            runMode: components["schemas"]["SubtaskRunMode"];
+        };
+        CreateTaskStage: {
+            name: string;
+            position?: number;
+        };
+        UpdateTaskStage: {
+            name?: string;
+            position?: number;
+        };
+        HandoverNoteInput: {
+            note: string | null;
         };
         /** @enum {string} */
         EmployeeStatus: "active" | "leaving" | "ended";
@@ -17787,6 +18508,15 @@ export interface components {
             overLimitPending: boolean;
             /** Format: uuid */
             postId: string | null;
+            parent: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+            progress: {
+                delivered: number;
+                total: number;
+            } | null;
             inPublishCycle: boolean;
         };
         CreatePostTask: {
@@ -20232,6 +20962,15 @@ export interface components {
             overLimitPending: boolean;
             /** Format: uuid */
             postId: string | null;
+            parent: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+            progress: {
+                delivered: number;
+                total: number;
+            } | null;
             snapshot: {
                 files: number;
                 hasText: boolean;
@@ -26329,6 +27068,7 @@ export interface operations {
                 department?: components["schemas"]["DepartmentCode"] | components["schemas"]["DepartmentCode"][];
                 assigneeId?: string | "me";
                 clientId?: string;
+                topLevel?: "true" | "false";
             };
             header?: never;
             path?: never;
@@ -26418,6 +27158,8 @@ export interface operations {
                 reviewer?: "me";
                 reviewStage?: components["schemas"]["ReviewStage"];
                 archived?: "true" | "false";
+                parentId?: string;
+                topLevel?: "true" | "false";
                 sort?: "dueDate" | "priority" | "createdAt" | "updatedAt";
                 order?: components["schemas"]["SortOrder"];
             };
@@ -26990,6 +27732,217 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    TaskSubtasksController_add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubtask"];
+            };
+        };
+        responses: {
+            /** @description The new subtask (manage scope on the parent or its assignee); an assignee needs assign scope, or is the caller in their own department */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+            /** @description No task the caller may read */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TaskSubtasksController_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubtaskOrder"];
+            };
+        };
+        responses: {
+            /** @description The run mode, stages and subtasks in their new order (rule A4) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubtasks"];
+                };
+            };
+        };
+    };
+    TaskSubtasksController_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenSubtasks"];
+            };
+        };
+        responses: {
+            /** @description The parent after chosen delivered subtasks went back to work (rule A10) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+        };
+    };
+    TaskSubtasksController_setRunMode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubtaskRunModeInput"];
+            };
+        };
+        responses: {
+            /** @description The run mode, stages and subtasks after the change (rule A4) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubtasks"];
+                };
+            };
+        };
+    };
+    TaskSubtasksController_createStage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaskStage"];
+            };
+        };
+        responses: {
+            /** @description The new stage */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStage"];
+                };
+            };
+        };
+    };
+    TaskSubtasksController_updateStage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                stageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTaskStage"];
+            };
+        };
+        responses: {
+            /** @description The renamed or moved stage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStage"];
+                };
+            };
+        };
+    };
+    TaskSubtasksController_archiveStage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                stageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stage is removed; only an empty stage is */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TaskSubtasksController_setHandoverNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoverNoteInput"];
+            };
+        };
+        responses: {
+            /** @description The subtask with its handover note (its assignee or department managers) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
             };
         };
     };

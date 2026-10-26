@@ -96,6 +96,7 @@ import {
   taskLinks,
   taskReviews,
   taskRevisions,
+  taskStages,
   tasks,
   templateRuns,
   templateRunTasks,
@@ -691,8 +692,14 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
  * Removes seeded tasks with their dependencies (both ways), checklists, links, revisions,
  * comments and audit entries (test cleanup only).
  */
-export async function removeTasks(db: Database, ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
+export async function removeTasks(db: Database, given: string[]): Promise<void> {
+  if (given.length === 0) return;
+  // F06B: a parent goes with its subtasks, and its stages with it.
+  const subtasks = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(inArray(tasks.parentId, given));
+  const ids = [...new Set([...given, ...subtasks.map((row) => row.id)])];
   await removeShoots(
     db,
     (
@@ -716,6 +723,10 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
       .select({ id: taskComments.id })
       .from(taskComments)
       .where(inArray(taskComments.taskId, ids))),
+    ...(await db
+      .select({ id: taskStages.id })
+      .from(taskStages)
+      .where(inArray(taskStages.taskId, ids))),
   ].map((row) => row.id);
   await db.delete(auditEntries).where(inArray(auditEntries.entityId, [...ids, ...children]));
   await db.delete(templateRunTasks).where(inArray(templateRunTasks.taskId, ids));
@@ -733,6 +744,8 @@ export async function removeTasks(db: Database, ids: string[]): Promise<void> {
   await db.delete(taskRevisions).where(inArray(taskRevisions.taskId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(attendancePunches).where(inArray(attendancePunches.fieldTaskId, ids));
+  await db.update(tasks).set({ stageId: null }).where(inArray(tasks.id, ids));
+  await db.delete(taskStages).where(inArray(taskStages.taskId, ids));
   await db.delete(tasks).where(inArray(tasks.id, ids));
 }
 

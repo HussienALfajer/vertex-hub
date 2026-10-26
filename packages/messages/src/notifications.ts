@@ -105,6 +105,8 @@ export const CAMPAIGN_STATUS_NAMES: Record<AdCampaignStatus, string> = {
 /** The texts of the notification types, with `{{name}}` placeholders. */
 export const NOTIFICATION_TEXT = {
   task_assigned: 'أُسندت إليك «{{task}}» بواسطة {{actor}}',
+  /** F06B: the text names the parent of a subtask. */
+  task_assigned_subtask: 'أُسندت إليك «{{task}}»، مهمة فرعية من «{{parent}}»، بواسطة {{actor}}',
   task_mentioned: 'أُشير إليك في تعليق على «{{task}}» بواسطة {{actor}}',
   task_returned: {
     internal: 'أُعيدت إليك «{{task}}» للتعديل بواسطة {{actor}}',
@@ -290,6 +292,20 @@ export const NOTIFICATION_TEXT = {
   lead_follow_up_due: 'حان موعد متابعة العميل المحتمل «{{lead}}»',
   push_device_lost: 'توقفت الإشعارات على {{device}}. فعّلها من جديد من ذلك الجهاز',
   task_reopened: 'أعاد {{actor}} فتح «{{task}}»',
+  /** F06B rules A6 and A12. */
+  subtask_turn: {
+    first: 'حان دورك في «{{task}}» من «{{parent}}»',
+    after: 'حان دورك في «{{task}}» من «{{parent}}» بعد تسليم «{{previous}}»',
+    note: '{{text}}. ملاحظة التسليم: {{note}}',
+  },
+  subtask_handover: 'انتهت مرحلة «{{stage}}» في «{{parent}}»: حان دورك في «{{task}}»',
+  subtask_stage_finished: 'انتهت مرحلة «{{stage}}» في «{{task}}»',
+  subtasks_all_finished: 'سُلّمت كل المهام الفرعية لـ«{{task}}»: أرسلها للمراجعة',
+  subtask_holding_next: {
+    parent: '«{{task}}» متأخرة وتؤخّر «{{waiting}}» في «{{parent}}»',
+    waiting: '«{{waiting}}» تنتظر «{{task}}» المتأخرة',
+  },
+  task_blocked: '«{{task}}» عادت بانتظار مهام أخرى',
   task_delivered: 'سُلّمت «{{task}}»',
   task_revision_decided: {
     free: 'قرر {{actor}} تنفيذ تعديل العميل على «{{task}}» دون مقابل',
@@ -1635,6 +1651,37 @@ type TaskNotification = Exclude<
 function taskText(notification: TaskNotification, actor: string): string {
   const task = notification.data.task.title;
   switch (notification.type) {
+    case 'task_assigned': {
+      const parent = notification.data.task.parent;
+      return parent
+        ? fill(text.task_assigned_subtask, { actor, task, parent })
+        : fill(text.task_assigned, { actor, task });
+    }
+    case 'subtask_turn': {
+      const { parent, previous } = notification.data;
+      const turn = previous
+        ? fill(text.subtask_turn.after, { task, parent, previous: previous.title })
+        : fill(text.subtask_turn.first, { task, parent });
+      return previous?.note
+        ? fill(text.subtask_turn.note, { text: turn, note: previous.note })
+        : turn;
+    }
+    case 'subtask_handover':
+      return fill(text.subtask_handover, {
+        task,
+        parent: notification.data.parent,
+        stage: notification.data.stage,
+      });
+    case 'subtask_stage_finished':
+      return fill(text.subtask_stage_finished, { task, stage: notification.data.stage });
+    case 'subtask_holding_next': {
+      const { parent, waiting, forParent } = notification.data;
+      return fill(text.subtask_holding_next[forParent ? 'parent' : 'waiting'], {
+        task,
+        parent,
+        waiting,
+      });
+    }
     case 'task_returned':
     case 'task_approved':
       return fill(text[notification.type][notification.data.source], { actor, task });

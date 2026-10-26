@@ -1,5 +1,6 @@
 import {
   createsDependencyCycle,
+  type DependencySource,
   isTaskBlocked,
   isTaskFinished,
   TASK_LIMITS,
@@ -53,6 +54,7 @@ const dependencyColumns = {
   department: tasks.department,
   status: tasks.status,
   archivedAt: tasks.archivedAt,
+  source: taskDependencies.source,
 };
 
 type DependencyRow = {
@@ -61,6 +63,7 @@ type DependencyRow = {
   department: TaskDependency['department'];
   status: TaskStatus;
   archivedAt: Date | null;
+  source: DependencySource;
 };
 
 const toDependency = (row: DependencyRow): TaskDependency => ({
@@ -70,15 +73,25 @@ const toDependency = (row: DependencyRow): TaskDependency => ({
   status: row.status,
   finished: isTaskFinished(row.status),
   archived: !!row.archivedAt,
+  source: row.source,
 });
 
-/** The tasks `taskId` waits on, by title. */
-export async function dependenciesOf(taskId: string, executor: Executor) {
+/** The tasks `taskId` waits on, by title; `source` keeps the hand-set (`manual`) ones only. */
+export async function dependenciesOf(
+  taskId: string,
+  executor: Executor,
+  source?: DependencySource,
+) {
   const rows = await executor
     .select(dependencyColumns)
     .from(taskDependencies)
     .innerJoin(tasks, eq(tasks.id, taskDependencies.dependsOnId))
-    .where(eq(taskDependencies.taskId, taskId))
+    .where(
+      and(
+        eq(taskDependencies.taskId, taskId),
+        source ? eq(taskDependencies.source, source) : undefined,
+      ),
+    )
     .orderBy(tasks.title);
   return rows.map(toDependency);
 }
@@ -149,24 +162,29 @@ export async function assertValidDependencies(
 }
 
 /**
- * Rule 4 when a task changes client: the tasks it waits on and the tasks waiting on it must all
- * be of the new client (or all without one).
+ * Rule 4 when tasks change client together (a parent and its subtasks, F06B rule A1): the tasks
+ * they wait on and the tasks waiting on them, outside the set, must all be of the new client (or
+ * all without one).
  */
 export async function assertSameClientLinks(
   tx: Transaction,
-  taskId: string,
+  taskIds: readonly string[],
   clientId: string | null,
 ): Promise<void> {
+  const ids = sql.join(
+    taskIds.map((id) => sql`${id}`),
+    sql`, `,
+  );
   const linked = await tx
     .select({ clientId: tasks.clientId })
     .from(taskDependencies)
     .innerJoin(
       tasks,
-      sql`${tasks.id} = case when ${taskDependencies.taskId} = ${taskId}
+      sql`${tasks.id} = case when ${taskDependencies.taskId} in (${ids})
         then ${taskDependencies.dependsOnId} else ${taskDependencies.taskId} end`,
     )
     .where(
-      sql`(${taskDependencies.taskId} = ${taskId} or ${taskDependencies.dependsOnId} = ${taskId})`,
+      sql`(${taskDependencies.taskId} in (${ids})) <> (${taskDependencies.dependsOnId} in (${ids}))`,
     );
   if (linked.some((row) => row.clientId !== clientId)) {
     throw new CodedException(
@@ -175,6 +193,15 @@ export async function assertSameClientLinks(
       'Remove the dependencies on tasks of other clients before changing the client',
     );
   }
+}
+
+/** Whether the stored edges already lead from `dependsOnId` back to `taskId` (rule 4). */
+export async function closesCycle(
+  tx: Transaction,
+  taskId: string,
+  dependsOnId: string,
+): Promise<boolean> {
+  return createsDependencyCycle(taskId, [dependsOnId], await reachableEdges(tx, [dependsOnId]));
 }
 
 /** Every dependency edge reachable from `from`, as task → the tasks it waits on. */

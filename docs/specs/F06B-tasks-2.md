@@ -179,7 +179,7 @@ F06's status machine and rules stay. What changes is listed here.
    - A parent holds at most 30 non-cancelled subtasks (`LIMIT_REACHED`).
 2. **Creating.** Subtasks are created with the parent (the wizard), added later to an open parent, or turned from a question or a comment (rule B11). Each one is checked as its own create:
    - the department's members for the assignee;
-   - assign scope, or the creator themself in their own department; otherwise it is a request that lands unassigned in the department's queue (owner, 2026-10-26);
+   - assign scope, or the creator themself in their own department; otherwise it is a request that lands unassigned in the department's queue (owner, 2026-10-26). Naming an assignee the caller may not assign answers 403, as F06's create does; only applying a template turns such a default assignee into a queue request (edge case 20) (owner, 2026-10-26, at PR 1);
    - F17's leave warning.
    - A subtask cannot be added to a delivered, cancelled or archived parent (`TASK_CLOSED`).
 3. **Run modes** (owner, 2026-10-25). The system keeps the parent's subtasks' `run` dependencies equal to what the mode and the order imply:

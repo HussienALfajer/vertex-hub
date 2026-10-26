@@ -9,6 +9,7 @@ import {
   businessDate,
   canMakeTaskMove,
   isTaskBlocked,
+  isTaskFinished,
   type RevisionDecisionInput,
   revisionExtraWorkTitle,
   revisionSourceOf,
@@ -29,7 +30,7 @@ import {
   taskRevisions,
   tasks,
 } from '@vertex-hub/db';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, notInArray } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { recordAudit } from '../audit/index.js';
@@ -40,6 +41,7 @@ import type { Notice } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
+import { SubtaskRuns } from './subtask-runs.js';
 import {
   actorOf,
   assertTaskWritable,
@@ -58,6 +60,7 @@ import {
   lockDependencyGraph,
 } from './task-dependencies.js';
 import { TaskGuards } from './task-guards.js';
+import { cancelledColumns, TaskHooksService } from './task-hooks.service.js';
 import { blocksDependents, TaskNotices } from './task-notices.js';
 import { TaskReviews } from './task-reviews.js';
 import { TasksService } from './tasks.service.js';
@@ -70,6 +73,15 @@ const RESPONSE_MOVES: readonly TaskMove[] = ['client_approved', 'client_changes'
 
 /** Internal passes (F09 rules 1 and 2): they write a snapshot of the content they were shown. */
 const PASS_MOVES: readonly TaskMove[] = ['send_to_client', 'approve'];
+
+/** F06B rule A8: moves toward review, the client or delivery wait for the subtasks. */
+const SUBTASK_HELD_MOVES: readonly TaskMove[] = [
+  'submit',
+  'resubmit',
+  'send_to_client',
+  'approve',
+  'deliver',
+];
 
 /** Moves that turn a delivered or cancelled task back into open work. */
 const REOPEN_MOVES: readonly TaskMove[] = ['reopen', 'reopen_client', 'reopen_internal'];
@@ -95,6 +107,8 @@ export class TaskWorkflowService {
     private readonly reviewHooks: ClientReviewHooks,
     private readonly postHooks: PostTaskHooks,
     private readonly guards: TaskGuards,
+    private readonly runs: SubtaskRuns,
+    private readonly hooks: TaskHooksService,
   ) {}
 
   private get directories() {
@@ -110,6 +124,20 @@ export class TaskWorkflowService {
       // A reopen must not hand open work back to an archived user (rule 6, edge case 4): it
       // waits for user archiving, which checks open tasks under the same lock, taken first.
       if (REOPEN_TARGETS.includes(change.status)) await lockAccessChanges(tx);
+      // F06B: a subtask's move may rewrite its parent's run, and the parent's lock serializes it
+      // with a move of the parent (edge case 2): the graph lock, then the parent, then the task.
+      const [peek] = await tx
+        .select({ parentId: tasks.parentId })
+        .from(tasks)
+        .where(eq(tasks.id, id));
+      if (peek?.parentId) {
+        await lockDependencyGraph(tx);
+        await tx
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(eq(tasks.id, peek.parentId))
+          .for('update');
+      }
       // The row lock makes a second concurrent move see the first one's status (edge case 1).
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       assertTaskWritable(task);
@@ -146,6 +174,11 @@ export class TaskWorkflowService {
         }
       }
       if (!canMakeTaskMove(taskState(task, blocked), move, rights)) throw new ForbiddenException();
+      // F06B rule A8: a parent goes to review only once its subtasks are delivered.
+      // A subtask added later holds the parent at every later step too.
+      if (!task.parentId && SUBTASK_HELD_MOVES.includes(move)) {
+        await this.assertSubtasksDelivered(tx, id);
+      }
       // F08 rule 7: the client approves the post, and publishing it delivers the task.
       if (isRefusedOnLinkedTask(task, change.status)) {
         throw new CodedException(
@@ -217,6 +250,16 @@ export class TaskWorkflowService {
         ? await this.reviews.clearedPass(tx, task)
         : null;
 
+      // F06 edge case 3: the tasks free to work now, to tell those this move holds again.
+      const freeDependents =
+        isTaskFinished(task.status) && !isTaskFinished(to)
+          ? await this.runs.freeDependents(tx, [id])
+          : [];
+      // Edge case 3: a cancelled subtask frees the next one; compare with the run before it.
+      const blockedBefore =
+        task.parentId && move === 'cancel'
+          ? await this.runs.blockedNow(tx, task.parentId)
+          : undefined;
       const now = new Date();
       await tx
         .update(tasks)
@@ -225,7 +268,7 @@ export class TaskWorkflowService {
           reviewStage: medical ? 'medical' : to === 'internal_review' ? 'internal' : null,
           ...(clearedReviewId && { clearedReviewId }),
           ...(to === 'in_progress' && !task.startedAt && { startedAt: now }),
-          ...(move === 'deliver' && { deliveredAt: now }),
+          ...((move === 'deliver' || move === 'approve_subtask') && { deliveredAt: now }),
           ...((move === 'reopen_client' || move === 'reopen_internal') && { deliveredAt: null }),
           ...(move === 'cancel' && { cancelledAt: now, cancelReason: note }),
           ...(move === 'reopen' && { cancelledAt: null, cancelReason: null }),
@@ -275,8 +318,11 @@ export class TaskWorkflowService {
         },
       });
       // F10 rule 9: an approval without the client marks the latest version of each deliverable
-      // final; a client approval marks the snapshot it answered (F09 rule 13).
-      if (move === 'approve') await this.files.markLatestFinal(tx, id, actorOf(actor));
+      // final; a client approval marks the snapshot it answered (F09 rule 13). Approving a
+      // subtask delivers it with its finals (F06B rule A7).
+      if (move === 'approve' || move === 'approve_subtask') {
+        await this.files.markLatestFinal(tx, id, actorOf(actor));
+      }
       if (answered && contactId) {
         await this.approvals.recordManual(tx, {
           task,
@@ -306,6 +352,16 @@ export class TaskWorkflowService {
       if (move === 'reopen_client' || move === 'reopen_internal') {
         await unlinkRemovedTask(tx, this.postHooks, task, 'reopened', actorOf(actor));
       }
+      // F06B rule A11: cancelling a parent cancels its open subtasks with its reason.
+      if (move === 'cancel' && !task.parentId && note) {
+        await this.cancelSubtasks(tx, actor, id, note);
+      }
+      // Rules A3 and A10: a subtask cancelled or back to work rewrites its parent's run, and a
+      // reopened one holds the parent again.
+      if (task.parentId && (move === 'cancel' || REOPEN_MOVES.includes(move))) {
+        await this.runs.sync(tx, task.parentId, actor.id, blockedBefore);
+        if (REOPEN_MOVES.includes(move)) await this.runs.rearm(tx, task.parentId, actor.id);
+      }
       const overLimit = !!revision?.overLimit;
       await this.notices.sendChange(
         tx,
@@ -313,10 +369,58 @@ export class TaskWorkflowService {
         actor.id,
         medical
           ? [await this.reviews.medicalRequested(tx, task, actor.id)]
-          : await this.moveNotices(tx, actor, task, move, overLimit),
+          : [
+              ...(await this.moveNotices(tx, actor, task, move, overLimit)),
+              // F06 edge case 3: a finished task back to work holds its dependents again.
+              ...(isTaskFinished(task.status) && !isTaskFinished(to)
+                ? await this.runs.blockedAgain(tx, actor.id, freeDependents)
+                : []),
+            ],
       );
     });
     return this.tasks.detail(actor, id);
+  }
+
+  /** Rule A8: `SUBTASKS_OPEN`, listing the live subtasks not delivered yet. */
+  private async assertSubtasksDelivered(tx: Transaction, parentId: string): Promise<void> {
+    const open = (await this.runs.subtasksOf(tx, parentId)).filter(
+      (s) => !s.archivedAt && s.status !== 'cancelled' && s.status !== 'delivered',
+    );
+    if (open.length > 0) {
+      throw new CodedException(
+        409,
+        'SUBTASKS_OPEN',
+        'Deliver or cancel the subtasks first',
+        open.map((s) => ({ id: s.id, title: s.title, status: s.status })),
+      );
+    }
+  }
+
+  /** Rule A11: the parent's open, non-archived subtasks, cancelled with its reason. */
+  private async cancelSubtasks(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    parentId: string,
+    reason: string,
+  ): Promise<void> {
+    const open = await tx
+      .select(cancelledColumns)
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.parentId, parentId),
+          isNull(tasks.archivedAt),
+          notInArray(tasks.status, ['delivered', 'cancelled']),
+        ),
+      )
+      .orderBy(asc(tasks.id))
+      .for('update');
+    // F11 rule 9: a scheduled shoot holds its task.
+    await this.guards.assertFree(
+      tx,
+      open.map((subtask) => subtask.id),
+    );
+    await this.hooks.cancelLocked(tx, open, reason, actorOf(actor), { parentId });
   }
 
   /** Rule 10: the account manager decides on an over-limit client revision, once. */
@@ -417,7 +521,9 @@ export class TaskWorkflowService {
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       if (!taskRights(actor, task).manage) throw new ForbiddenException();
       assertTaskWritable(task);
-      const current = await dependenciesOf(id, tx);
+      // F06B: only the hand-set dependencies are edited here; the run writes its own.
+      const wasBlocked = isTaskBlocked(await dependenciesOf(id, tx));
+      const current = await dependenciesOf(id, tx, 'manual');
       const currentIds = current.map((d) => d.id);
       const added = input.dependsOn.filter((dependsOn) => !currentIds.includes(dependsOn));
       const removed = currentIds.filter((dependsOn) => !input.dependsOn.includes(dependsOn));
@@ -430,14 +536,25 @@ export class TaskWorkflowService {
         await tx
           .delete(taskDependencies)
           .where(
-            and(eq(taskDependencies.taskId, id), inArray(taskDependencies.dependsOnId, removed)),
+            and(
+              eq(taskDependencies.taskId, id),
+              eq(taskDependencies.source, 'manual'),
+              inArray(taskDependencies.dependsOnId, removed),
+            ),
           );
       }
       if (added.length > 0) {
+        // A dependency the run already implies becomes manual (F06B, `task_dependencies`).
         await tx
           .insert(taskDependencies)
-          .values(added.map((dependsOnId) => ({ taskId: id, dependsOnId, createdById: actor.id })));
+          .values(added.map((dependsOnId) => ({ taskId: id, dependsOnId, createdById: actor.id })))
+          .onConflictDoUpdate({
+            target: [taskDependencies.taskId, taskDependencies.dependsOnId],
+            set: { source: 'manual', createdById: actor.id },
+          });
       }
+      // A removed manual dependency the run implies comes back as `run`.
+      if (task.parentId && removed.length > 0) await this.runs.sync(tx, task.parentId, actor.id);
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'task.dependencies_updated',
@@ -447,7 +564,7 @@ export class TaskWorkflowService {
         after: { dependsOn: after },
       });
       // Rule 7 (A03): removing the last open dependency opens a new task.
-      if (task.status === 'new' && isTaskBlocked(current) && !(await isBlocked(id, tx))) {
+      if (task.status === 'new' && wasBlocked && !(await isBlocked(id, tx))) {
         const recipients = await this.notices.assigneeOrManagers(tx, task);
         await this.notices.send(tx, [
           this.notices.notice(task, 'task_opened', recipients, actor.id),
@@ -472,8 +589,22 @@ export class TaskWorkflowService {
       case 'submit':
       case 'resubmit': {
         const managers = await this.notices.managers(tx, task.department);
-        return [notice(task, 'task_review_requested', [...managers, accountManager], actor.id)];
+        // F06B rule A7: a subtask's reviewers are its department managers and the parent's
+        // assignee, never the account manager.
+        const reviewers = task.parent
+          ? [
+              ...managers,
+              task.parent.assigneeId !== task.assigneeId ? task.parent.assigneeId : null,
+            ]
+          : [...managers, accountManager];
+        return [notice(task, 'task_review_requested', reviewers, actor.id)];
       }
+      case 'approve_subtask':
+        return [
+          notice(task, 'task_approved', assignee, actor.id, { source: 'internal' }),
+          ...(await this.notices.openedDependents(tx, [task.id], actor.id)),
+          ...(await this.runs.delivered(tx, task, actorOf(actor))),
+        ];
       case 'return':
         return [notice(task, 'task_returned', assignee, actor.id, { source: 'internal' })];
       case 'client_changes':
@@ -481,6 +612,10 @@ export class TaskWorkflowService {
         return [
           notice(task, 'task_returned', assignee, actor.id, { source: 'client' }),
           ...(overLimit ? [notice(task, 'task_over_limit', [accountManager], actor.id)] : []),
+          // F06B event audit: a delivered task reopened tells its creator too.
+          ...(move === 'reopen_client'
+            ? [notice(task, 'task_reopened', [task.createdById], actor.id)]
+            : []),
         ];
       case 'send_to_client':
         return [
@@ -498,6 +633,7 @@ export class TaskWorkflowService {
       case 'deliver':
         return this.notices.delivered(task, actor.id);
       case 'reopen':
+      case 'reopen_internal':
         return [notice(task, 'task_reopened', [task.assigneeId, task.createdById], actor.id)];
       case 'cancel':
         return [
@@ -529,6 +665,8 @@ export class TaskWorkflowService {
     // The client step follows the approval flag; client moves need a client.
     if (move === 'send_to_client' && !task.needsClientApproval) throw invalid();
     if (move === 'approve' && task.needsClientApproval) throw invalid();
+    // F06B rule A7: only a subtask is delivered from review.
+    if (move === 'approve_subtask' && !task.parentId) throw invalid();
     // F09 rule 4: in the medical stage the pass belongs to the medical reviewers.
     if (PASS_MOVES.includes(move) && task.reviewStage === 'medical') throw invalid();
     if (CLIENT_MOVES.includes(move) && !task.clientId) throw invalid();

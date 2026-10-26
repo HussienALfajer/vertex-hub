@@ -54,7 +54,7 @@ describe('task resolutions (F16 rule B5, part C)', () => {
 
   it('closes the assignment when work starts, and voids it when reassigned', () => {
     expect(taskResolutions(task, { ...task, status: 'in_progress' })).toEqual([
-      { types: ['task_assigned'], outcome: 'done' },
+      { types: ['task_assigned', 'subtask_turn', 'subtask_handover'], outcome: 'done' },
     ]);
     expect(taskResolutions(task, { ...task, assigneeId: 'b' })).toEqual([
       { types: ['task_assigned', 'task_returned'], outcome: 'void', recipients: ['a'] },
@@ -74,6 +74,9 @@ describe('task resolutions (F16 rule B5, part C)', () => {
       reviewStage: 'internal' as const,
     };
     const medical = { ...internal, reviewStage: 'medical' as const };
+    expect(taskResolutions({ ...task, status: 'in_progress' }, internal)).toEqual([
+      { types: ['subtasks_all_finished'], outcome: 'done' },
+    ]);
     expect(taskResolutions(internal, medical)).toEqual([
       { types: ['task_review_requested'], outcome: 'done' },
     ]);
@@ -88,7 +91,7 @@ describe('task resolutions (F16 rule B5, part C)', () => {
   it('closes a return when the task is resubmitted', () => {
     const revisions = { ...task, status: 'revisions' as const };
     expect(taskResolutions(revisions, { ...task, status: 'internal_review' })).toEqual([
-      { types: ['task_returned'], outcome: 'done' },
+      { types: ['subtasks_all_finished', 'task_returned'], outcome: 'done' },
     ]);
   });
 
@@ -96,13 +99,25 @@ describe('task resolutions (F16 rule B5, part C)', () => {
     const working = { ...task, status: 'in_progress' as const };
     expect(taskResolutions(working, { ...working, status: 'approved' })).toEqual([
       {
-        types: ['task_due_soon', 'task_overdue', 'task_overdue_escalated', 'task_due_shortly'],
+        types: [
+          'task_due_soon',
+          'task_overdue',
+          'task_overdue_escalated',
+          'task_due_shortly',
+          'subtask_holding_next',
+        ],
         outcome: 'done',
       },
     ]);
     expect(taskResolutions(working, { ...working, dueTime: '10:00' })).toEqual([
       {
-        types: ['task_due_soon', 'task_overdue', 'task_overdue_escalated', 'task_due_shortly'],
+        types: [
+          'task_due_soon',
+          'task_overdue',
+          'task_overdue_escalated',
+          'task_due_shortly',
+          'subtask_holding_next',
+        ],
         outcome: 'void',
       },
     ]);

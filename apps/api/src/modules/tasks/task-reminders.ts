@@ -9,8 +9,21 @@ import {
   OPEN_TASK_STATUSES,
   timedReminderWindow,
 } from '@vertex-hub/contracts';
-import { type Database, type Transaction, tasks } from '@vertex-hub/db';
-import { and, asc, between, eq, gt, inArray, isNotNull, lt, lte, ne, type SQL } from 'drizzle-orm';
+import { type Database, type Transaction, taskDependencies, tasks } from '@vertex-hub/db';
+import {
+  and,
+  asc,
+  between,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  ne,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
 import { UserDirectory } from '../auth/index.js';
@@ -20,8 +33,9 @@ import { TasksService } from './tasks.service.js';
 
 /**
  * The task reminders of the `notifications.daily` job (spec F14 rules 9–11): due on the next work
- * day (A07), overdue (A08), and the escalation to the department's managers a work day later.
- * Each is sent once per task and due date; a new due date starts again.
+ * day (A07), overdue (A08), and the escalation to the department's managers a work day later;
+ * and an overdue subtask holding the next one (F06B rule A14). Each is sent once per task and due
+ * date; a new due date starts again.
  */
 @Injectable()
 export class TaskReminders implements OnModuleInit {
@@ -97,6 +111,7 @@ export class TaskReminders implements OnModuleInit {
       ['Due-soon reminders', () => this.dueSoon(today)],
       ['Overdue reminders', () => this.overdue(today)],
       ['Overdue escalations', () => this.escalate(today)],
+      ['Subtasks holding the next', () => this.holdingNext(today)],
     ];
     await runEach(
       kinds,
@@ -167,6 +182,54 @@ export class TaskReminders implements OnModuleInit {
     });
   }
 
+  /**
+   * F06B rule A14: an overdue subtask that an open subtask waits on through its run, to the
+   * parent's assignee (else its department's managers) and, for information, to the assignee of
+   * the first subtask waiting.
+   */
+  private holdingNext(today: CalendarDate): Promise<number> {
+    const waitedOn = sql`exists (
+      select 1 from ${taskDependencies} as d
+      inner join ${tasks} as waiting on waiting.id = d.task_id
+      where d.depends_on_id = "tasks"."id" and d.source = 'run'
+        and waiting.archived_at is null
+        and waiting.status not in ('approved', 'delivered', 'cancelled'))`;
+    const filters = [isNotNull(tasks.parentId), lt(tasks.dueDate, today), waitedOn];
+    return this.send(today, 'subtask_holding_next', filters, async (tx, task) => {
+      if (!task.parent) return null;
+      const [waiting] = await tx
+        .select({ id: tasks.id })
+        .from(taskDependencies)
+        .innerJoin(tasks, eq(tasks.id, taskDependencies.taskId))
+        .where(
+          and(
+            eq(taskDependencies.dependsOnId, task.id),
+            eq(taskDependencies.source, 'run'),
+            sql`${tasks.archivedAt} is null`,
+            sql`${tasks.status} not in ('approved', 'delivered', 'cancelled')`,
+          ),
+        )
+        .orderBy(asc(tasks.position));
+      if (!waiting) return null;
+      const next = await this.notices.load(tx, waiting.id);
+      const data = (forParent: boolean) => ({
+        parent: task.parent?.title ?? '',
+        waiting: next.title,
+        forParent,
+      });
+      return [
+        this.notices.notice(
+          task,
+          'subtask_holding_next',
+          await this.notices.assigneeOrManagers(tx, task.parent),
+          null,
+          data(true),
+        ),
+        this.notices.notice(task, 'subtask_holding_next', [next.assigneeId], null, data(false)),
+      ];
+    });
+  }
+
   /** Open tasks shown in views (not archived, nor under archived work) matching `filters`. */
   private eligible(filters: SQL[]): SQL {
     return and(
@@ -185,7 +248,7 @@ export class TaskReminders implements OnModuleInit {
     today: CalendarDate,
     kind: NotificationReminderKind,
     filters: SQL[],
-    build: (tx: Transaction, task: NoticeTask) => Promise<Notice | null>,
+    build: (tx: Transaction, task: NoticeTask) => Promise<Notice | Notice[] | null>,
   ): Promise<number> {
     const candidates = await this.db
       .select({ id: tasks.id })

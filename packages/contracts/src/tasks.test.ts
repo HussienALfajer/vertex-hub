@@ -5,6 +5,7 @@ import {
   CLIENT_TEXT_MAX,
   canMakeTaskMove,
   commentExcerpt,
+  createSubtaskSchema,
   createsDependencyCycle,
   createTaskChecklistItemSchema,
   createTaskSchema,
@@ -12,9 +13,13 @@ import {
   isTaskOverdue,
   medicalReviewSchema,
   mentionedUserIds,
+  reopenSubtasksSchema,
   reviewContentToken,
   revisionDecisionInputSchema,
   revisionSourceOf,
+  runDependencies,
+  subtaskProgress,
+  suggestSubtaskDates,
   TASK_STATUSES,
   type TaskRights,
   type TaskState,
@@ -213,6 +218,8 @@ describe('allowedTaskTransitions', () => {
     assign: false,
     client: false,
     creator: false,
+    parentReviewer: false,
+    parentManager: false,
   };
   const assignee: TaskRights = { ...none, work: true };
   const departmentManager: TaskRights = { ...none, work: true, manage: true, assign: true };
@@ -225,6 +232,7 @@ describe('allowedTaskTransitions', () => {
     hasClient: true,
     needsClientApproval: true,
     blocked: false,
+    subtask: false,
     ...overrides,
   });
 
@@ -353,6 +361,159 @@ describe('allowedTaskTransitions', () => {
     for (const status of TASK_STATUSES) {
       expect(allowedTaskTransitions(state({ status }), none), status).toEqual([]);
     }
+  });
+
+  it('approves a subtask straight to delivered, never to the client (F06B rule A7)', () => {
+    const review = state({ status: 'internal_review', subtask: true });
+    expect(allowedTaskTransitions(review, departmentManager)).toEqual([
+      'revisions',
+      'delivered',
+      'cancelled',
+    ]);
+    const parentAssignee: TaskRights = { ...none, parentReviewer: true };
+    expect(allowedTaskTransitions(review, parentAssignee)).toEqual(['revisions', 'delivered']);
+    expect(allowedTaskTransitions(state({ status: 'internal_review' }), departmentManager)).toEqual(
+      ['awaiting_client', 'revisions', 'cancelled'],
+    );
+    expect(allowedTaskTransitions(state({ status: 'internal_review' }), parentAssignee)).toEqual(
+      [],
+    );
+    // The parent's assignee cancels a subtask, even their own (F06B, Roles).
+    const parentManager: TaskRights = { ...none, parentManager: true };
+    expect(allowedTaskTransitions(state({ subtask: true }), parentManager)).toEqual(['cancelled']);
+    expect(allowedTaskTransitions(state({}), parentManager)).toEqual([]);
+    const delivered = state({ status: 'delivered', subtask: true });
+    expect(allowedTaskTransitions(delivered, accountManager)).toEqual(['in_progress']);
+  });
+});
+
+describe('runDependencies (F06B rule A3)', () => {
+  const sub = (id: string, position: number, stagePosition: number | null = null) => ({
+    id,
+    position,
+    stagePosition,
+  });
+
+  it('chains a sequence by position', () => {
+    expect(runDependencies('sequential', [sub('c', 3), sub('a', 1), sub('b', 2)])).toEqual([
+      { taskId: 'b', dependsOnId: 'a' },
+      { taskId: 'c', dependsOnId: 'b' },
+    ]);
+  });
+
+  it('skips what the caller left out (cancelled or archived subtasks)', () => {
+    expect(runDependencies('sequential', [sub('a', 1), sub('c', 3)])).toEqual([
+      { taskId: 'c', dependsOnId: 'a' },
+    ]);
+  });
+
+  it('writes nothing in parallel', () => {
+    expect(runDependencies('parallel', [sub('a', 1), sub('b', 2)])).toEqual([]);
+  });
+
+  it('makes each stage wait for the whole previous non-empty stage', () => {
+    expect(
+      runDependencies('stages', [sub('a', 1, 1), sub('b', 2, 3), sub('c', 3, 3), sub('d', 4, 4)]),
+    ).toEqual([
+      { taskId: 'b', dependsOnId: 'a' },
+      { taskId: 'c', dependsOnId: 'a' },
+      { taskId: 'd', dependsOnId: 'b' },
+      { taskId: 'd', dependsOnId: 'c' },
+    ]);
+  });
+});
+
+describe('suggestSubtaskDates (F06B rule A5)', () => {
+  // From Sunday 2026-11-01 to Monday 2026-11-09: eight work days, Friday 2026-11-06 skipped.
+  const base = { from: '2026-11-01', parentDueDate: '2026-11-09' };
+
+  it('shares the work days in proportion to the estimates, one after another', () => {
+    expect(
+      suggestSubtaskDates({
+        ...base,
+        mode: 'sequential',
+        subtasks: [{ estimateMinutes: 240 }, { estimateMinutes: null }, { estimateMinutes: 120 }],
+      }),
+    ).toEqual(['2026-11-04', '2026-11-07', '2026-11-09']);
+  });
+
+  it('skips holidays', () => {
+    expect(
+      suggestSubtaskDates({
+        ...base,
+        mode: 'sequential',
+        holidays: [{ startsOn: '2026-11-02', endsOn: '2026-11-04' }],
+        subtasks: [{ estimateMinutes: 60 }, { estimateMinutes: 60 }],
+      }),
+    ).toEqual(['2026-11-07', '2026-11-09']);
+  });
+
+  it('gives one date per stage and the day before the parent in parallel', () => {
+    expect(
+      suggestSubtaskDates({
+        ...base,
+        mode: 'stages',
+        subtasks: [
+          { estimateMinutes: 120, stageIndex: 0 },
+          { estimateMinutes: 120, stageIndex: 1 },
+          { estimateMinutes: 60, stageIndex: 1 },
+        ],
+      }),
+    ).toEqual(['2026-11-04', '2026-11-09', '2026-11-09']);
+    expect(
+      suggestSubtaskDates({
+        ...base,
+        mode: 'parallel',
+        subtasks: [{ estimateMinutes: null }, { estimateMinutes: 600 }],
+      }),
+    ).toEqual(['2026-11-08', '2026-11-08']);
+  });
+
+  it("falls back to the parent's date without a work day", () => {
+    expect(
+      suggestSubtaskDates({
+        mode: 'sequential',
+        from: '2026-11-06',
+        parentDueDate: '2026-11-06',
+        subtasks: [{ estimateMinutes: null }],
+      }),
+    ).toEqual(['2026-11-06']);
+  });
+});
+
+describe('subtaskProgress (F06B rule A9)', () => {
+  it('counts delivered against the live subtasks', () => {
+    expect(
+      subtaskProgress([
+        { status: 'delivered', archived: false },
+        { status: 'in_progress', archived: false },
+        { status: 'cancelled', archived: false },
+        { status: 'delivered', archived: true },
+      ]),
+    ).toEqual({ delivered: 1, total: 2 });
+  });
+});
+
+describe('subtask inputs', () => {
+  it('needs each subtask once with a note to reopen', () => {
+    expect(reopenSubtasksSchema.safeParse({ items: [] }).success).toBe(false);
+    expect(
+      reopenSubtasksSchema.safeParse({
+        items: [
+          { id: ids.user, note: 'Fix the logo' },
+          { id: ids.user, note: 'Again' },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(reopenSubtasksSchema.safeParse({ items: [{ id: ids.user, note: ' ' }] }).success).toBe(
+      false,
+    );
+  });
+
+  it('defaults a new subtask to the queue, normal priority and no checklist', () => {
+    expect(
+      createSubtaskSchema.parse({ title: 'Copy', department: 'design', dueDate: '2026-11-09' }),
+    ).toMatchObject({ assigneeId: null, priority: 'normal', checklist: [] });
   });
 });
 

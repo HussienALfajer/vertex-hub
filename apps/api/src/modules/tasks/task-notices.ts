@@ -9,8 +9,8 @@ import {
   type TimeOfDay,
   taskResolutions,
 } from '@vertex-hub/contracts';
-import { type Database, type Transaction, tasks } from '@vertex-hub/db';
-import { inArray } from 'drizzle-orm';
+import { type Database, type Transaction, taskStages, tasks } from '@vertex-hub/db';
+import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { UserDirectory } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary } from '../clients/index.js';
 import {
@@ -20,14 +20,27 @@ import {
   type Resolution,
 } from '../notifications/index.js';
 import { EngagementDirectory, type ProjectLink } from '../projects/index.js';
-import { accessColumns, type TaskRow } from './task-access.js';
+import {
+  accessColumns,
+  type ParentRef,
+  parentsOf,
+  type TaskRow,
+  taskLockOrder,
+} from './task-access.js';
 import { dependentsOf, isBlocked } from './task-dependencies.js';
 import { TaskQueueHooks } from './task-queue-hooks.js';
 
 type Executor = Database | Transaction;
 
-/** A task with the client and project its snapshot and recipients come from. */
-export type NoticeTask = TaskRow & { client: ClientSummary | null; project: ProjectLink | null };
+/** A task with the client, project and parent its snapshot and recipients come from. */
+export type NoticeTask = TaskRow & {
+  client: ClientSummary | null;
+  project: ProjectLink | null;
+  parent: ParentRef | null;
+};
+
+/** A delivered subtask as a handover names it (F06B rule A12). */
+export type HandoverSnapshot = { title: string; by: string | null; note: string | null };
 
 /** Types whose snapshot is a task plus fields of their own. */
 type TaskNoticeType = {
@@ -92,14 +105,16 @@ export class TaskNotices {
     const rows = await executor.select(accessColumns).from(tasks).where(inArray(tasks.id, ids));
     const linked = (key: 'clientId' | 'projectId') =>
       rows.flatMap((row) => (row[key] ? [row[key]] : []));
-    const [clients, projects] = await Promise.all([
+    const [clients, projects, parents] = await Promise.all([
       this.clients.summaries(linked('clientId'), executor),
       this.engagements.projects(linked('projectId'), executor),
+      parentsOf(executor, rows),
     ]);
     return rows.map((row) => ({
       ...row,
       client: (row.clientId && clients.get(row.clientId)) || null,
       project: (row.projectId && projects.get(row.projectId)) || null,
+      parent: (row.parentId && parents.get(row.parentId)) || null,
     }));
   }
 
@@ -122,6 +137,7 @@ export class TaskNotices {
           department: task.department,
           client: task.client?.name ?? null,
           project: task.project?.name ?? null,
+          ...(task.parent && { parent: task.parent.title }),
         },
         ...extra[0],
       },
@@ -134,7 +150,10 @@ export class TaskNotices {
   }
 
   /** The assignee, or the department's managers when the task is unassigned. */
-  async assigneeOrManagers(executor: Executor, task: NoticeTask): Promise<string[]> {
+  async assigneeOrManagers(
+    executor: Executor,
+    task: Pick<TaskRow, 'assigneeId' | 'department'>,
+  ): Promise<string[]> {
     return task.assigneeId ? [task.assigneeId] : this.managers(executor, task.department);
   }
 
@@ -142,7 +161,8 @@ export class TaskNotices {
    * Rule 7 (A03): `task_opened` for each task waiting on one of `taskIds` that is `new`, not
    * archived and no longer blocked, after those tasks stopped blocking (approved, delivered,
    * cancelled or archived: owner decision). One notice per task, however many of its dependencies
-   * stopped blocking in the transaction.
+   * stopped blocking in the transaction. A subtask opened through a `run` dependency gets its
+   * turn or its handover instead (F06B rule A6).
    */
   async openedDependents(
     tx: Transaction,
@@ -150,9 +170,11 @@ export class TaskNotices {
     actorId: string | null,
   ): Promise<Notice[]> {
     const waiting = new Map<string, TaskDependency>();
+    const viaRun = new Set<string>();
     for (const taskId of taskIds) {
       for (const dependent of await dependentsOf(taskId, tx)) {
         if (dependent.status === 'new' && !dependent.archived) waiting.set(dependent.id, dependent);
+        if (dependent.source === 'run') viaRun.add(dependent.id);
       }
     }
     // Serializes with a change that unblocks the same task at once, so one of them sees it open.
@@ -161,18 +183,85 @@ export class TaskNotices {
         .select({ id: tasks.id })
         .from(tasks)
         .where(inArray(tasks.id, [...waiting.keys()]))
-        .orderBy(tasks.id)
+        .orderBy(...taskLockOrder)
         .for('update');
     }
     const notices: Notice[] = [];
     for (const dependent of waiting.values()) {
       if (await isBlocked(dependent.id, tx)) continue;
       const task = await this.load(tx, dependent.id);
+      const opened = viaRun.has(task.id) ? await this.subtaskOpened(tx, task, actorId) : null;
       notices.push(
-        this.notice(task, 'task_opened', await this.assigneeOrManagers(tx, task), actorId),
+        opened ??
+          this.notice(task, 'task_opened', await this.assigneeOrManagers(tx, task), actorId),
       );
     }
     return notices;
+  }
+
+  /**
+   * F06B rules A6 and A12: a subtask its run opened. In sequence it is its turn, after the live
+   * subtask before it; by stages it receives the previous non-empty stage's handover. Null when
+   * the parent runs neither way.
+   */
+  async subtaskOpened(
+    executor: Executor,
+    task: NoticeTask,
+    actorId: string | null,
+  ): Promise<Notice | null> {
+    const parent = task.parent;
+    if (!parent || task.position === null) return null;
+    const recipients = await this.assigneeOrManagers(executor, task);
+    const siblings = await executor
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        status: tasks.status,
+        assigneeId: tasks.assigneeId,
+        position: tasks.position,
+        stageId: tasks.stageId,
+        handoverNote: tasks.handoverNote,
+      })
+      .from(tasks)
+      .where(
+        and(eq(tasks.parentId, parent.id), isNull(tasks.archivedAt), ne(tasks.status, 'cancelled')),
+      )
+      .orderBy(asc(tasks.position));
+    const names = await this.users.summaries(
+      siblings.flatMap((s) => (s.assigneeId ? [s.assigneeId] : [])),
+      executor,
+    );
+    const snapshot = (sibling: (typeof siblings)[number]): HandoverSnapshot => ({
+      title: sibling.title,
+      by: sibling.assigneeId ? (names.get(sibling.assigneeId)?.name ?? null) : null,
+      note: sibling.handoverNote,
+    });
+    if (parent.runMode === 'sequential') {
+      const before = siblings.filter((s) => (s.position ?? 0) < (task.position ?? 0)).at(-1);
+      return this.notice(task, 'subtask_turn', recipients, actorId, {
+        parent: parent.title,
+        previous: before ? snapshot(before) : null,
+      });
+    }
+    if (parent.runMode !== 'stages' || !task.stageId) return null;
+    const stages = await executor
+      .select({ id: taskStages.id, name: taskStages.name })
+      .from(taskStages)
+      .where(and(eq(taskStages.taskId, parent.id), isNull(taskStages.archivedAt)))
+      .orderBy(asc(taskStages.position));
+    const at = stages.findIndex((stage) => stage.id === task.stageId);
+    const previous = stages
+      .slice(0, Math.max(at, 0))
+      .reverse()
+      .find((stage) => siblings.some((s) => s.stageId === stage.id));
+    if (!previous) return null;
+    return this.notice(task, 'subtask_handover', recipients, actorId, {
+      parent: parent.title,
+      stage: previous.name,
+      handover: siblings
+        .filter((s) => s.stageId === previous.id && s.status === 'delivered')
+        .map(snapshot),
+    });
   }
 
   /**
