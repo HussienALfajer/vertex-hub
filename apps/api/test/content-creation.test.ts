@@ -211,6 +211,22 @@ describe('creating a post in one save (F08B rules B1–B3)', () => {
       cause: { part: 'subtasks', index: 0 },
     });
 
+    // An assignee the creator may not choose: a bare 403 still names its part (edge case 9).
+    const forbidden = await create(cast.writer.cookie, {
+      title,
+      tasks: [
+        { title: 'مهمة', department: 'design', dueDate: cast.inDays(3) },
+        {
+          title: 'مهمة لغيري',
+          department: 'design',
+          assigneeId: cast.designer.id,
+          dueDate: cast.inDays(3),
+        },
+      ],
+    });
+    expect(forbidden.status, await forbidden.clone().text()).toBe(403);
+    expect((await forbidden.json()).details).toEqual({ part: 'tasks', index: 1 });
+
     await expectError(
       await create(cast.writer.cookie, {
         title,

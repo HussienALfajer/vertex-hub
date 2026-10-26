@@ -72,6 +72,15 @@ const lockPillars = (tx: Transaction) =>
   tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('content.pillars', 0))`);
 
 /**
+ * Serializes changes to one client's settings: the row may not exist yet, and a skip rewrites the
+ * fields it read, so two writers must not interleave.
+ */
+const lockClientSettings = (tx: Transaction, clientId: string) =>
+  tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`content.settings:${clientId}`}, 0))`,
+  );
+
+/**
  * Pillars, best publishing times, client settings and snippets of the content calendar (spec
  * F08B rules A10 and C1–C7). Agency-wide settings belong to `content.review` holders of scope
  * all; a client's to `content.manage` holders covering it.
@@ -407,6 +416,7 @@ export class ContentSettingsService {
   ): Promise<ClientContentSettings> {
     const client = await this.manageableClient(actor, clientId);
     await this.db.transaction(async (tx) => {
+      await lockClientSettings(tx, client.id);
       const total = input.pillarTargets.reduce((sum, target) => sum + target.percent, 0);
       if (input.pillarTargets.length > 0 && total !== 100) {
         throw new CodedException(400, 'INVALID_TARGETS', 'The targets sum to 100', { total });
@@ -463,6 +473,7 @@ export class ContentSettingsService {
         .from(contentOccasions)
         .where(eq(contentOccasions.id, skip.occasionId));
       if (!occasion) throw new NotFoundException();
+      await lockClientSettings(tx, client.id);
       const current = await this.planningSettings(client, tx);
       const same = (item: OccasionSkip) =>
         item.occasionId === skip.occasionId && item.year === skip.year;

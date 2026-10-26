@@ -14,6 +14,7 @@ import {
   contentWeekSubjectId,
   firstOfMonth,
   lastOfMonth,
+  occasionYearKey,
   type PlannedPost,
   pillarBalance,
   planningIssues,
@@ -245,8 +246,8 @@ export class ContentPlanner {
       clients.map((client) => {
         const own = settings.get(client.id) as ClientPlanningSettings;
         const clientPosts = posts.get(client.id) ?? [];
-        // Occasions carried by any post of the client, of any date, count as covered (rule C6).
-        const coveredIds = covered.get(client.id) ?? new Set<string>();
+        // Rule C6: a post of the occurrence's year outside the range covers it too.
+        const coveredKeys = covered.get(client.id) ?? new Set<string>();
         const occasions = (applying.get(client.id) ?? []).flatMap((item) =>
           item.occurrences.map((occurrence) => ({
             id: item.row.id,
@@ -273,8 +274,9 @@ export class ContentPlanner {
           pillarTargets: own.pillarTargets,
           pillarIds,
         }).filter(
-          // A post of another date covers the occasion too.
-          (issue) => issue.kind !== 'occasion_uncovered' || !coveredIds.has(issue.occasionId ?? ''),
+          (issue) =>
+            issue.kind !== 'occasion_uncovered' ||
+            !coveredKeys.has(occasionYearKey(issue.occasionId ?? '', issue.date)),
         );
         const month = clientPosts.filter(
           (post) => firstOfMonth(from) <= post.publishDate && post.publishDate <= lastOfMonth(from),
@@ -348,7 +350,10 @@ export class ContentPlanner {
     return posts;
   }
 
-  /** Rule C6: the occasions a non-cancelled, non-archived post of each client carries. */
+  /**
+   * Rule C6: the occasions a non-cancelled, non-archived post of each client carries, by the
+   * year of its publish date (`occasionYearKey`).
+   */
   private async coveredOccasions(
     ids: string[],
     executor: Executor = this.db,
@@ -360,6 +365,7 @@ export class ContentPlanner {
             .selectDistinct({
               clientId: contentPosts.clientId,
               occasionId: contentPosts.occasionId,
+              year: sql<number>`extract(year from ${contentPosts.publishDate})::int`,
             })
             .from(contentPosts)
             .where(
@@ -370,7 +376,9 @@ export class ContentPlanner {
               ),
             );
     const covered = new Map<string, Set<string>>(ids.map((id) => [id, new Set<string>()]));
-    for (const row of rows) if (row.occasionId) covered.get(row.clientId)?.add(row.occasionId);
+    for (const row of rows) {
+      if (row.occasionId) covered.get(row.clientId)?.add(occasionYearKey(row.occasionId, row.year));
+    }
     return covered;
   }
 
@@ -389,7 +397,9 @@ export class ContentPlanner {
           endDate: occurrence.end,
           leadDays: item.row.leadDays,
           confirmed: occurrence.confirmed,
-          covered: client ? client.covered.has(item.row.id) : null,
+          covered: client
+            ? client.covered.has(occasionYearKey(item.row.id, occurrence.year))
+            : null,
           skipped: client
             ? client.settings.skippedOccasions.some(
                 (skip) => skip.occasionId === item.row.id && skip.year === occurrence.year,

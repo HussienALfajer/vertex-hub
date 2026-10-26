@@ -92,6 +92,54 @@ describe('planning aids (F08B part C)', () => {
     await connection.close();
   });
 
+  it('requires a session on every route', async () => {
+    const id = randomUUID();
+    for (const path of [
+      '/api/content/settings',
+      `/api/content/clients/${id}/settings`,
+      '/api/content/pillars',
+      '/api/content/occasions?from=2027-01-01&to=2027-01-31',
+      '/api/content/snippets',
+      '/api/content/ideas',
+      '/api/content/planning?from=2027-01-01&to=2027-01-31',
+      `/api/content/grid?clientId=${id}&month=2027-01`,
+      `/api/content/posts/${id}/move-preview?publishDate=2027-01-10`,
+    ]) {
+      expect((await client.get(path)).status, path).toBe(401);
+    }
+    for (const path of [
+      `/api/content/clients/${id}/occasion-skips`,
+      '/api/content/pillars',
+      `/api/content/pillars/${id}/archive`,
+      `/api/content/pillars/${id}/restore`,
+      '/api/content/occasions',
+      `/api/content/occasions/${id}/archive`,
+      `/api/content/occasions/${id}/restore`,
+      '/api/content/snippets',
+      `/api/content/snippets/${id}/archive`,
+      '/api/content/ideas',
+      `/api/content/ideas/${id}/drop`,
+      `/api/content/ideas/${id}/restore`,
+      `/api/content/posts/${id}/move`,
+    ]) {
+      expect((await client.post(path, undefined, {})).status, path).toBe(401);
+    }
+    for (const [method, path] of [
+      ['PUT', '/api/content/settings'],
+      ['PUT', `/api/content/clients/${id}/settings`],
+      ['PUT', '/api/content/pillars/order'],
+      ['PUT', `/api/content/occasions/${id}/dates/2027`],
+      ['PATCH', `/api/content/pillars/${id}`],
+      ['PATCH', `/api/content/occasions/${id}`],
+      ['PATCH', `/api/content/snippets/${id}`],
+      ['PATCH', `/api/content/ideas/${id}`],
+      ['DELETE', `/api/content/clients/${id}/occasion-skips/${id}/2027`],
+      ['DELETE', `/api/content/occasions/${id}/dates/2027`],
+    ] as const) {
+      expect((await client.request(method, path, { body: {} })).status, path).toBe(401);
+    }
+  });
+
   describe('pillars (rule C1)', () => {
     it('are read by everyone and changed by content.review over all posts', async () => {
       const before = await get(
@@ -124,6 +172,17 @@ describe('planning aids (F08B part C)', () => {
 
       // Reorder: every live pillar once.
       const ids = [pillar.id, ...live.map((item) => item.id)];
+      expect((await put('/api/content/pillars/order', cast.writer.cookie, { ids })).status).toBe(
+        403,
+      );
+      expect(
+        (
+          await client.request('PATCH', `/api/content/pillars/${pillar.id}`, {
+            cookie: cast.writer.cookie,
+            body: { color: 'chart_6' },
+          })
+        ).status,
+      ).toBe(403);
       await expectError(
         await put('/api/content/pillars/order', cast.contentManager.cookie, { ids: ids.slice(1) }),
         400,
@@ -144,6 +203,9 @@ describe('planning aids (F08B part C)', () => {
       expect(after.items.filter((item) => !item.archived).map((item) => item.position)).toEqual(
         live.map((_, index) => index + 1),
       );
+      expect(
+        (await client.post(`/api/content/pillars/${pillar.id}/restore`, cast.writer.cookie)).status,
+      ).toBe(403);
       const restored = contentPillarSchema.parse(
         await (
           await client.post(`/api/content/pillars/${pillar.id}/restore`, cast.contentManager.cookie)
@@ -281,6 +343,9 @@ describe('planning aids (F08B part C)', () => {
         startDate: '2027-02-09',
         confirmed: true,
       });
+      expect((await client.request('DELETE', path, { cookie: cast.writer.cookie })).status).toBe(
+        403,
+      );
       const cleared = await client.request('DELETE', path, { cookie: cast.contentManager.cookie });
       expect(contentOccasionSchema.parse(await cleared.json()).occurrences).toEqual(
         expect.arrayContaining([expect.objectContaining({ year: 2027, startDate: '2027-02-08' })]),
@@ -318,11 +383,34 @@ describe('planning aids (F08B part C)', () => {
         (await client.post('/api/content/occasions', cast.am.cookie, { ...body, clientId: null }))
           .status,
       ).toBe(403);
+      // Out of scope: another client's account manager.
+      const patch = (cookie: string) =>
+        client.request('PATCH', `/api/content/occasions/${occasion.id}`, {
+          cookie,
+          body: { leadDays: 5 },
+        });
+      expect((await patch(cast.otherAm.cookie)).status).toBe(403);
+      const patched = await patch(cast.am.cookie);
+      expect(patched.status, await patched.clone().text()).toBe(200);
+      expect(contentOccasionSchema.parse(await patched.json()).leadDays).toBe(5);
+      expect(
+        (await client.post(`/api/content/occasions/${occasion.id}/archive`, cast.otherAm.cookie))
+          .status,
+      ).toBe(403);
       const archived = await client.post(
         `/api/content/occasions/${occasion.id}/archive`,
         cast.am.cookie,
       );
       expect(contentOccasionSchema.parse(await archived.json()).archived).toBe(true);
+      expect(
+        (await client.post(`/api/content/occasions/${occasion.id}/restore`, cast.otherAm.cookie))
+          .status,
+      ).toBe(403);
+      const back = await client.post(
+        `/api/content/occasions/${occasion.id}/restore`,
+        cast.am.cookie,
+      );
+      expect(contentOccasionSchema.parse(await back.json()).archived).toBe(false);
     });
   });
 
@@ -469,6 +557,51 @@ describe('planning aids (F08B part C)', () => {
       expect(covered.issues.some((issue) => issue.occasionId === occasion.id)).toBe(false);
     });
 
+    it('lets edit scope on a client skip an occasion for one year, and take the skip back', async () => {
+      const from = cast.inDays(20);
+      const to = addDays(from, 13);
+      const occasion = contentOccasionSchema.parse(
+        await (
+          await client.post('/api/content/occasions', cast.am.cookie, {
+            name: `افتتاح ${cast.run}`,
+            category: 'general',
+            clientId,
+            calendar: 'once',
+            date: addDays(from, 4),
+            leadDays: 3,
+          })
+        ).json(),
+      );
+      const year = Number(addDays(from, 4).slice(0, 4));
+      const skips = `/api/content/clients/${clientId}/occasion-skips`;
+      const body = { occasionId: occasion.id, year };
+      expect((await client.post(skips, cast.otherAm.cookie, body)).status).toBe(403);
+      expect((await client.post(skips, cast.employee.cookie, body)).status).toBe(403);
+      const skipped = await client.post(skips, cast.am.cookie, body);
+      expect(skipped.status, await skipped.clone().text()).toBe(200);
+      expect(clientContentSettingsSchema.parse(await skipped.json()).skippedOccasions).toEqual([
+        body,
+      ]);
+      const calendar = async () =>
+        get(
+          `/api/content/calendar?from=${from}&to=${to}&clientId=${clientId}`,
+          contentCalendarSchema,
+        );
+      const quiet = await calendar();
+      expect(quiet.occasions.find((item) => item.id === occasion.id)?.skipped).toBe(true);
+      expect(quiet.issues.some((issue) => issue.occasionId === occasion.id)).toBe(false);
+
+      const undo = (cookie: string) =>
+        client.request('DELETE', `${skips}/${occasion.id}/${year}`, { cookie });
+      expect((await undo(cast.otherAm.cookie)).status).toBe(403);
+      const undone = await undo(cast.am.cookie);
+      expect(undone.status, await undone.clone().text()).toBe(200);
+      expect(clientContentSettingsSchema.parse(await undone.json()).skippedOccasions).toEqual([]);
+      const again = await calendar();
+      expect(again.occasions.find((item) => item.id === occasion.id)?.skipped).toBe(false);
+      expect(again.issues.some((issue) => issue.occasionId === occasion.id)).toBe(true);
+    });
+
     it('counts planned posts against the open cycle and flags what falls short', async () => {
       const committed = (await cast.createClient()).id;
       await cast.createRetainer(committed);
@@ -579,9 +712,7 @@ describe('planning aids (F08B part C)', () => {
       // it before and after, or a later run on this database finds the week already sent.
       const clear = async () => {
         await db.delete(notifications).where(eq(notifications.subjectId, subject));
-        await db
-          .delete(notificationReminders)
-          .where(eq(notificationReminders.subjectId, subject));
+        await db.delete(notificationReminders).where(eq(notificationReminders.subjectId, subject));
       };
       await clear();
       await reminders.remind(addDays(saturday, 1));

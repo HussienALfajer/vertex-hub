@@ -252,7 +252,7 @@ describe('the planning check (rules C2, C6–C10)', () => {
     ]);
   });
 
-  it('flags an applying occasion without a post from its lead days, unless covered or skipped', () => {
+  it('flags an applying occasion without a post from its lead days, unless covered this year or skipped', () => {
     const occasion = {
       id: 'o',
       start: '2026-11-20',
@@ -269,8 +269,9 @@ describe('the planning check (rules C2, C6–C10)', () => {
     ]);
     expect(issues([], [{ ...occasion, leadDays: 5 }])).toEqual([]);
     expect(issues([], [{ ...occasion, skipped: true }])).toEqual([]);
-    // A post covers it whatever its date.
+    // A post of the occurrence's year covers it whatever its date; last year's post does not.
     expect(issues([post('a', { occasionId: 'o', publishDate: '2026-12-01' })])).toEqual([]);
+    expect(issues([post('a', { occasionId: 'o', publishDate: '2025-11-20' })])).toHaveLength(1);
   });
 
   it('flags the month when a pillar is 15 points off its target with at least 4 posts', () => {

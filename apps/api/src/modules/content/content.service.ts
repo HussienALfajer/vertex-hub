@@ -14,7 +14,6 @@ import {
   type CreatePost,
   captionGroupsOf,
   type DuplicatePost,
-  type ErrorCode,
   type ErrorResponse,
   type Following,
   type HolidayRange,
@@ -132,24 +131,28 @@ const returnedSql = sql`${contentPosts.status} = 'in_production' and coalesce((
 type Part = { part: 'captions' | 'files' | 'tasks' | 'links'; index: number };
 
 /**
- * F08B rule B2: a coded error thrown while saving one part of the wizard names that part in its
- * `details`, so the wizard opens its step; an error that names a part already (a subtask of a new
- * task) keeps its own details under `cause`.
+ * F08B rule B2: an error thrown while saving one part of the wizard names that part in its
+ * `details`, so the wizard opens its step, whether it carries a code or not (a bare 403 for a task
+ * assignee the creator may not choose, edge case 9); an error that names a part already (a
+ * subtask of a new task) keeps its own details under `cause`.
  */
 async function inPart<T>(part: Part, save: () => Promise<T>): Promise<T> {
   try {
     return await save();
   } catch (error) {
-    const body = error instanceof HttpException ? (error.getResponse() as ErrorResponse) : null;
-    if (body?.code && error instanceof HttpException) {
-      throw new CodedException(
-        error.getStatus() as ConstructorParameters<typeof CodedException>[0],
-        body.code as ErrorCode,
-        body.message,
-        { ...part, ...(body.details !== undefined && { cause: body.details }) },
-      );
-    }
-    throw error;
+    if (!(error instanceof HttpException)) throw error;
+    const response = error.getResponse();
+    const body: ErrorResponse =
+      typeof response === 'string' ? { message: response } : (response as ErrorResponse);
+    throw new HttpException(
+      {
+        statusCode: error.getStatus(),
+        ...(body.code && { code: body.code }),
+        message: body.message,
+        details: { ...part, ...(body.details !== undefined && { cause: body.details }) },
+      } satisfies ErrorResponse,
+      error.getStatus(),
+    );
   }
 }
 

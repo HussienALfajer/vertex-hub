@@ -717,6 +717,14 @@ export const planningIssueSchema = z
 
 export type PlanningIssue = z.infer<typeof planningIssueSchema>;
 
+/**
+ * Rule C6: a post covers the occurrence of its occasion in the year of its publish date, the
+ * year "No post this year" skips; a yearly occasion needs a post each year.
+ */
+export function occasionYearKey(occasionId: string, date: CalendarDate | number): string {
+  return `${occasionId}/${typeof date === 'number' ? date : Number(date.slice(0, 4))}`;
+}
+
 /** A planned post as the planning check reads it: neither cancelled nor archived. */
 export interface PlannedPost {
   id: string;
@@ -912,9 +920,13 @@ export function planningIssues(input: {
       }
     }
   }
-  const covered = new Set(input.posts.flatMap((post) => post.occasionId ?? []));
+  const covered = new Set(
+    input.posts.flatMap((post) =>
+      post.occasionId ? occasionYearKey(post.occasionId, post.publishDate) : [],
+    ),
+  );
   for (const occasion of input.occasions) {
-    if (occasion.skipped || covered.has(occasion.id)) continue;
+    if (occasion.skipped || covered.has(occasionYearKey(occasion.id, occasion.start))) continue;
     if (occasion.end < from || addDays(occasion.start, -occasion.leadDays) > to) continue;
     issues.push(
       issue({
