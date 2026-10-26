@@ -28,13 +28,20 @@ import {
   assertTaskWritable,
   holdsAll,
   isReadOnly,
+  managesDepartment,
   managesSubtasks,
   readableTask,
   type TaskAccess,
   taskRights,
 } from './task-access.js';
 import { TaskNotices } from './task-notices.js';
-import { type CommentRow, isAddressee, mayForward, waitingQuestionsSql } from './task-questions.js';
+import {
+  type CommentRow,
+  forwardingDepartment,
+  isAddressee,
+  managedDepartments,
+  waitingQuestionsSql,
+} from './task-questions.js';
 import { TasksService } from './tasks.service.js';
 
 type Executor = Database | Transaction;
@@ -99,7 +106,11 @@ export class TaskCommentsService {
   async mine(actor: CurrentUserInfo, query: MyQuestionsQuery): Promise<MyQuestionPage> {
     const where = and(
       holdsAll(actor, 'tasks.read') ? undefined : sql`false`,
-      waitingQuestionsSql(actor, query.status),
+      waitingQuestionsSql(
+        actor,
+        await this.users.archivedPrimaryMembers(managedDepartments(actor)),
+        query.status,
+      ),
       this.tasks.visibleSql(),
     );
     const [rows, [total]] = await Promise.all([
@@ -416,11 +427,11 @@ export class TaskCommentsService {
       ...(row.answeredById ? [row.answeredById] : []),
     ]);
     const convertedIds = live.flatMap((row) => (row.convertedTaskId ? [row.convertedTaskId] : []));
-    const [people, memberships, files, converted] = await Promise.all([
+    const addressees = rows.flatMap((row) => (row.addressedUserId ? [row.addressedUserId] : []));
+    const [people, memberships, primaries, files, converted] = await Promise.all([
       this.users.summaries(peopleIds),
-      this.users.memberships(
-        rows.flatMap((row) => (row.addressedUserId ? [row.addressedUserId] : [])),
-      ),
+      this.users.memberships(addressees),
+      this.users.primaryDepartments(addressees),
       this.attachments.ofComments(live.map((row) => row.id)),
       convertedIds.length > 0
         ? this.db
@@ -499,7 +510,15 @@ export class TaskCommentsService {
           canAnswer:
             writable && open && (asker || (replied && (isAddressee(actor, row) || replyAuthor))),
           canReopen: writable && !row.archivedAt && row.questionStatus === 'answered' && asker,
-          canForward: writable && open && mayForward(actor, row),
+          canForward: (() => {
+            // Edge case 14: an archived addressee's former department forwards it.
+            const former =
+              addressee?.archived && row.addressedUserId
+                ? (primaries.get(row.addressedUserId) ?? null)
+                : null;
+            const department = forwardingDepartment(row, former);
+            return writable && open && !!department && managesDepartment(actor, department);
+          })(),
         },
         replies: ownReplies.map(fields),
       };

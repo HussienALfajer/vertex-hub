@@ -7,7 +7,7 @@ import {
   workHoursBetween,
 } from '@vertex-hub/contracts';
 import { type Database, type Transaction, taskComments, tasks } from '@vertex-hub/db';
-import { and, asc, eq, isNull, lte, notInArray, type SQL } from 'drizzle-orm';
+import { and, asc, eq, lte, notInArray, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
 import { UserDirectory } from '../auth/index.js';
@@ -17,15 +17,9 @@ import { TaskCommentsService } from './task-comments.service.js';
 import { TaskNotices } from './task-notices.js';
 import { type CommentRow, openQuestionSql } from './task-questions.js';
 import { TaskQuestionsService } from './task-questions.service.js';
+import { TasksService } from './tasks.service.js';
 
 const HOUR_MS = 60 * 60 * 1000;
-
-/** Open questions of live tasks that are not delivered or cancelled (rule B10). */
-const remindable = and(
-  openQuestionSql,
-  isNull(tasks.archivedAt),
-  notInArray(tasks.status, ['delivered', 'cancelled']),
-) as SQL;
 
 /**
  * F06B rule B8: a question open 24 work hours reminds its current addressee, and at 48 it
@@ -45,7 +39,20 @@ export class QuestionReminders implements OnModuleInit {
     private readonly notices: TaskNotices,
     private readonly comments: TaskCommentsService,
     private readonly questions: TaskQuestionsService,
+    private readonly tasks: TasksService,
   ) {}
+
+  /**
+   * Open questions of tasks that are not delivered or cancelled (rule B10) and not read-only:
+   * archived, or of an archived client, project or retainer (F06 rule 17).
+   */
+  private remindable(): SQL {
+    return and(
+      openQuestionSql,
+      this.tasks.visibleSql(),
+      notInArray(tasks.status, ['delivered', 'cancelled']),
+    ) as SQL;
+  }
 
   onModuleInit(): void {
     this.timed.register('task-questions', (now) => this.remind(now));
@@ -60,7 +67,7 @@ export class QuestionReminders implements OnModuleInit {
       .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
       .where(
         and(
-          remindable,
+          this.remindable(),
           lte(
             taskComments.clockStartedAt,
             new Date(now.getTime() - QUESTION_TIMING_HOURS.reminder * HOUR_MS),
@@ -89,7 +96,7 @@ export class QuestionReminders implements OnModuleInit {
         .select({ question: taskComments })
         .from(taskComments)
         .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
-        .where(and(eq(taskComments.id, id), remindable))
+        .where(and(eq(taskComments.id, id), this.remindable()))
         .for('update', { of: taskComments });
       const question = row?.question;
       if (!question?.clockStartedAt) return 0;

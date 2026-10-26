@@ -43,6 +43,7 @@ import {
 } from './task-access.js';
 import { lockDependencyGraph } from './task-dependencies.js';
 import { TaskNotices } from './task-notices.js';
+import { restartQuestionClocks } from './task-questions.js';
 import { TaskQuestionsService } from './task-questions.service.js';
 import { TaskReviews } from './task-reviews.js';
 import { TasksService } from './tasks.service.js';
@@ -418,6 +419,12 @@ export class TaskSubtasksService {
         ]);
         reopened.push({ id: row.id, title: row.title, note });
       }
+      // Rule B10: back to work, their open questions count from now again.
+      await restartQuestionClocks(
+        tx,
+        rows.map((row) => row.id),
+        new Date(),
+      );
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'task.subtasks_reopened',

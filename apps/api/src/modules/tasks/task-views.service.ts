@@ -20,7 +20,7 @@ import { DATABASE } from '../../core/database/database.module.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { accessColumns } from './task-access.js';
 import { blockedSql } from './task-dependencies.js';
-import { waitingQuestionsSql } from './task-questions.js';
+import { managedDepartments, waitingQuestionsSql } from './task-questions.js';
 import { TaskReports } from './task-reports.js';
 import { openSql, overdueSql } from './task-sql.js';
 import { TasksService } from './tasks.service.js';
@@ -216,7 +216,15 @@ export class TaskViewsService {
         .select({ value: count() })
         .from(taskComments)
         .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
-        .where(and(this.tasks.visibleSql(), waitingQuestionsSql(actor))),
+        .where(
+          and(
+            this.tasks.visibleSql(),
+            waitingQuestionsSql(
+              actor,
+              await this.users.archivedPrimaryMembers(managedDepartments(actor)),
+            ),
+          ),
+        ),
     ]);
     return {
       overdue: mine?.overdue ?? 0,

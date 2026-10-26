@@ -26,25 +26,43 @@ export const isAddressee = (actor: CurrentUserInfo, question: CommentRow): boole
   (!!question.addressedUserId && question.addressedUserId === actor.id) ||
   (!!question.addressedDepartment && managesDepartment(actor, question.addressedDepartment));
 
-/** Rule B5: a manager of the department a question is addressed to forwards it. */
-export const mayForward = (actor: CurrentUserInfo, question: CommentRow): boolean =>
-  !!question.addressedDepartment && managesDepartment(actor, question.addressedDepartment);
+/**
+ * Rule B5 and edge case 14: the department whose managers forward a question: the one it is
+ * addressed to, else the former primary department of its archived addressee.
+ */
+export const forwardingDepartment = (
+  question: CommentRow,
+  formerDepartment: DepartmentCode | null,
+): DepartmentCode | null => question.addressedDepartment ?? formerDepartment;
+
+/** The departments the actor manages. */
+export const managedDepartments = (actor: CurrentUserInfo): DepartmentCode[] =>
+  actor.access.departments
+    .filter((department) => department.isManager)
+    .map((department) => department.code);
 
 /**
  * Rule B7: live questions in `status` waiting for the actor's answer: addressed to them, or to a
- * department they manage and not forwarded to someone else.
+ * department they manage and not forwarded to someone else, or to an archived member of one
+ * (`archivedMembers`, the archived users whose primary department the actor manages; edge case 14).
  */
-export function waitingQuestionsSql(actor: CurrentUserInfo, status: QuestionStatus = 'open'): SQL {
-  const managed: DepartmentCode[] = actor.access.departments
-    .filter((department) => department.isManager)
-    .map((department) => department.code);
+export function waitingQuestionsSql(
+  actor: CurrentUserInfo,
+  archivedMembers: readonly string[],
+  status: QuestionStatus = 'open',
+): SQL {
+  const managed = managedDepartments(actor);
   const department =
     managed.length > 0
       ? sql` or (${taskComments.addressedUserId} is null and ${inArray(taskComments.addressedDepartment, managed)})`
       : sql``;
+  const archived =
+    archivedMembers.length > 0
+      ? sql` or ${inArray(taskComments.addressedUserId, [...archivedMembers])}`
+      : sql``;
   return sql`(${taskComments.kind} = 'question' and ${taskComments.questionStatus} = ${status}
     and ${taskComments.archivedAt} is null
-    and (${taskComments.addressedUserId} = ${actor.id}${department}))`;
+    and (${taskComments.addressedUserId} = ${actor.id}${department}${archived}))`;
 }
 
 /**

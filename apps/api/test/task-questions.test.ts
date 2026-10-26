@@ -16,12 +16,14 @@ import {
 } from '@vertex-hub/contracts';
 import {
   auditEntries,
+  clients,
   createDatabase,
   fileItems,
   notifications,
   publicHolidays,
   taskComments,
   tasks,
+  users,
 } from '@vertex-hub/db';
 import { testDatabaseUrl } from '@vertex-hub/db/testing';
 import { and, asc, eq, inArray } from 'drizzle-orm';
@@ -653,6 +655,102 @@ describe('task questions, rich text and criteria (F06B parts B and C6)', () => {
     });
     const [row] = await db.select().from(taskComments).where(eq(taskComments.id, question.id));
     expect(row?.clockStartedAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  it('restarts the clocks of reopened subtasks, and reminds nobody on read-only tasks (rule B10)', async () => {
+    const reminders = app.get(QuestionReminders);
+    const { id: clientId } = await cast.createClient();
+    const parent = await cast.createTask(cast.am.cookie, {
+      department: 'content_management',
+      assigneeId: cast.writer.id,
+      clientId,
+      dueDate: cast.inDays(10),
+    });
+    const copy = taskDetailSchema.parse(
+      await (
+        await client.post(`/api/tasks/${parent.id}/subtasks`, cast.writer.cookie, {
+          title: `نص ${cast.run}`,
+          department: 'content_management',
+          assigneeId: cast.writer.id,
+          dueDate: cast.inDays(5),
+        })
+      ).json(),
+    );
+    const question = await ask(copy.id, cast.employee.cookie, { addressedUserId: cast.writer.id });
+    await cast.moveOk(copy.id, cast.writer.cookie, { status: 'in_progress' });
+    await cast.moveOk(copy.id, cast.writer.cookie, { status: 'internal_review' });
+    await cast.moveOk(copy.id, cast.contentManager.cookie, { status: 'delivered' });
+    await cast.moveOk(parent.id, cast.writer.cookie, { status: 'in_progress' });
+    await cast.moveOk(parent.id, cast.writer.cookie, { status: 'internal_review' });
+    await cast.moveOk(parent.id, cast.contentManager.cookie, { status: 'awaiting_client' });
+    await cast.moveOk(parent.id, cast.am.cookie, { status: 'revisions', note: 'أقصر' });
+    const old = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    await db
+      .update(taskComments)
+      .set({ clockStartedAt: old })
+      .where(eq(taskComments.id, question.id));
+    const before = Date.now();
+    const reopened = await client.post(
+      `/api/tasks/${parent.id}/subtasks/reopen`,
+      cast.contentManager.cookie,
+      { items: [{ id: copy.id, note: 'أقصر' }] },
+    );
+    expect(reopened.status).toBe(200);
+    const [row] = await db.select().from(taskComments).where(eq(taskComments.id, question.id));
+    expect(row?.clockStartedAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);
+
+    // A task of an archived client is read-only: its questions remind nobody.
+    await db
+      .update(taskComments)
+      .set({ clockStartedAt: old })
+      .where(eq(taskComments.id, question.id));
+    await db.update(clients).set({ archivedAt: new Date() }).where(eq(clients.id, clientId));
+    await reminders.remind(new Date());
+    expect(await rowsOf(cast.writer.id, copy.id, 'task_question_reminder')).toHaveLength(0);
+  });
+
+  it("lets the former department's managers see and forward an archived addressee's question (edge case 14)", async () => {
+    const task = await designTask();
+    const leaver = await cast.signedIn({ name: `مغادر ${cast.run}` });
+    const question = await ask(task.id, cast.writer.cookie, {
+      addressedUserId: leaver.id,
+      bodyDoc: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'سؤال ' },
+              { type: 'mention', attrs: { userId: leaver.id } },
+            ],
+          },
+        ],
+      },
+    });
+    // The addressee gets the question that waits on them, not the earlier-ranked mention.
+    expect(await rowsOf(leaver.id, task.id, 'task_question_asked')).toHaveLength(1);
+    expect(await rowsOf(leaver.id, task.id, 'task_mentioned')).toHaveLength(0);
+    expect((await thread(task.id, cast.designManager.cookie)).items[0]?.question?.canForward).toBe(
+      false,
+    );
+
+    await db.update(users).set({ archivedAt: new Date() }).where(eq(users.id, leaver.id));
+    const asManager = (await thread(task.id, cast.designManager.cookie)).items[0];
+    expect(asManager?.question).toMatchObject({
+      addressee: { id: leaver.id, archived: true },
+      canForward: true,
+    });
+    expect((await mine(cast.designManager.cookie)).items.map((item) => item.id)).toContain(
+      question.id,
+    );
+    const forwarded = await action(task.id, question.id, 'forward', cast.designManager.cookie, {
+      userId: cast.designer.id,
+    });
+    expect(forwarded.status, await forwarded.clone().text()).toBe(200);
+    expect(taskCommentSchema.parse(await forwarded.json()).question).toMatchObject({
+      addressee: { id: cast.designer.id },
+      department: 'design',
+    });
   });
 
   it('turns a question into a subtask with its files, answered and told (rule B11)', async () => {

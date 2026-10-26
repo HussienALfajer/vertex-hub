@@ -1,5 +1,6 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  type DepartmentCode,
   type ForwardQuestion,
   TASK_QUESTION_TYPES,
   type TaskComment,
@@ -13,10 +14,10 @@ import { recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { FileAttachments } from '../files/index.js';
 import type { Resolution } from '../notifications/index.js';
-import { actorOf, assertTaskWritable, type TaskAccess } from './task-access.js';
+import { actorOf, assertTaskWritable, managesDepartment, type TaskAccess } from './task-access.js';
 import { bodyOf, TaskCommentsService } from './task-comments.service.js';
 import { type NoticeTask, TaskNotices } from './task-notices.js';
-import { type CommentRow, isAddressee, mayForward } from './task-questions.js';
+import { type CommentRow, forwardingDepartment, isAddressee } from './task-questions.js';
 
 /**
  * Questions on a task (spec F06B part B, ADR 0041): asked to a person or a department (rule B1),
@@ -93,15 +94,20 @@ export class TaskQuestionsService {
         },
       });
       const data = await this.comments.questionData(tx, created);
+      const addressees = await this.waitingOn(tx, created);
       await this.notices.send(tx, [
-        this.notices.notice(task, 'task_mentioned', mentions, actor.id, { excerpt: data.excerpt }),
+        // The addressee gets the question, which waits on them, not the earlier-ranked mention.
         this.notices.notice(
           task,
-          'task_question_asked',
-          await this.waitingOn(tx, created),
+          'task_mentioned',
+          mentions.filter((id) => !addressees.includes(id)),
           actor.id,
-          { ...data, forwarded: false },
+          { excerpt: data.excerpt },
         ),
+        this.notices.notice(task, 'task_question_asked', addressees, actor.id, {
+          ...data,
+          forwarded: false,
+        }),
       ]);
       // F16 rule B12: the asker, those mentioned and the person asked follow the task.
       await this.notices.follow(tx, taskId, [actor.id, ...mentions, addressedUserId]);
@@ -197,8 +203,8 @@ export class TaskQuestionsService {
     const { task, question } = await this.db.transaction(async (tx) => {
       const task = await this.comments.task(tx, actor, taskId);
       const question = await this.comments.liveQuestion(tx, taskId, questionId);
-      const department = question.addressedDepartment;
-      if (!department || !mayForward(actor, question)) throw new ForbiddenException();
+      const department = forwardingDepartment(question, await this.formerDepartment(tx, question));
+      if (!department || !managesDepartment(actor, department)) throw new ForbiddenException();
       assertTaskWritable(task);
       if (question.questionStatus !== 'open') {
         throw new CodedException(409, 'QUESTION_CLOSED', 'The question is answered');
@@ -214,7 +220,8 @@ export class TaskQuestionsService {
       const before = await this.waitingOn(tx, question);
       const [forwarded] = await tx
         .update(taskComments)
-        .set({ addressedUserId: input.userId })
+        // Edge case 14: an archived person's question joins their former department.
+        .set({ addressedUserId: input.userId, addressedDepartment: department })
         .where(eq(taskComments.id, questionId))
         .returning();
       if (!forwarded) throw new NotFoundException();
@@ -223,7 +230,10 @@ export class TaskQuestionsService {
         action: 'task_comment.question_forwarded',
         entityType: 'task_comment',
         entityId: questionId,
-        before: { addressedUserId: question.addressedUserId },
+        before: {
+          addressedUserId: question.addressedUserId,
+          addressedDepartment: question.addressedDepartment,
+        },
         after: { taskId, addressedDepartment: department, addressedUserId: input.userId },
       });
       const data = await this.comments.questionData(tx, forwarded);
@@ -338,6 +348,16 @@ export class TaskQuestionsService {
     return question.addressedDepartment
       ? this.notices.managers(tx, question.addressedDepartment)
       : [];
+  }
+
+  /** Edge case 14: the primary department of a question's archived addressee, else null. */
+  private async formerDepartment(
+    tx: Transaction,
+    question: CommentRow,
+  ): Promise<DepartmentCode | null> {
+    const addressee = question.addressedUserId;
+    if (!addressee || (await this.users.activeUser(addressee, tx))) return null;
+    return (await this.users.primaryDepartments([addressee], tx)).get(addressee) ?? null;
   }
 
   private async markAnswered(
