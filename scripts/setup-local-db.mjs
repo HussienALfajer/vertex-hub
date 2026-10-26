@@ -11,6 +11,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { testWorkers } from '../packages/db/src/test-workers.ts';
 
 const root = new URL('..', import.meta.url);
 const envFile = new URL('.env', root);
@@ -32,9 +33,9 @@ if (app.username !== test.username || app.host !== test.host) {
 
 const role = decodeURIComponent(app.username);
 const password = decodeURIComponent(app.password);
-// One test database per parallel Vitest worker of the api suite: `<test database>_api_<n>`.
-// Keep in step with TEST_WORKERS in packages/db/src/testing.ts.
-const TEST_WORKERS = 4;
+// One test database per parallel Vitest worker of the api suite: `<test database>_api_<n>`, as
+// many as the suite uses on this machine (packages/db/src/test-workers.ts).
+const TEST_WORKERS = testWorkers();
 const testDatabase = decodeURIComponent(test.pathname.slice(1));
 const databases = [
   decodeURIComponent(app.pathname.slice(1)),

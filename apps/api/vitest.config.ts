@@ -17,6 +17,10 @@ export default defineConfig({
     // files in one worker run one after another on it, since some rows are global (one manager
     // per department).
     maxWorkers: TEST_WORKERS,
+    // A worker keeps its modules from one file to the next instead of loading the whole app again
+    // for each file (that reload was 46% of the suite's time). Each file still starts its own app
+    // and seeds its own data; a run with shuffled files passed whole (2026-10-26).
+    isolate: false,
     globalSetup: ['./test/global-setup.ts'],
     setupFiles: ['./test/worker-env.ts'],
     env: {
@@ -26,6 +30,8 @@ export default defineConfig({
       TEST_DATABASE_SUITE: 'api',
       // Tests call job handlers directly; pg-boss stays off.
       JOBS_ENABLED: 'false',
+      // Each worker's app opens at most 4 connections, so 12 workers fit PostgreSQL's default 100.
+      DATABASE_POOL_MAX: '4',
     },
   },
 });

@@ -416,6 +416,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
       // items in Approvals, an item and its decision, the file's Attendance tab, the entrance
       // screens in HR settings, and the entrance screen itself.
       test(`attendance (${size})`, async ({ page }, testInfo) => {
+        // A tour of thirteen screens, like the other tours of this file.
+        test.setTimeout(90_000);
         await page.setViewportSize({ width, height });
         await page.clock.setFixedTime(new Date(HR_NOW));
         const api = await mockApi(page, { signedIn: true, me: employeeMe });
@@ -525,6 +527,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
       // F01C screens 1–7: the image dialog, My account, the team, client, project and task lists.
       test(`images (${size})`, async ({ page }, testInfo) => {
+        // A tour of twelve screens, like the other tours of this file.
+        test.setTimeout(90_000);
         await page.setViewportSize({ width, height });
         const im = ar.images;
         await mockApi(page, { signedIn: true, me: employeeMe });
