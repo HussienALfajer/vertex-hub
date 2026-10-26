@@ -17,7 +17,7 @@ Spec: `docs/specs/F06B-tasks-2.md` (Approved 2026-10-26) · ADR 0041 (and 0013, 
 - [x] api: questions, replies, answered/reopen, forward, convert to subtask (`fromCommentId`), attachments through `FileAttachments`; brief as rich text; criteria endpoints and `CRITERIA_OPEN` on submit/resubmit; `openQuestions` + `hasOpenQuestions`; `GET /me/questions`, `questionsWaiting`; minute job reminder and escalation through `timed_reminders` (work hours); voiding on deliver/cancel/archive, clock restart on reopen and restore; `test/task-questions.test.ts` + changed F06 suites
 - [x] bridge: `openapi:export`, `api:generate`; the comment composer sends `bodyDoc`; fixtures and audit labels adapted
 - [x] wiring: error codes, audit actions, notification types (catalog, messages, `ar.json`), timed reminder kinds, test cleanup of question reminders and attachments, `docs/architecture.md`
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+- [x] checks (full run green), reviewer (3 findings fixed), acceptance (owner), PR with auto-merge
 
 ## PR 3 — Creation, readiness, estimates, templates and tree API (Parts C, D)
 - [ ] contracts: `briefFieldsSchemas`, `estimateMinutes`, extended `createTaskSchema` (subtasks, stages, files, questions, criteria, limits), readiness schemas, `bottleneck` with tests, tree schema, workload capacity fields; `template_kind` `task` schemas; `TEMPLATE_KIND`
