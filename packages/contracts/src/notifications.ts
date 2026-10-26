@@ -187,6 +187,12 @@ export const NOTIFICATION_TYPES = [
   'subtask_stage_finished',
   'subtasks_all_finished',
   'subtask_holding_next',
+  // F06B part B.
+  'task_question_asked',
+  'task_question_answered',
+  'task_question_reminder',
+  'task_question_escalated',
+  'task_question_converted',
   'task_blocked',
   // F16: the followers' status notices come last, after every other notice of the change.
   'task_progressed',
@@ -447,6 +453,12 @@ const CATALOG: Record<
   subtasks_all_finished: { category: 'tasks', subject: 'task', mutable: false },
   /** F06B rule A14: about the overdue subtask. */
   subtask_holding_next: { category: 'tasks', subject: 'task', mutable: false },
+  /** F06B part B: about the question's task. */
+  task_question_asked: { category: 'tasks', subject: 'task', mutable: false },
+  task_question_answered: { category: 'tasks', subject: 'task', mutable: true },
+  task_question_reminder: { category: 'tasks', subject: 'task', mutable: false },
+  task_question_escalated: { category: 'tasks', subject: 'task', mutable: false },
+  task_question_converted: { category: 'tasks', subject: 'task', mutable: true },
   task_blocked: { category: 'tasks', subject: 'task', mutable: true },
 };
 
@@ -649,6 +661,11 @@ const CHANNELS: Record<NotificationType, Channels> = {
   subtasks_all_finished: important(),
   /** Normal for the waiting subtask's assignee (`notificationPriority`). */
   subtask_holding_next: important(),
+  task_question_asked: important(),
+  task_question_answered: normal(),
+  task_question_reminder: important(),
+  task_question_escalated: important('on'),
+  task_question_converted: informational,
   task_blocked: informational,
 };
 
@@ -716,6 +733,8 @@ interface Engine {
   merges: boolean;
   /** F01C: merges only into a row created on the same business day ("merges per … and day"). */
   mergesDaily: boolean;
+  /** F06B: merges only into a row whose snapshot has the same value of this key ("per question"). */
+  mergesOn?: string;
   /** Rule B11: the steps sent while the original stays unresolved; empty when it never escalates. */
   escalation: readonly EscalationStep[];
 }
@@ -911,6 +930,12 @@ const ENGINE: Record<NotificationType, Engine> = {
   subtask_holding_next: action({
     escalation: [{ step: 2, after: { workDays: 1 }, target: { to: 'managers' } }],
   }),
+  /** Rule B8: the question's own timing, not the daily chain. */
+  task_question_asked: action(),
+  task_question_answered: { ...merged, mergesOn: 'questionId' },
+  task_question_reminder: action(),
+  task_question_escalated: action(),
+  task_question_converted: info,
   task_blocked: mergedDaily,
 };
 
@@ -990,6 +1015,16 @@ const handoverSnapshotSchema = z.object({
 
 const commentData = taskData.extend({
   excerpt: z.string().max(NOTIFICATION_EXCERPT_MAX),
+});
+
+/**
+ * A question on the task (F06B part B): `questionId` resolves and merges per question;
+ * `department` is set for a department question, `addressee` names the person it waits on.
+ */
+const questionData = commentData.extend({
+  questionId: z.uuid(),
+  department: departmentCodeSchema.nullable(),
+  addressee: nameSchema.nullable(),
 });
 
 const dueSchema = z.object({ dueDate: calendarDateSchema, dueTime: timeOfDaySchema.nullable() });
@@ -1534,6 +1569,14 @@ export const NOTIFICATION_DATA_SCHEMAS = {
     waiting: nameSchema,
     forParent: z.boolean(),
   }),
+  /** `forwarded`: a manager forwarded the department question to the recipient (rule B5). */
+  task_question_asked: questionData.extend({ forwarded: z.boolean() }),
+  /** `reply`: a reply was posted; otherwise someone other than the asker marked it answered. */
+  task_question_answered: questionData.extend({ reply: z.boolean() }),
+  task_question_reminder: questionData,
+  task_question_escalated: questionData,
+  /** Rule B11: `questionId` is the question or comment turned into the subtask. */
+  task_question_converted: questionData.extend({ subtask: nameSchema, question: z.boolean() }),
   task_blocked: taskData,
 } satisfies Record<NotificationType, z.ZodType>;
 
@@ -2074,6 +2117,9 @@ export const TIMED_REMINDER_KINDS = [
   ...LEAD_REMINDER_KINDS,
   'shoot_check_in',
   'kiosk_offline',
+  /** F06B rule B8: once per question and clock. */
+  'question_reminder',
+  'question_escalation',
 ] as const;
 
 export type TimedReminderKind = (typeof TIMED_REMINDER_KINDS)[number];

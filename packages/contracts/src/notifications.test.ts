@@ -90,6 +90,8 @@ describe('notification catalog', () => {
         // F06B.
         'subtask_stage_finished',
         'task_blocked',
+        'task_question_answered',
+        'task_question_converted',
         // F17 part B.
         'holiday_changed',
         'hr_request_decided',
@@ -430,6 +432,8 @@ describe('channels (F16 rule B3)', () => {
         'task_over_limit_pending',
         'task_overdue',
         'task_overdue_escalated',
+        // F06B rule B8.
+        'task_question_escalated',
       ].sort(),
     );
   });
@@ -645,6 +649,9 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       'subtask_handover',
       'subtasks_all_finished',
       'subtask_holding_next',
+      'task_question_asked',
+      'task_question_reminder',
+      'task_question_escalated',
     ]);
   });
 

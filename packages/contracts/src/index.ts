@@ -41,6 +41,7 @@ export * from './resolutions.js';
 export * from './retainer-contracts.js';
 export * from './retainer-cycles.js';
 export * from './retainers.js';
+export * from './rich-text.js';
 export * from './roles.js';
 export * from './tasks.js';
 export * from './templates.js';

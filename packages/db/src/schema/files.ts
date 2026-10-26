@@ -34,7 +34,7 @@ import { projects } from './projects.js';
 import { quotes } from './quotes.js';
 import { retainerContracts } from './retainer-contracts.js';
 import { retainers } from './retainers.js';
-import { tasks } from './tasks.js';
+import { taskComments, tasks } from './tasks.js';
 
 /*
  * Files and versions (F10, ADR 0019), owned by the api `files` module. Content lives on disk
@@ -74,6 +74,8 @@ export const fileItems = pgTable(
     employeeId: uuid('employee_id').references(() => users.id),
     /** F17 rule B13: a leave request's document (the sick certificate); no client. */
     hrRequestId: uuid('hr_request_id').references((): AnyPgColumn => hrRequests.id),
+    /** F06B rule B2: the comment, question or reply a task `attachment` belongs to. */
+    taskCommentId: uuid('task_comment_id').references((): AnyPgColumn => taskComments.id),
     /** The owner's client; the owner itself for `client`; null for a task without a client. */
     clientId: uuid('client_id').references(() => clients.id),
     role: fileRoleEnum('role').notNull(),
@@ -98,9 +100,13 @@ export const fileItems = pgTable(
     index('file_items_announcement_id_idx').on(table.announcementId),
     index('file_items_employee_id_idx').on(table.employeeId),
     index('file_items_hr_request_id_idx').on(table.hrRequestId),
+    index('file_items_task_comment_id_idx').on(table.taskCommentId),
     index('file_items_client_id_idx').on(table.clientId, table.role),
     index('file_items_created_by_id_idx').on(table.createdById),
-    /** Names are unique per owner and role among live items, except references. */
+    /**
+     * Names are unique per owner and role among live items, except references and the
+     * attachments of a task's thread (F06B: two comments may attach `image.png`).
+     */
     uniqueIndex('file_items_name_unique')
       .on(
         table.ownerType,
@@ -108,7 +114,9 @@ export const fileItems = pgTable(
         sql`coalesce(${table.taskId}, ${table.projectId}, ${table.retainerId}, ${table.postId}, ${table.quoteId}, ${table.invoiceId}, ${table.adWalletEntryId}, ${table.retainerContractId}, ${table.announcementId}, ${table.employeeId}, ${table.hrRequestId}, ${table.clientId})`,
         sql`lower(${table.name})`,
       )
-      .where(sql`${table.archivedAt} is null and ${table.role} <> 'reference'`),
+      .where(
+        sql`${table.archivedAt} is null and ${table.role} <> 'reference' and ${table.taskCommentId} is null`,
+      ),
     // `post`, `quote`, `invoice`, `ad_wallet_entry`, `retainer_contract`, `announcement` and
     // `employee`, `hr_request` (and the `attachment` role) are compared as text: their enum values
     // were added in the same migration as these checks (F08, F04, F13, F12, F05C, F16, F17).
@@ -130,7 +138,7 @@ export const fileItems = pgTable(
     ),
     check(
       'file_items_role_check',
-      sql`(${table.ownerType} = 'task' and ${table.role} in ('deliverable', 'reference'))
+      sql`(${table.ownerType} = 'task' and ${table.role} in ('deliverable', 'reference', 'attachment'))
         or (${table.ownerType} = 'client' and ${table.role} in ('brand', 'document'))
         or (${table.ownerType} in ('project', 'retainer') and ${table.role} = 'document')
         or (${table.ownerType}::text = 'post' and ${table.role} = 'deliverable')
@@ -138,6 +146,11 @@ export const fileItems = pgTable(
         or (${table.ownerType}::text in ('invoice', 'ad_wallet_entry', 'retainer_contract') and ${table.role} = 'document')
         or (${table.ownerType}::text = 'announcement' and ${table.role}::text = 'attachment')
         or (${table.ownerType}::text in ('employee', 'hr_request') and ${table.role} = 'document')`,
+    ),
+    // F06B rule B2: a task attachment belongs to a comment, and only it does.
+    check(
+      'file_items_task_comment_check',
+      sql`(${table.taskCommentId} is not null) = (${table.ownerType} = 'task' and ${table.role} = 'attachment')`,
     ),
     check(
       'file_items_brand_kind_check',

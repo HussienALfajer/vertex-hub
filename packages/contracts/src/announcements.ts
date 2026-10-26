@@ -4,6 +4,7 @@ import { calendarDateSchema, instantSchema } from './dates.js';
 import { personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
 import { notificationPrioritySchema } from './notifications.js';
+import { type RichTextDoc, richTextPlain, richTextSchema } from './rich-text.js';
 
 /*
  * Announcements (spec F16 part D, ADR 0038): written by anyone to any audience, frozen into
@@ -122,106 +123,22 @@ const httpsUrlSchema = z
   .trim()
   .pipe(z.url({ protocol: /^https$/ }).max(ANNOUNCEMENT_LIMITS.linkUrl));
 
-/* The body: a TipTap document limited to the allowed nodes and marks (rule D13). */
+/* The body: a rich-text document without mentions (rule D13, ADR 0038). */
 
-/**
- * TipTap's name of the emphasis mark. The web renders it as a highlight, never slanted: Arabic is
- * not italicized (brand/identity.md).
- */
-export const EMPHASIS_MARK = 'italic';
-
-const markSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('bold') }),
-  z.object({ type: z.literal(EMPHASIS_MARK) }),
-  z.object({
-    type: z.literal('link'),
-    attrs: z.object({
-      href: z
-        .string()
-        .trim()
-        .pipe(z.url({ protocol: /^(https|mailto)$/ }).max(ANNOUNCEMENT_LIMITS.linkUrl)),
-    }),
-  }),
-]);
-
-const textNodeSchema = z.object({
-  type: z.literal('text'),
-  text: z.string().min(1),
-  marks: z.array(markSchema).max(3).optional(),
-});
-
-const inlineContent = z.array(textNodeSchema).optional();
-
-const paragraphSchema = z.object({ type: z.literal('paragraph'), content: inlineContent });
-
-const headingSchema = z.object({
-  type: z.literal('heading'),
-  attrs: z.object({ level: z.literal(3) }),
-  content: inlineContent,
-});
-
-export type ListNode =
-  | { type: 'bulletList'; content: ListItemNode[] }
-  | { type: 'orderedList'; attrs?: { start?: number }; content: ListItemNode[] };
-
-export type ListItemNode = {
-  type: 'listItem';
-  content: (z.infer<typeof paragraphSchema> | ListNode)[];
-};
-
-const listItemSchema: z.ZodType<ListItemNode> = z.lazy(() =>
-  z.object({
-    type: z.literal('listItem'),
-    content: z.array(z.union([paragraphSchema, listSchema])).min(1),
-  }),
-);
-
-const listSchema: z.ZodType<ListNode> = z.lazy(() =>
-  z.union([
-    z.object({ type: z.literal('bulletList'), content: z.array(listItemSchema).min(1) }),
-    z.object({
-      type: z.literal('orderedList'),
-      attrs: z.object({ start: z.number().int().min(1).optional() }).optional(),
-      content: z.array(listItemSchema).min(1),
-    }),
-  ]),
-);
-
-const blockSchema = z.union([paragraphSchema, headingSchema, listSchema]);
-
-type BodyNode = { type: string; text?: string; content?: readonly BodyNode[] };
-
-/** The blocks of a body as plain text, one per line; list items each on their own line. */
-function blocksText(nodes: readonly BodyNode[]): string[] {
-  return nodes.flatMap((node) => {
-    if (node.type === 'paragraph' || node.type === 'heading') {
-      return [(node.content ?? []).map((child) => child.text ?? '').join('')];
-    }
-    return blocksText(node.content ?? []);
-  });
-}
-
-/**
- * Rule D13: an announcement's body. Unknown nodes, marks and attributes are refused or dropped
- * (Zod objects strip unknown keys), so only the allowed document is stored and rendered.
- */
-export const announcementBodySchema = z
-  .object({ type: z.literal('doc'), content: z.array(blockSchema).min(1) })
-  .refine((body) => announcementText(body).trim().length > 0, { message: 'The body is empty' })
-  .refine((body) => announcementText(body).length <= ANNOUNCEMENT_LIMITS.bodyText, {
-    message: `The body holds more than ${ANNOUNCEMENT_LIMITS.bodyText} characters`,
-  })
-  .meta({ id: 'AnnouncementBody' });
+/** Rule D13: an announcement's body. */
+export const announcementBodySchema = richTextSchema({
+  maxText: ANNOUNCEMENT_LIMITS.bodyText,
+}).meta({ id: 'AnnouncementBody' });
 
 export type AnnouncementBody = z.infer<typeof announcementBodySchema>;
 
 /** The body as plain text: blocks on their own lines (pushes, emails and search, rule D13). */
-export function announcementText(body: { content: readonly BodyNode[] }): string {
-  return blocksText(body.content).join('\n');
+export function announcementText(body: { content: RichTextDoc['content'] }): string {
+  return richTextPlain(body);
 }
 
 /** Rule D13: the body's first 140 characters as one line of plain text. */
-export function announcementExcerpt(body: { content: readonly BodyNode[] }): string {
+export function announcementExcerpt(body: { content: RichTextDoc['content'] }): string {
   const text = announcementText(body).replace(/\s+/g, ' ').trim();
   return text.length <= 140 ? text : `${text.slice(0, 139)}…`;
 }

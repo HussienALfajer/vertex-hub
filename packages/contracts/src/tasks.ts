@@ -26,6 +26,7 @@ import {
 } from './lists.js';
 import { NOTIFICATION_EXCERPT_MAX } from './notifications.js';
 import { deliverableKindSchema } from './retainers.js';
+import { mentionedUserIds, replaceMentions, richTextPlain, richTextSchema } from './rich-text.js';
 import { httpUrlSchema, optionalText } from './text.js';
 import {
   revisionDecisionSchema,
@@ -117,7 +118,35 @@ export const TASK_LIMITS = {
   checklist: 20,
   links: 30,
   revisionLimit: 20,
+  /** Non-archived acceptance criteria (F06B rule C6). */
+  criteria: 15,
+  /** Files attached to one comment, question or reply (F06B rule B2). */
+  attachments: 10,
 } as const;
+
+/** F06B: the text of a brief and of a comment, question or reply (rules B2 and C1). */
+export const TASK_TEXT_MAX = { brief: 20_000, comment: 4000 } as const;
+
+/** A row of a task's thread: a comment (and a reply) or a question (F06B part B). */
+export const TASK_COMMENT_KINDS = ['comment', 'question'] as const;
+
+export const taskCommentKindSchema = z.enum(TASK_COMMENT_KINDS).meta({ id: 'TaskCommentKind' });
+
+export type TaskCommentKind = z.infer<typeof taskCommentKindSchema>;
+
+export const QUESTION_STATUSES = ['open', 'answered'] as const;
+
+export const questionStatusSchema = z.enum(QUESTION_STATUSES).meta({ id: 'QuestionStatus' });
+
+export type QuestionStatus = z.infer<typeof questionStatusSchema>;
+
+/** A row of a task's checklist: an F06 item, or an acceptance criterion (F06B rule C6). */
+export const CHECKLIST_ITEM_KINDS = ['checklist', 'criterion'] as const;
+
+export type ChecklistItemKind = (typeof CHECKLIST_ITEM_KINDS)[number];
+
+/** F06B rule B8: work hours a question stays open before its reminder and its escalation. */
+export const QUESTION_TIMING_HOURS = { reminder: 24, escalation: 48 } as const;
 
 export const DEFAULT_REVISION_LIMIT = 2;
 
@@ -476,6 +505,30 @@ export function subtaskProgress(subtasks: readonly { status: TaskStatus; archive
 
 export const taskTitleSchema = z.string().trim().min(1).max(160);
 
+export const MAX_COMMENT_MENTIONS = 20;
+
+/** F06B rule C1: the brief as rich text, without mentions; `brief` keeps its plain extract. */
+export const taskBriefDocSchema = richTextSchema({ maxText: TASK_TEXT_MAX.brief }).meta({
+  id: 'TaskBriefDoc',
+});
+
+export type TaskBriefDoc = z.infer<typeof taskBriefDocSchema>;
+
+/**
+ * F06B rule B2: a comment, question or reply, with mention nodes (F06 rule 16); `body` keeps its
+ * plain extract with `@{userId}` tokens. The API checks that mentioned users are active.
+ */
+export const taskCommentDocSchema = richTextSchema({
+  maxText: TASK_TEXT_MAX.comment,
+  mentions: true,
+})
+  .refine((doc) => mentionedUserIds(richTextPlain(doc)).length <= MAX_COMMENT_MENTIONS, {
+    message: `At most ${MAX_COMMENT_MENTIONS} people are mentioned in one comment`,
+  })
+  .meta({ id: 'TaskCommentDoc' });
+
+export type TaskCommentDoc = z.infer<typeof taskCommentDocSchema>;
+
 const checklistTextSchema = z.string().trim().min(1).max(200);
 
 const uniqueIds = z.array(z.uuid()).transform((ids) => [...new Set(ids)]);
@@ -554,6 +607,8 @@ export const createTaskSchema = taskFieldsSchema
     dependsOn: uniqueIds.default([]),
     checklist: z.array(checklistTextSchema).default([]),
     links: z.array(createTaskLinkSchema).default([]),
+    /** F06B rule C1: the brief as rich text; when set, `brief` is written from it. */
+    briefDoc: taskBriefDocSchema.nullable().optional(),
   })
   .partial({ brief: true, dueTime: true, requestedByContactId: true, requestedOn: true })
   .extend({
@@ -599,10 +654,16 @@ export type CreateTaskInput = z.input<typeof createTaskSchema>;
  * `requestScope` client scope. The API checks the links against the stored ones. `acceptLeave`
  * (F17 rule B17) keeps an assignee or a due date that falls on the assignee's leave.
  * `moveSubtasks` (F06B rule A5) brings the subtasks due after a parent's new due date to it.
+ * `briefDoc` (rule C1) replaces `brief` with its plain extract; null clears both.
  */
 export const updateTaskSchema = taskFieldsSchema
   .partial()
-  .extend({ acceptLeave: z.boolean().optional(), moveSubtasks: z.boolean().optional() })
+  .extend({
+    acceptLeave: z.boolean().optional(),
+    moveSubtasks: z.boolean().optional(),
+    /** F06B rule C1: the brief as rich text; when set, `brief` is written from it. */
+    briefDoc: taskBriefDocSchema.nullable().optional(),
+  })
   .meta({ id: 'UpdateTask' });
 
 export type UpdateTask = z.infer<typeof updateTaskSchema>;
@@ -626,6 +687,12 @@ export const createSubtaskSchema = taskFieldsSchema
     position: z.number().int().min(1).optional(),
     stageId: z.uuid().nullable().optional(),
     acceptLeave: z.boolean().optional(),
+    briefDoc: taskBriefDocSchema.nullable().optional(),
+    /**
+     * F06B rule B11: a question or comment of the parent or of one of its subtasks, turned into
+     * this subtask; its attachments are copied as references.
+     */
+    fromCommentId: z.uuid().optional(),
   })
   .meta({ id: 'CreateSubtask' });
 
@@ -826,6 +893,14 @@ export const taskSchema = z
     progress: z
       .object({ delivered: z.number().int().min(0), total: z.number().int().min(0) })
       .nullable(),
+    /**
+     * Open questions of the task and, on a parent, of its subtasks (F06B rule B7, edge case 13);
+     * `inSubtasks` is the subtasks' share of `total`.
+     */
+    openQuestions: z.object({
+      total: z.number().int().min(0),
+      inSubtasks: z.number().int().min(0),
+    }),
   })
   .meta({ id: 'Task' });
 
@@ -1034,6 +1109,10 @@ export const taskPermissionsSchema = z
     canReopenSubtasks: z.boolean(),
     /** Write the subtask's handover note (rule A12). */
     canWriteHandover: z.boolean(),
+    /** Add, edit, order and archive acceptance criteria (rule C6). */
+    canEditCriteria: z.boolean(),
+    /** Tick and untick acceptance criteria: the assignee, department managers, manage scope. */
+    canTickCriteria: z.boolean(),
   })
   .meta({ id: 'TaskPermissions', description: 'What the caller may do, for the UI' });
 
@@ -1042,6 +1121,8 @@ export type TaskPermissions = z.infer<typeof taskPermissionsSchema>;
 export const taskDetailSchema = taskSchema
   .extend({
     brief: z.string().nullable(),
+    /** The brief as rich text (F06B rule C1); null without a brief. */
+    briefDoc: taskBriefDocSchema.nullable(),
     needsClientApproval: z.boolean(),
     clientRequest: z
       .object({
@@ -1059,6 +1140,8 @@ export const taskDetailSchema = taskSchema
     dependents: z.array(taskDependencySchema),
     /** Non-archived items, by position. */
     checklistItems: z.array(taskChecklistItemSchema),
+    /** Non-archived acceptance criteria, by position (F06B rule C6). */
+    criteria: z.array(taskChecklistItemSchema),
     /** Non-archived links, oldest first. */
     links: z.array(taskLinkSchema),
     /** Non-archived file items of the task (F10). */
@@ -1144,6 +1227,8 @@ export const taskListQuerySchema = pageQuerySchema.extend({
   parentId: z.uuid().optional(),
   /** `true` hides subtasks ("Hide subtasks"). */
   topLevel: queryBooleanSchema.optional(),
+  /** `true`: tasks with an open question, their own or a subtask's (F06B rule B7). */
+  hasOpenQuestions: queryBooleanSchema.optional(),
   sort: z.enum(TASK_SORTS).default('dueDate'),
   order: sortOrderSchema.default('asc'),
 });
@@ -1184,30 +1269,14 @@ export const taskChecklistSchema = z
 
 export type TaskChecklist = z.infer<typeof taskChecklistSchema>;
 
-// Comments
-
-/** A mention in a comment body: `@{userId}`, shown with the user's current name. */
-const MENTION_TOKEN =
-  /@\{([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\}/g;
-
-export const MAX_COMMENT_MENTIONS = 20;
-
-/** The distinct users a comment body mentions, in order of first mention, lowercased. */
-export function mentionedUserIds(body: string): string[] {
-  return [
-    ...new Set(
-      [...body.matchAll(MENTION_TOKEN)].map((match) => (match[1] as string).toLowerCase()),
-    ),
-  ];
-}
+// Comments and questions
 
 /**
  * A comment as a notification shows it (F14): mentions as `@name`, whitespace collapsed, cut to
  * `NOTIFICATION_EXCERPT_MAX` characters with an ellipsis.
  */
 export function commentExcerpt(body: string, nameOf: (userId: string) => string): string {
-  const text = body
-    .replace(MENTION_TOKEN, (_, id: string) => `@${nameOf(id.toLowerCase())}`)
+  const text = replaceMentions(body, (id) => `@${nameOf(id)}`)
     .replace(/\s+/g, ' ')
     .trim();
   return text.length > NOTIFICATION_EXCERPT_MAX
@@ -1215,46 +1284,179 @@ export function commentExcerpt(body: string, nameOf: (userId: string) => string)
     : text;
 }
 
-/** Rule 16: plain text with line breaks; the API checks that mentioned users are active. */
+/** Held uploads (F10 rule 1) attached to a comment, a question or a reply (F06B rule B2). */
+const commentFilesSchema = z
+  .array(z.object({ uploadId: z.uuid() }))
+  .max(TASK_LIMITS.attachments)
+  .refine((files) => new Set(files.map((file) => file.uploadId)).size === files.length, {
+    message: 'An upload is listed once',
+  })
+  .default([]);
+
+/** A comment, or a reply to the question `questionId` (F06B rule B3). */
 export const taskCommentInputSchema = z
   .object({
-    body: z
-      .string()
-      .trim()
-      .min(1)
-      .max(4000)
-      .refine((body) => mentionedUserIds(body).length <= MAX_COMMENT_MENTIONS, {
-        message: `At most ${MAX_COMMENT_MENTIONS} people are mentioned in one comment`,
-      }),
+    bodyDoc: taskCommentDocSchema,
+    questionId: z.uuid().optional(),
+    files: commentFilesSchema,
   })
   .meta({ id: 'TaskCommentInput' });
 
 export type TaskCommentInput = z.infer<typeof taskCommentInputSchema>;
 
-export const taskCommentSchema = z
+export type TaskCommentInputValue = z.input<typeof taskCommentInputSchema>;
+
+/** The author edits the text only; a question's addressee changes by forwarding (rule B13). */
+export const taskCommentUpdateSchema = z
+  .object({ bodyDoc: taskCommentDocSchema })
+  .meta({ id: 'TaskCommentUpdate' });
+
+export type TaskCommentUpdate = z.infer<typeof taskCommentUpdateSchema>;
+
+/** Rule B1: a question to one person or one department. */
+export const taskQuestionInputSchema = z
+  .object({
+    bodyDoc: taskCommentDocSchema,
+    addressedUserId: z.uuid().optional(),
+    addressedDepartment: departmentCodeSchema.optional(),
+    files: commentFilesSchema,
+  })
+  .refine((input) => !input.addressedUserId !== !input.addressedDepartment, {
+    message: 'A question is addressed to one person or one department',
+    path: ['addressedUserId'],
+  })
+  .meta({ id: 'TaskQuestionInput' });
+
+export type TaskQuestionInput = z.infer<typeof taskQuestionInputSchema>;
+
+export type TaskQuestionInputValue = z.input<typeof taskQuestionInputSchema>;
+
+/** Rule B5: a department question forwarded to one of its members. */
+export const forwardQuestionSchema = z.object({ userId: z.uuid() }).meta({ id: 'ForwardQuestion' });
+
+export type ForwardQuestion = z.infer<typeof forwardQuestionSchema>;
+
+export const taskCommentListQuerySchema = pageQuerySchema.extend({
+  /** `question`: the questions only ("Open questions" filter). */
+  kind: taskCommentKindSchema.optional(),
+  /** Questions in this state only. */
+  status: questionStatusSchema.optional(),
+});
+
+export type TaskCommentListQuery = z.infer<typeof taskCommentListQuerySchema>;
+
+export type TaskCommentListQueryInput = z.input<typeof taskCommentListQuerySchema>;
+
+/** A file attached to a comment, a question or a reply (F06B rule B2), at its only version. */
+export const taskAttachmentSchema = z
   .object({
     id: z.uuid(),
-    author: archivablePersonSchema,
-    /** Null once removed: the UI shows "comment removed" in its place. */
-    body: z.string().nullable(),
-    /** The users the body mentions, with their current names (edge case 14). */
-    mentions: z.array(archivablePersonSchema),
-    editedAt: z.iso.datetime().nullable(),
-    removed: z.boolean(),
-    createdAt: z.iso.datetime(),
-    /** The caller wrote it and the task is not read-only. */
-    canEdit: z.boolean(),
-    /** The caller wrote it or holds `tasks.manage` with scope all, and the task is not read-only. */
-    canRemove: z.boolean(),
+    name: z.string(),
+    versionId: z.uuid(),
+    mimeType: z.string(),
+    sizeBytes: z.number().int().min(1),
+    /** Images have a thumbnail once their preview is ready (F10). */
+    previewReady: z.boolean(),
+  })
+  .meta({ id: 'TaskAttachment' });
+
+export type TaskAttachment = z.infer<typeof taskAttachmentSchema>;
+
+const commentFieldsSchema = z.object({
+  id: z.uuid(),
+  kind: taskCommentKindSchema,
+  author: archivablePersonSchema,
+  /** Plain text with `@{userId}` tokens; null once removed (the UI shows "comment removed"). */
+  body: z.string().nullable(),
+  /** The rich text; null once removed. */
+  bodyDoc: taskCommentDocSchema.nullable(),
+  /** The users the body mentions, with their current names (edge case 14). */
+  mentions: z.array(archivablePersonSchema),
+  /** Empty once removed. */
+  attachments: z.array(taskAttachmentSchema),
+  /** The question a reply answers; null on comments and questions. */
+  questionId: z.uuid().nullable(),
+  /** The subtask it was turned into (rule B11). */
+  convertedTask: z.object({ id: z.uuid(), title: z.string() }).nullable(),
+  editedAt: z.iso.datetime().nullable(),
+  removed: z.boolean(),
+  createdAt: z.iso.datetime(),
+  /** The caller wrote it and the task is not read-only. */
+  canEdit: z.boolean(),
+  /** The caller wrote it or holds `tasks.manage` with scope all, and the task is not read-only. */
+  canRemove: z.boolean(),
+  /** The caller may turn it into a subtask (rule B11). */
+  canConvert: z.boolean(),
+});
+
+export const taskReplySchema = commentFieldsSchema.meta({ id: 'TaskReply' });
+
+export type TaskReply = z.infer<typeof taskReplySchema>;
+
+/** A question's state (rules B1–B5). */
+export const taskQuestionStateSchema = z
+  .object({
+    /** The person asked, or the member a department question was forwarded to. */
+    addressee: archivablePersonSchema
+      .extend({
+        /** False when a forwarded member left the department (edge case 15). */
+        inDepartment: z.boolean(),
+      })
+      .nullable(),
+    /** Set for a department question; kept when it is forwarded. */
+    department: departmentCodeSchema.nullable(),
+    status: questionStatusSchema,
+    answeredBy: personSchema.nullable(),
+    answeredAt: z.iso.datetime().nullable(),
+    canAnswer: z.boolean(),
+    canReopen: z.boolean(),
+    canForward: z.boolean(),
+  })
+  .meta({ id: 'TaskQuestionState' });
+
+export type TaskQuestionState = z.infer<typeof taskQuestionStateSchema>;
+
+export const taskCommentSchema = commentFieldsSchema
+  .extend({
+    /** Questions only. */
+    question: taskQuestionStateSchema.nullable(),
+    /** A question's replies, oldest first; empty on comments. */
+    replies: z.array(taskReplySchema),
   })
   .meta({ id: 'TaskComment' });
 
 export type TaskComment = z.infer<typeof taskCommentSchema>;
 
-export const taskCommentPageSchema = pageSchema(taskCommentSchema).meta({ id: 'TaskCommentPage' });
+export const taskCommentPageSchema = pageSchema(taskCommentSchema).meta({
+  id: 'TaskCommentPage',
+  description: 'Comments and questions, oldest first, each question with its replies',
+});
 
 export type TaskCommentPage = z.infer<typeof taskCommentPageSchema>;
 
+export const myQuestionsQuerySchema = pageQuerySchema.extend({
+  status: questionStatusSchema.default('open'),
+});
+
+export type MyQuestionsQuery = z.infer<typeof myQuestionsQuerySchema>;
+
+export type MyQuestionsQueryInput = z.input<typeof myQuestionsQuerySchema>;
+
+/** Rule B7: a question waiting for the caller's answer, with its task. */
+export const myQuestionSchema = taskCommentSchema
+  .extend({
+    task: z.object({ id: z.uuid(), title: z.string(), status: taskStatusSchema }),
+  })
+  .meta({ id: 'MyQuestion' });
+
+export type MyQuestion = z.infer<typeof myQuestionSchema>;
+
+export const myQuestionPageSchema = pageSchema(myQuestionSchema).meta({
+  id: 'MyQuestionPage',
+  description: 'Oldest asked first',
+});
+
+export type MyQuestionPage = z.infer<typeof myQuestionPageSchema>;
 // Views
 
 /** The statuses the board shows as columns; cancelled tasks are left out. */
@@ -1358,6 +1560,8 @@ export const myTaskSummarySchema = z
     requestedByMe: z.number().int().min(0),
     /** Open unassigned tasks in the departments the caller manages; null for non-managers. */
     unassignedInMyDepartments: z.number().int().min(0).nullable(),
+    /** Open questions waiting for the caller's answer (F06B rule B7). */
+    questionsWaiting: z.number().int().min(0),
   })
   .meta({ id: 'MyTaskSummary' });
 

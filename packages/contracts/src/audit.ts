@@ -303,6 +303,12 @@ export const AUDIT_ACTIONS = [
   'task_stage.updated',
   'task_stage.archived',
   'task_stage.finished',
+  // F06B part B.
+  'task_comment.question_asked',
+  'task_comment.question_forwarded',
+  'task_comment.question_answered',
+  'task_comment.question_reopened',
+  'task_comment.converted',
 ] as const;
 
 export const auditActionSchema = z.enum(AUDIT_ACTIONS).meta({ id: 'AuditAction' });

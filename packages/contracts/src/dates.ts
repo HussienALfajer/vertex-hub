@@ -190,6 +190,25 @@ export function businessInstant(date: CalendarDate, time: TimeOfDay): Date {
   return new Date(wall - businessOffsetMs(new Date(first)));
 }
 
+/**
+ * F06B rule B9: the hours from `from` to `to` that fall on work days in Asia/Damascus, all 24
+ * hours of each (Fridays and public holidays do not count); 0 when `to` is not after `from`.
+ */
+export function workHoursBetween(
+  from: Date,
+  to: Date,
+  holidays: readonly HolidayRange[] = [],
+): number {
+  let ms = 0;
+  for (let day = businessDate(from); day <= businessDate(to); day = addDays(day, 1)) {
+    if (!isWorkDay(day, holidays)) continue;
+    const start = Math.max(businessInstant(day, '00:00').getTime(), from.getTime());
+    const end = Math.min(businessInstant(addDays(day, 1), '00:00').getTime(), to.getTime());
+    if (end > start) ms += end - start;
+  }
+  return ms / (60 * 60 * 1000);
+}
+
 /** The first work day after `date`. */
 export function nextWorkDay(
   date: CalendarDate,

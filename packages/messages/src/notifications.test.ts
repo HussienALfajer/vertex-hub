@@ -308,6 +308,30 @@ const SAMPLES: Record<NotificationType, unknown> = {
   subtask_stage_finished: { task, stage: 'النص' },
   subtasks_all_finished: { task },
   subtask_holding_next: { task, parent: 'حملة رمضان', waiting: 'تصميم البوستر', forParent: true },
+  task_question_asked: {
+    task,
+    questionId: '0192a5a0-0000-7000-8000-000000000009', excerpt: 'أي مقاس؟',
+    department: null,
+    addressee: 'سامر',
+    forwarded: false,
+  },
+  task_question_answered: {
+    task,
+    questionId: '0192a5a0-0000-7000-8000-000000000009', excerpt: 'أي مقاس؟',
+    department: null,
+    addressee: 'سامر',
+    reply: true,
+  },
+  task_question_reminder: { task, questionId: '0192a5a0-0000-7000-8000-000000000009', excerpt: 'أي مقاس؟', department: null, addressee: 'سامر' },
+  task_question_escalated: { task, questionId: '0192a5a0-0000-7000-8000-000000000009', excerpt: 'أي مقاس؟', department: null, addressee: 'سامر' },
+  task_question_converted: {
+    task,
+    questionId: '0192a5a0-0000-7000-8000-000000000009', excerpt: 'أي مقاس؟',
+    department: null,
+    addressee: 'سامر',
+    subtask: 'مقاسات البوستر',
+    question: true,
+  },
   task_blocked: { task },
 };
 
@@ -868,5 +892,73 @@ describe('subtasks (F06B part A)', () => {
 
   it('opens the task', () => {
     expect(linkPath(notificationLink(sample('subtask_turn')))).toBe(`/tasks/${SUBJECT_ID}`);
+  });
+});
+
+describe('questions (F06B part B)', () => {
+  const render = (type: NotificationType, data?: object, count = 1) =>
+    notificationText(
+      data
+        ? sample(type, { data, count } as Partial<Notification>)
+        : sample(type, { count } as Partial<Notification>),
+      departmentName,
+    ).text;
+  const question = {
+    task,
+    questionId: '0192a5a0-0000-7000-8000-000000000009',
+    excerpt: 'أي مقاس؟',
+  };
+
+  it('names the asker, the department or the forward', () => {
+    expect(render('task_question_asked')).toBe('سألك رنا في «تصميم منيو»: أي مقاس؟');
+    expect(
+      render('task_question_asked', {
+        ...question,
+        department: 'design',
+        addressee: null,
+        forwarded: false,
+      }),
+    ).toBe('سأل رنا قسم التصميم في «تصميم منيو»: أي مقاس؟');
+    expect(
+      render('task_question_asked', {
+        ...question,
+        department: 'design',
+        addressee: 'سامر',
+        forwarded: true,
+      }),
+    ).toBe('حوّل رنا إليك سؤالًا في «تصميم منيو»: أي مقاس؟');
+  });
+
+  it('tells the asker of replies, merged per question', () => {
+    expect(render('task_question_answered')).toBe('ردّ رنا على سؤالك في «تصميم منيو»: أي مقاس؟');
+    expect(
+      render('task_question_answered', {
+        ...question,
+        department: null,
+        addressee: 'سامر',
+        reply: false,
+      }),
+    ).toBe('عدّ رنا سؤالك في «تصميم منيو» مُجابًا');
+    expect(render('task_question_answered', undefined, 3)).toBe(
+      'ردود جديدة على سؤالك في «تصميم منيو»',
+    );
+  });
+
+  it('reminds the addressee and escalates to the person or the department', () => {
+    expect(render('task_question_reminder')).toBe(
+      'سؤال في «تصميم منيو» ينتظر إجابتك منذ يوم عمل: أي مقاس؟',
+    );
+    expect(render('task_question_escalated')).toBe(
+      'سؤال في «تصميم منيو» ينتظر سامر منذ يومَي عمل: أي مقاس؟',
+    );
+    expect(
+      render('task_question_escalated', { ...question, department: 'design', addressee: null }),
+    ).toBe('سؤال في «تصميم منيو» ينتظر قسم التصميم منذ يومَي عمل: أي مقاس؟');
+  });
+
+  it('names the subtask a question was turned into', () => {
+    expect(render('task_question_converted')).toBe(
+      'حوّل رنا سؤالًا في «تصميم منيو» إلى المهمة الفرعية «مقاسات البوستر»',
+    );
   });
 });
