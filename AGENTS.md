@@ -18,6 +18,7 @@ This project is independent. Do not read or reuse other folders on this machine 
 | `docs/specs/<feature>.md` | Detailed spec per feature, written before implementation. |
 | `docs/open-questions.md` | Unresolved decisions. Never guess an answer to one: ask. |
 | `docs/workflow.md` | How work is run with AI coding agents (feature cycle, effort, sessions). |
+| `docs/testing.md` | How checks run: `pnpm verify`, what runs locally and what in CI, the test databases, the E2E rules, the CI jobs, the local machine. |
 | `brand/identity.md` | Visual identity: colors, typography, shape, motif, logo usage, patterns to avoid. Read before any UI work. |
 | `brand/` | The only home of logo files and brand assets. |
 
@@ -43,12 +44,13 @@ Run from the repository root (Node 24, pnpm via Corepack). Turborepo builds depe
 | Task | Command |
 |---|---|
 | Install | `pnpm install` |
-| First-time local DB (creates `.env`, role, dev + test databases and the api suite's per-worker test databases; asks for the postgres password; run it again when `TEST_WORKERS` changes) | `pnpm db:setup-local` |
+| First-time local DB (creates `.env`, role, dev + test databases and the api suite's per-worker test databases; asks for the postgres password; the api tests create missing worker databases when the role may, otherwise run it again) | `pnpm db:setup-local` |
 | Dev (api :3000, worker, web :5173) | `pnpm dev` |
+| Check a change, each check once: lint; typecheck, test and build (Turborepo replays unchanged packages); the changed E2E specs; migration and OpenAPI drift. Summary on the console, logs in `.verify/` (`docs/testing.md`) · only some test files (paths from the root; `--grep <title>` for part of a spec) | `pnpm verify` · `pnpm verify <file>...` |
 | Typecheck | `pnpm typecheck` |
 | Lint + format check / fix | `pnpm lint` / `pnpm lint:fix` |
-| Unit + integration tests (need `TEST_DATABASE_URL`; migrations run automatically; `db` → `worker` share the test database and run one after another, the api suite runs at the same time on a database per Vitest worker, see `turbo.json` and `packages/db/src/testing.ts`); Turbo replays packages whose inputs did not change | `pnpm test` |
-| E2E (Playwright, builds web first): the full suite (CI runs it over four shards) · only the specs changed against `main` (after `pnpm build`) | `pnpm test:e2e` · `pnpm --filter @vertex-hub/web exec playwright test --only-changed=origin/main` |
+| Unit + integration tests (need `TEST_DATABASE_URL`; migrations run automatically; `db` → `worker` share the test database and run one after another, the api suite runs at the same time on a database per Vitest worker, `TEST_WORKERS`, see `turbo.json` and `packages/db/src/testing.ts`; a second run of a suite waits for the first); Turbo replays packages whose inputs did not change | `pnpm test` |
+| E2E (Playwright, builds web first): the changed specs run in `pnpm verify`; the whole suite runs in CI over four shards (here only on purpose: `pnpm verify --e2e-all`) | `pnpm verify apps/web/e2e/<file>.spec.ts [--grep <title>]` |
 | Generate a migration after a schema change | `pnpm db:generate` |
 | Apply migrations to the dev database | `pnpm db:migrate` |
 | Build | `pnpm build` |
@@ -82,7 +84,7 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 
 - Continue without asking when the next step needs no input from the owner. Put brief status notes in the same message as the next action.
 - Stop and ask only when a decision belongs to the owner (scope, business rules, anything in `open-questions.md`), when a spec is ambiguous in a way that changes the result, or before a destructive or outward-facing action (deleting data, dropping tables, restoring a database snapshot, force-push, publishing). Deploying `main` to production and changing production through the server or an admin panel need no approval (owner, 2026-10-18): do them when the task calls for them and report what changed.
-- A task is done only when its checks pass: typecheck, lint, and the relevant tests; for UI changes, a Playwright screenshot in RTL. Show the evidence (commands run and their results) instead of asserting success.
+- A task is done only when `pnpm verify` passes on its final state and CI is green; for UI changes, a Playwright screenshot in RTL. Show the evidence (the verify summary) instead of asserting success.
 - Fix root causes. Never silence a failing test, type error, or lint rule to make a check pass.
 - For multi-step work keep a checklist in `TASKS.md`: mark items done and add work you discover.
 - Mark anything you could not confirm and say where you looked.
@@ -92,7 +94,7 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 
 - Search before reading (file and content search), then read only the relevant range. For `v1-scope.md`, read the feature's section, not the whole file.
 - Never read generated or lock files: `pnpm-lock.yaml` (use `pnpm why <pkg>` or the `package.json`), `packages/db/migrations/meta/`, `routeTree.gen.ts`, `dist/`, `.turbo/`. Open Playwright screenshots only to verify a UI change.
-- Run the narrowest check first (one package, one test file), and the full set once before the PR, in one turbo command (`pnpm turbo run typecheck test build`) so the tasks run in parallel and Turbo's cache skips what did not change. Add `--output-logs=errors-only`. Run the `checker` in the background and keep working (the reviewer can run at the same time).
+- Checks (`docs/testing.md`): while building, run only the tests you work on (`pnpm verify <file>`); before the PR, `pnpm verify` once, and again only after a change. Each check runs once: read its failures in the summary and in `.verify/`, never run a suite again to see its output, and rerun only the files that failed. One test run at a time, and no edits while it runs: the `test-guard` hook refuses a second run, the whole E2E suite and `timeout` around tests. CI runs everything.
 - In replies, point to `path:line` instead of pasting files or diffs.
 
 ## Git
@@ -108,10 +110,10 @@ When a task's work is done (a spec approved, a `/feature-slice` PR accepted, a f
 1. **Branch:** not `main`; if on `main`, create the branch named by type. `TASKS.md` has no open items for this PR.
 2. **Docs:** update `docs/ROADMAP.md` when a feature or roadmap item is done, and every doc the change made stale (`docs/architecture.md`, a folder `CLAUDE.md`, `docs/open-questions.md`, the commands table above).
 3. **Secrets:** `git status` and `git diff --stat` show no `.env`, key, report or stray file.
-4. **Checks:** lint, typecheck, test and build, plus the changed E2E specs when `apps/web` or `packages/ui` changed and `drift` when `packages/db` changed, through the `checker` subagent. Turbo's cache replays every task whose inputs did not change, so this run costs only what changed since the last one: run it again after any fix rather than reasoning about what already passed. Documentation-only changes run no local checks (CI skips them as well). CI runs everything, the full E2E suite over four shards. Everything must pass; fix root causes.
+4. **Checks:** `pnpm verify` passes on the final tree (lint, typecheck, test, build, the changed E2E specs, and migration and OpenAPI drift when their sources changed). A green run on the same tree counts; after a fix run it again, and Turborepo replays what the fix did not touch. Documentation-only changes run no local checks (CI skips them as well). CI runs everything, the whole E2E suite over four shards. Everything must pass; fix root causes.
 5. **Review:** for a feature, the `reviewer` subagent has run and its blocking findings are fixed.
 6. **Commit:** stage the intended files only; Conventional Commit subject, a body with what and why, ending with the session's attribution line.
-7. **Pull request:** `git push -u origin <branch>`, `gh pr create --base main` with `## Summary` (what and why, in bullets) and `## Test plan` (the checks as ticked boxes; for docs only, "documentation only, CI runs the checks"), ending with the session's attribution line; then immediately `gh pr merge <number> --auto --merge`.
+7. **Pull request:** `git push -u origin <branch>`, `gh pr create --base main` with `## Summary` (what and why, in bullets) and `## Test plan` (the checks as ticked boxes; for docs only, "documentation only, CI runs the checks"), ending with the session's attribution line; then immediately `gh pr merge <number> --auto --merge`. If CI fails, read `gh run view <run-id> --log-failed`, fix the cause on the branch and push: auto-merge waits for green.
 8. **Report** in the format below, in Arabic, with the PR link under Changed and the cleanup line at the end of "Needs from you".
 
 ## Reporting

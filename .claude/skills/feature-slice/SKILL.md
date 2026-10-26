@@ -21,23 +21,23 @@ Implement **$ARGUMENTS**. This skill orders the work and names the gates; the ru
 - Show the owner the PR split and the task list in a few lines, in Arabic, then **stop and wait for approval**.
 
 ## 2. Build, one layer at a time
-Finish a layer, run its gate through the `checker` subagent, fix root causes, tick the item in `TASKS.md`, then start the next layer. Never start a layer while the previous gate fails.
+Finish a layer, run its gate, fix root causes, tick the item in `TASKS.md`, then start the next layer. Never start a layer while the previous gate fails. A gate runs the layer's own tests with `pnpm verify <files>` (paths from the root) and typechecks with `pnpm typecheck` (Turborepo replays untouched packages); when one fails, fix it and rerun only the files its summary names. Never run the whole suite at a gate.
 
 | # | Layer | Build | Gate |
 |---|---|---|---|
-| 1 | contracts | Schemas and types, list query and page schemas, permissions and grants, error codes, audit actions and entity types; unit tests for pure rules | `contracts` test, root `typecheck` |
-| 2 | db | Run `/db-migration`: schema, generated migration, SQL review | `db` test, migration drift |
-| 3 | api | Module, controller, service: scopes as `where` filters, audit in the change's transaction, archive instead of delete, coded errors; `test/<module>.test.ts` | `api` test file of the module, `test/architecture.test.ts`, `api` typecheck |
+| 1 | contracts | Schemas and types, list query and page schemas, permissions and grants, error codes, audit actions and entity types; unit tests for pure rules | `pnpm verify` on the changed `packages/contracts/src/*.test.ts`, `pnpm typecheck` |
+| 2 | db | Run `/db-migration`: schema, generated migration, SQL review | `pnpm verify packages/db/src/conventions.test.ts`, migration drift (`pnpm db:generate` writes nothing) |
+| 3 | api | Module, controller, service: scopes as `where` filters, audit in the change's transaction, archive instead of delete, coded errors; `test/<module>.test.ts` | `pnpm verify apps/api/test/<module>.test.ts apps/api/test/architecture.test.ts`, `api` typecheck |
 | 4 | bridge | `pnpm build`, then `openapi:export` and `api:generate` (commands in `AGENTS.md`) | `web` typecheck |
-| 5 | web | `features/<module>/`: queries, pages, forms; thin routes; navigation; `ar.json` keys (feature, errors, audit); loading, empty and error states | `web` typecheck, lint, `web` test |
-| 6 | e2e | Mocks in `e2e/fixtures.ts`, the feature's flow spec, RTL screenshots in both themes in `e2e/screens.spec.ts` | `pnpm test:e2e`; open the new screenshots and look at them |
+| 5 | web | `features/<module>/`: queries, pages, forms; thin routes; navigation; `ar.json` keys (feature, errors, audit); loading, empty and error states | `web` typecheck, lint, `pnpm verify` on the changed `apps/web/src/**/*.test.ts` |
+| 6 | e2e | Mocks in `e2e/fixtures.ts`, the feature's flow spec, RTL screenshots in both themes in `e2e/screens.spec.ts` | `pnpm verify apps/web/e2e/<flow>.spec.ts`, then `pnpm verify apps/web/e2e/screens.spec.ts --grep "<new test title>"`; open the new screenshots and look at them. The whole suite runs in CI. |
 
 Layers a PR does not include are skipped. Helpers that ADR 0013 says arrive with their first use (sorting, money columns, new list or error shapes) are written in the layer that first needs them, in the shared place ADR 0013 names.
 
 ## 3. Close each PR
 1. Walk the wiring checklist in `wiring.md` against the diff (`git diff main...HEAD --stat`).
-2. Start the full checks through `checker` in the background: lint, typecheck, test, build; add the changed E2E specs when web changed and migration drift when db changed. While they run, run the `reviewer` (next step). After any fix (checks, reviewer, owner), run the checks again: Turbo's cache replays what the fix did not touch, so the re-run costs only the changed packages.
-3. Run the `reviewer` subagent with the spec path. Fix every blocking finding, then re-run the affected gates.
+2. Run `pnpm verify` once (lint, typecheck, test, build, the changed E2E specs, drift), through the `checker` to keep its output out of the context, and the `reviewer` (next step) at the same time. Edit nothing until both are done.
+3. Run the `reviewer` subagent with the spec path. Fix every blocking finding and every failure of step 2 together, then run `pnpm verify` once more: Turborepo replays what the fixes did not touch.
 4. Owner acceptance, in Arabic:
    - PR with screens: turn the spec's "Acceptance" section into numbered browser steps for the owner (`pnpm dev`, which roles to sign in as, what to click, what they should see). Ask before `pnpm db:migrate` on the dev database.
    - PR without screens: summarize the endpoints and their rules; the owner may try them at `http://127.0.0.1:3000/api/docs`.
