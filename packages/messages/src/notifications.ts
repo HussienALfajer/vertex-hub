@@ -246,6 +246,47 @@ export const NOTIFICATION_TEXT = {
     medical: 'اعتُمد المنشور «{{post}}» بعد المراجعة الطبية بواسطة {{actor}}',
   },
   post_task_ready: 'اعتُمدت المهمة «{{task}}» المرتبطة بالمنشور «{{post}}»',
+  /** F08B. */
+  post_moved: 'نقل {{actor}} المنشور «{{post}}» من {{from}} إلى {{to}}',
+  post_moved_shifted:
+    'نقل {{actor}} المنشور «{{post}}» من {{from}} إلى {{to}}، ونُقلت معه مواعيد: {{tasks}}',
+  post_moved_merged: 'نُقل المنشور «{{post}}» أكثر من مرة اليوم، وموعده الآن {{to}}',
+  post_unassigned: 'لم تعد مسؤولًا عن المنشور «{{post}}»: صار مع {{holder}}',
+  post_changed: 'عدّل {{actor}} {{changes}} في المنشور «{{post}}»',
+  post_changed_merged: {
+    zero: 'تعديلات على محتوى المنشور «{{post}}»',
+    one: 'تعديل على محتوى المنشور «{{post}}»',
+    two: 'تعديلان على محتوى المنشور «{{post}}»',
+    few: '{{n}} تعديلات على محتوى المنشور «{{post}}»',
+    many: '{{n}} تعديلًا على محتوى المنشور «{{post}}»',
+    other: '{{n}} تعديل على محتوى المنشور «{{post}}»',
+  },
+  postChanges: {
+    captions: 'النصوص',
+    slides: 'الشرائح',
+    platforms: 'المنصات',
+    type: 'النوع',
+    title: 'العنوان',
+  },
+  post_at_risk: {
+    production: 'المنشور «{{post}}» موعده {{date}} ولم يُعتمد بعد: ما زال في الإنتاج',
+    tasks: 'المنشور «{{post}}» موعده {{date}} ولم يُعتمد بعد: ينتظر {{tasks}}',
+    internal_review: 'المنشور «{{post}}» موعده {{date}} ولم يُعتمد بعد: ينتظر المراجعة الداخلية',
+    medical_review: 'المنشور «{{post}}» موعده {{date}} ولم يُعتمد بعد: ينتظر المراجعة الطبية',
+    client: 'المنشور «{{post}}» موعده {{date}} ولم يُعتمد بعد: ينتظر ردّ العميل منذ {{since}}',
+  },
+  content_week_check: 'فحص تخطيط المحتوى من {{from}} إلى {{to}}: {{clients}}',
+  weekCheckClient: '{{client}} ({{n}})',
+  content_idea_added: 'أضاف {{actor}} فكرة: {{idea}}',
+  content_idea_added_merged: {
+    zero: 'أفكار جديدة في بنك الأفكار',
+    one: 'فكرة جديدة في بنك الأفكار',
+    two: 'فكرتان جديدتان في بنك الأفكار',
+    few: '{{n}} أفكار جديدة في بنك الأفكار',
+    many: '{{n}} فكرة جديدة في بنك الأفكار',
+    other: '{{n}} فكرة جديدة في بنك الأفكار',
+  },
+  content_idea_used: 'صارت فكرتك منشورًا: «{{post}}»: {{idea}}',
   post_task_unlinked: {
     cancelled: 'أُلغيت المهمة «{{task}}» وفُكّ ارتباطها بالمنشور «{{post}}»',
     archived: 'أُرشفت المهمة «{{task}}» وفُكّ ارتباطها بالمنشور «{{post}}»',
@@ -735,6 +776,12 @@ export function notificationLink(notification: Notification): NotificationLink {
     case 'kiosk':
       // Rule C22: the entrance screens in HR settings.
       return { to: '/hr/settings', search: { tab: 'screens' } };
+    case 'content_week':
+      // F08B rule C10: the Planning check of the Content page.
+      return { to: '/content', search: { tab: 'planning' } };
+    case 'content_ideas':
+      // F08B rule C12: the ideas panel beside the calendar.
+      return { to: '/content', search: { ideas: 'open' } };
     case 'attendance_month':
       // Rule D3: the month sheet.
       return notification.type === 'attendance_month_closed'
@@ -1074,6 +1121,94 @@ export function notificationText(
         context: data.post.client,
       };
     }
+    case 'post_moved': {
+      const { data, count } = notification;
+      const values = {
+        actor,
+        post: data.post.title,
+        from: formatDue({ dueDate: data.previousDate, dueTime: data.previousTime }),
+        to: formatDue({ dueDate: data.post.publishDate, dueTime: data.post.publishTime }),
+        tasks: formatList(data.shiftedTasks.map((task) => `«${task}»`)),
+      };
+      return {
+        text: fill(
+          count > 1
+            ? text.post_moved_merged
+            : data.shiftedTasks.length > 0
+              ? text.post_moved_shifted
+              : text.post_moved,
+          values,
+        ),
+        context: data.post.client,
+      };
+    }
+    case 'post_unassigned':
+      return {
+        text: fill(text.post_unassigned, {
+          post: notification.data.post.title,
+          holder: notification.data.holder,
+        }),
+        context: notification.data.post.client,
+      };
+    case 'post_changed': {
+      const { data, count } = notification;
+      return {
+        text:
+          count > 1
+            ? counted(text.post_changed_merged, count, { post: data.post.title })
+            : fill(text.post_changed, {
+                actor,
+                post: data.post.title,
+                changes: formatList(data.changes.map((change) => text.postChanges[change])),
+              }),
+        context: data.post.client,
+      };
+    }
+    case 'post_at_risk': {
+      const { data } = notification;
+      return {
+        text: fill(text.post_at_risk[data.waitingOn], {
+          post: data.post.title,
+          date: formatDue({ dueDate: data.post.publishDate, dueTime: data.post.publishTime }),
+          tasks: formatList(data.tasks.map((task) => `«${task}»`)),
+          since: data.clientSince ? formatCalendarDate(data.clientSince) : '',
+        }),
+        context: data.post.client,
+      };
+    }
+    case 'content_week_check': {
+      const { data } = notification;
+      return {
+        text: fill(text.content_week_check, {
+          from: formatCalendarDate(data.from),
+          to: formatCalendarDate(data.to),
+          clients: formatList(
+            data.clients.map((client) =>
+              fill(text.weekCheckClient, { client: client.name, n: formatNumber(client.issues) }),
+            ),
+          ),
+        }),
+        context: null,
+      };
+    }
+    case 'content_idea_added': {
+      const { data, count } = notification;
+      return {
+        text:
+          count > 1
+            ? counted(text.content_idea_added_merged, count, {})
+            : fill(text.content_idea_added, { actor, idea: data.idea }),
+        context: count > 1 ? null : data.client,
+      };
+    }
+    case 'content_idea_used':
+      return {
+        text: fill(text.content_idea_used, {
+          post: notification.data.post.title,
+          idea: notification.data.idea,
+        }),
+        context: notification.data.post.client,
+      };
     case 'post_task_ready':
       return {
         text: fill(text.post_task_ready, {
@@ -1664,6 +1799,7 @@ type TaskNotification = Exclude<
       | 'kiosk_offline'
       | 'attendance_month_closed'
       | 'profile_changed'
+      | `content_${string}`
       | CalendarNotification['type'];
   }
 >;

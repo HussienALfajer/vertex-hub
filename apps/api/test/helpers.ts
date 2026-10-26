@@ -31,7 +31,12 @@ import {
   clientReportNotes,
   clientReportPdfs,
   clients,
+  contentIdeas,
+  contentOccasionDates,
+  contentOccasions,
+  contentPlanningSettings,
   contentPosts,
+  contentSnippets,
   type Database,
   departmentMembers,
   departments,
@@ -433,6 +438,13 @@ export async function removeUsers(db: Database, ids: string[]): Promise<void> {
         .where(or(inArray(contentPosts.createdById, ids), inArray(contentPosts.responsibleId, ids)))
     ).map((row) => row.id),
   );
+  // F08B: the planning rows they wrote.
+  await removeContentPlanning(db, {
+    ideas: inArray(contentIdeas.createdById, ids),
+    snippets: inArray(contentSnippets.createdById, ids),
+    occasions: inArray(contentOccasions.createdById, ids),
+  });
+  await db.delete(contentOccasionDates).where(inArray(contentOccasionDates.confirmedById, ids));
   // F06B: questions addressed to or answered by them, and the replies and files of those rows.
   const authored = (
     await db
@@ -677,6 +689,13 @@ export async function removeClients(db: Database, ids: string[]): Promise<void> 
         .where(inArray(contentPosts.clientId, ids))
     ).map((row) => row.id),
   );
+  // F08B: the client's planning rows.
+  await removeContentPlanning(db, {
+    ideas: inArray(contentIdeas.clientId, ids),
+    snippets: inArray(contentSnippets.clientId, ids),
+    occasions: inArray(contentOccasions.clientId, ids),
+  });
+  await db.delete(contentPlanningSettings).where(inArray(contentPlanningSettings.clientId, ids));
   await removeInvoices(db, ids);
   await removeQuotes(db, ids);
   const clientProjects = await db
@@ -850,9 +869,60 @@ export async function removePosts(db: Database, ids: string[]): Promise<void> {
   await removePostResponses(db, inArray(postClientResponses.postId, ids));
   await db.delete(postReviews).where(inArray(postReviews.postId, ids));
   await db.delete(postCaptions).where(inArray(postCaptions.postId, ids));
+  await db.delete(contentIdeas).where(inArray(contentIdeas.postId, ids));
   await db.delete(notificationReminders).where(inArray(notificationReminders.subjectId, ids));
   await db.delete(notifications).where(inArray(notifications.subjectId, ids));
   await db.delete(contentPosts).where(inArray(contentPosts.id, ids));
+}
+
+/**
+ * F08B: removes ideas, snippets and occasions matching the filters, with what points at them
+ * (posts lose the occasion, ideas pointing at a removed occasion go) and their audit entries.
+ */
+export async function removeContentPlanning(
+  db: Database,
+  filters: { ideas?: SQL; snippets?: SQL; occasions?: SQL },
+): Promise<void> {
+  const occasions = filters.occasions
+    ? (
+        await db.select({ id: contentOccasions.id }).from(contentOccasions).where(filters.occasions)
+      ).map((row) => row.id)
+    : [];
+  const ideas = (
+    await db
+      .select({ id: contentIdeas.id })
+      .from(contentIdeas)
+      .where(
+        or(
+          filters.ideas,
+          occasions.length > 0 ? inArray(contentIdeas.occasionId, occasions) : undefined,
+        ),
+      )
+  ).map((row) => row.id);
+  if (ideas.length > 0) {
+    await db.delete(auditEntries).where(inArray(auditEntries.entityId, ideas));
+    await db.delete(contentIdeas).where(inArray(contentIdeas.id, ideas));
+  }
+  if (filters.snippets) {
+    const snippets = (
+      await db.select({ id: contentSnippets.id }).from(contentSnippets).where(filters.snippets)
+    ).map((row) => row.id);
+    if (snippets.length > 0) {
+      await db.delete(auditEntries).where(inArray(auditEntries.entityId, snippets));
+      await db.delete(contentSnippets).where(inArray(contentSnippets.id, snippets));
+    }
+  }
+  if (occasions.length > 0) {
+    await db
+      .update(contentPosts)
+      .set({ occasionId: null })
+      .where(inArray(contentPosts.occasionId, occasions));
+    await db
+      .delete(contentOccasionDates)
+      .where(inArray(contentOccasionDates.occasionId, occasions));
+    await db.delete(auditEntries).where(inArray(auditEntries.entityId, occasions));
+    await db.delete(contentOccasions).where(inArray(contentOccasions.id, occasions));
+  }
 }
 
 /** Removes file items with their versions and audit entries; content stays on disk (test cleanup only). */

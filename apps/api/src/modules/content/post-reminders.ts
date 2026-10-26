@@ -3,22 +3,34 @@ import {
   businessDate,
   businessInstant,
   type CalendarDate,
+  contentWeekSubjectId,
   type HolidayRange,
   isWorkDay,
   type NotificationReminderKind,
   nextWorkDay,
+  nthWorkDay,
+  type PostRiskWait,
+  type PostStatus,
   timedReminderWindow,
+  weekOf,
 } from '@vertex-hub/contracts';
-import { contentPosts, type Database } from '@vertex-hub/db';
+import { contentPosts, type Database, type Transaction } from '@vertex-hub/db';
 import { and, asc, between, eq, gte, inArray, isNotNull, lt, type SQL } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { runEach } from '../../core/jobs/index.js';
+import { UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { HolidayCalendar } from '../hr/index.js';
 import { DailyReminders, type Notice, TimedNotifications } from '../notifications/index.js';
-import { ContentService } from './content.service.js';
+import { PostTasks } from '../tasks/index.js';
+import { atRiskUntil, ContentService } from './content.service.js';
+import { ContentPlanner } from './content-planner.js';
 import type { PostAccess } from './post-access.js';
 import { PostNotices, toTimeOfDay } from './post-notices.js';
+import { PostReviews } from './post-reviews.js';
+
+/** F08B `post_at_risk`: open and not approved yet. */
+const NOT_APPROVED: PostStatus[] = ['idea', 'in_production', 'internal_review', 'awaiting_client'];
 
 /**
  * The post reminders of the `notifications.daily` job (spec F08, "Jobs"): the publish day, and a
@@ -37,6 +49,10 @@ export class PostReminders implements OnModuleInit {
     private readonly reminders: DailyReminders,
     private readonly timed: TimedNotifications,
     private readonly holidays: HolidayCalendar,
+    private readonly users: UserDirectory,
+    private readonly tasks: PostTasks,
+    private readonly reviews: PostReviews,
+    private readonly planner: ContentPlanner,
   ) {}
 
   onModuleInit(): void {
@@ -45,12 +61,14 @@ export class PostReminders implements OnModuleInit {
   }
 
   /**
-   * F16 rule B13: `post_publish_shortly` two hours before the publish time of an approved or
-   * scheduled post, once per post and publish time; work days do not apply.
+   * F16 rule B13: `post_publish_shortly` two hours before the publish time of an approved post
+   * not yet scheduled (F08B: a scheduled post needs no hand), once per post and publish time;
+   * work days do not apply.
    */
   async publishShortly(now: Date): Promise<number> {
     const { from, to } = timedReminderWindow('post_publish_shortly', now);
     const filters = [
+      eq(contentPosts.status, 'approved'),
       isNotNull(contentPosts.publishTime),
       between(contentPosts.publishDate, businessDate(from), businessDate(to)),
     ];
@@ -99,6 +117,8 @@ export class PostReminders implements OnModuleInit {
     const kinds: [string, () => Promise<number>][] = [
       ['Publish-today reminders', () => this.publishToday(today, holidays)],
       ['Publish-overdue reminders', () => this.publishOverdue(today)],
+      ['At-risk reminders', () => this.atRisk(today, holidays)],
+      ['Weekly content check', () => this.weekCheck(today, holidays)],
     ];
     await runEach(
       kinds,
@@ -134,10 +154,77 @@ export class PostReminders implements OnModuleInit {
     );
   }
 
-  /** Approved or scheduled posts shown in calendars (not archived) matching `filters`. */
-  private eligible(filters: SQL[]): SQL {
+  /**
+   * F08B: an open post not yet approved whose publish date is within two work days, to its
+   * responsible and the account manager, once per post and publish date, with what it waits on.
+   */
+  private atRisk(today: CalendarDate, holidays: readonly HolidayRange[]): Promise<number> {
+    const filters = [between(contentPosts.publishDate, today, atRiskUntil(today, holidays))];
+    return this.send(
+      today,
+      'post_at_risk',
+      filters,
+      async (post, tx) => {
+        let waitingOn: PostRiskWait = 'production';
+        let taskNames: string[] = [];
+        let clientSince: CalendarDate | null = null;
+        if (post.status === 'internal_review') {
+          waitingOn = post.reviewStage === 'medical' ? 'medical_review' : 'internal_review';
+        } else if (post.status === 'awaiting_client') {
+          waitingOn = 'client';
+          clientSince = businessDate((await this.reviews.clearedPass(tx, post)).createdAt);
+        } else {
+          const open = ((await this.tasks.linked([post.id], tx)).get(post.id) ?? []).filter(
+            (task) => task.status !== 'approved',
+          );
+          if (open.length > 0) {
+            waitingOn = 'tasks';
+            taskNames = open.slice(0, 5).map((task) => task.title);
+          }
+        }
+        return this.notices.notice(
+          post,
+          'post_at_risk',
+          [post.responsibleId, post.client.accountManagerId],
+          null,
+          { waitingOn, tasks: taskNames, clientSince },
+        );
+      },
+      NOT_APPROVED,
+    );
+  }
+
+  /**
+   * F08B rule C10: on the week's first work day (Saturday, or the next work day after a
+   * holiday), one notice to every member of Content Management listing the clients with planning
+   * issues in the next 14 days; once per week.
+   */
+  private async weekCheck(today: CalendarDate, holidays: readonly HolidayRange[]): Promise<number> {
+    if (nthWorkDay(weekOf(today).from, 1, holidays) !== today) return 0;
+    const members = await this.users.activeMembers(['content_management']);
+    const notice = await this.planner.weekCheck(
+      today,
+      members.map((member) => member.id),
+    );
+    if (!notice) return 0;
+    const sent = await this.db.transaction((tx) =>
+      this.reminders.remindOnce(
+        tx,
+        { kind: 'content_week_check', subjectId: contentWeekSubjectId(today), occurrence: today },
+        today,
+        notice,
+      ),
+    );
+    return sent ? 1 : 0;
+  }
+
+  /** Posts shown in calendars (not archived) in `statuses` matching `filters`. */
+  private eligible(
+    filters: SQL[],
+    statuses: readonly PostStatus[] = ['approved', 'scheduled'],
+  ): SQL {
     return and(
-      inArray(contentPosts.status, ['approved', 'scheduled']),
+      inArray(contentPosts.status, [...statuses]),
       this.content.visibleSql(),
       ...filters,
     ) as SQL;
@@ -152,12 +239,13 @@ export class PostReminders implements OnModuleInit {
     today: CalendarDate,
     kind: Extract<NotificationReminderKind, `post_${string}`>,
     filters: SQL[],
-    build: (post: PostAccess) => Notice,
+    build: (post: PostAccess, tx: Transaction) => Notice | Promise<Notice>,
+    statuses?: readonly PostStatus[],
   ): Promise<number> {
     const candidates = await this.db
       .select({ id: contentPosts.id })
       .from(contentPosts)
-      .where(this.eligible(filters))
+      .where(this.eligible(filters, statuses))
       .orderBy(asc(contentPosts.id));
     let sent = 0;
     await runEach(
@@ -169,12 +257,12 @@ export class PostReminders implements OnModuleInit {
           const [row] = await tx
             .select()
             .from(contentPosts)
-            .where(and(eq(contentPosts.id, id), this.eligible(filters)))
+            .where(and(eq(contentPosts.id, id), this.eligible(filters, statuses)))
             .for('update', { of: contentPosts });
           const client = row && (await this.clients.summary(row.clientId, tx));
           if (!row || !client) return false;
           const key = { kind, subjectId: row.id, occurrence: row.publishDate };
-          return this.reminders.remindOnce(tx, key, today, build({ ...row, client }));
+          return this.reminders.remindOnce(tx, key, today, await build({ ...row, client }, tx));
         });
         if (recorded) sent += 1;
       },

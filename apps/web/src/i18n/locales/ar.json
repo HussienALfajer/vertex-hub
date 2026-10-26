@@ -553,7 +553,10 @@
     "QUESTION_CLOSED": "هذا السؤال مُجاب. يعيد السائل فتحه أولًا.",
     "NOT_QUESTION_ASKER": "يعيد السائل وحده فتح سؤاله.",
     "CAPTION_TOO_LONG": "نص إحدى المنصات أطول من حدّها. اختصره قبل الإرسال للمراجعة.",
-    "INVALID_CAPTION_GROUP": "هذا النص لمنصة ليست من منصات المنشور."
+    "INVALID_CAPTION_GROUP": "هذا النص لمنصة ليست من منصات المنشور.",
+    "INVALID_TARGETS": "يجب أن يكون مجموع نسب الأعمدة 100٪.",
+    "IDEA_USED": "صارت هذه الفكرة منشورًا بالفعل. يمكنك حفظ المنشور دون ربطه بها.",
+    "NAME_TAKEN": "هذا الاسم مستخدم. اختر اسمًا آخر."
   },
   "users": {
     "title": "الفريق",
@@ -990,7 +993,12 @@
       "attendance_item": "بند حضور",
       "attendance_punch": "تسجيل حضور",
       "attendance_month": "شهر حضور",
-      "task_stage": "مرحلة مهمة"
+      "task_stage": "مرحلة مهمة",
+      "content_pillar": "عمود محتوى",
+      "content_occasion": "مناسبة",
+      "content_settings": "إعدادات المحتوى",
+      "content_snippet": "مقتطف نصي",
+      "content_idea": "فكرة محتوى"
     },
     "actions": {
       "user": {
@@ -1201,7 +1209,8 @@
         "archived": "أرشف منشورًا",
         "restored": "استعاد منشورًا",
         "layout_changed": "رتّب شرائح منشور",
-        "pack_downloaded": "نزّل حزمة نشر منشور"
+        "pack_downloaded": "نزّل حزمة نشر منشور",
+        "moved": "نقل منشورًا إلى يوم آخر"
       },
       "shoot": {
         "created": "حجز جلسة تصوير",
@@ -1427,6 +1436,36 @@
         "updated": "عدّل مرحلة",
         "archived": "حذف مرحلة",
         "finished": "أنهى مرحلة"
+      },
+      "content_pillar": {
+        "created": "أضاف عمود محتوى",
+        "updated": "عدّل عمود محتوى",
+        "reordered": "غيّر ترتيب عمود محتوى",
+        "archived": "أرشف عمود محتوى",
+        "restored": "استعاد عمود محتوى"
+      },
+      "content_occasion": {
+        "created": "أضاف مناسبة",
+        "updated": "عدّل مناسبة",
+        "archived": "أرشف مناسبة",
+        "restored": "استعاد مناسبة",
+        "date_confirmed": "ثبّت موعد مناسبة",
+        "date_cleared": "أعاد موعد مناسبة إلى المحسوب"
+      },
+      "content_settings": {
+        "updated": "عدّل إعدادات المحتوى"
+      },
+      "content_snippet": {
+        "created": "أضاف مقتطفًا نصيًا",
+        "updated": "عدّل مقتطفًا نصيًا",
+        "archived": "حذف مقتطفًا نصيًا من القوائم"
+      },
+      "content_idea": {
+        "created": "أضاف فكرة",
+        "updated": "عدّل فكرة",
+        "dropped": "استبعد فكرة",
+        "restored": "أعاد فكرة",
+        "used": "حوّل فكرة إلى منشور"
       }
     },
     "fields": {
@@ -1803,7 +1842,20 @@
       "captions": "النصوص",
       "layout": "الشرائح",
       "media": "الوسائط",
-      "groups": "المنصات"
+      "groups": "المنصات",
+      "color": "اللون",
+      "category": "الفئة",
+      "calendar": "التقويم",
+      "day": "اليوم",
+      "date": "التاريخ",
+      "durationDays": "المدة بالأيام",
+      "leadDays": "التنبيه قبل (أيام)",
+      "postingTimes": "أفضل أوقات النشر",
+      "pillarTargets": "نسب الأعمدة",
+      "maxGapDays": "أطول فجوة",
+      "occasionCategories": "فئات المناسبات",
+      "skippedOccasions": "مناسبات دون منشور هذا العام",
+      "xLongPosts": "منشورات إكس الطويلة"
     },
     "checklistKinds": {
       "checklist": "قائمة التحقق",
@@ -5138,7 +5190,8 @@
       "clients_projects": "العملاء والمشاريع",
       "account": "الحساب",
       "announcements": "الإعلانات",
-      "hr": "الموارد البشرية"
+      "hr": "الموارد البشرية",
+      "content": "المحتوى"
     },
     "settings": {
       "title": "إعدادات الإشعارات",
@@ -5306,7 +5359,14 @@
       "task_question_answered": "رد على سؤالي",
       "task_question_reminder": "تذكير بسؤال ينتظر إجابتي",
       "task_question_escalated": "سؤال تأخرت إجابته",
-      "task_question_converted": "تحويل سؤال أو تعليق إلى مهمة فرعية"
+      "task_question_converted": "تحويل سؤال أو تعليق إلى مهمة فرعية",
+      "post_moved": "منشور تغيّر موعده",
+      "post_unassigned": "منشور لم أعد مسؤولًا عنه",
+      "post_changed": "تعديل على محتوى منشور أنا مسؤول عنه أو أتابعه",
+      "post_at_risk": "منشور قريب الموعد ولم يُعتمد",
+      "content_week_check": "فحص تخطيط المحتوى الأسبوعي",
+      "content_idea_added": "فكرة جديدة في بنك الأفكار",
+      "content_idea_used": "فكرتي صارت منشورًا"
     },
     "priorities": {
       "critical": "حرج",

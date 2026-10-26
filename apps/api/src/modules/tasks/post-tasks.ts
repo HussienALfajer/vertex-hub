@@ -2,11 +2,15 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   type CalendarDate,
   type CreatePostTask,
+  type CreateTask,
   createTaskSchema,
   type DepartmentCode,
+  type HolidayRange,
+  isTaskFinished,
   type LinkableTask,
   type LinkableTaskQuery,
   POST_LIMITS,
+  shiftDueDate,
   type TaskStatus,
 } from '@vertex-hub/contracts';
 import { type Database, type Transaction, taskRevisions, tasks } from '@vertex-hub/db';
@@ -18,6 +22,7 @@ import type { CurrentUserInfo } from '../auth/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { clearPostLink } from './post-task-hooks.js';
 import { accessColumns, actorOf } from './task-access.js';
+import { TaskCreation } from './task-creation.js';
 import { TaskNotices } from './task-notices.js';
 import { TaskReviews } from './task-reviews.js';
 import { TasksService } from './tasks.service.js';
@@ -48,6 +53,18 @@ export interface PostTaskDraft extends Pick<CreatePostTask, 'department' | 'cycl
   title: string;
   brief: string | null;
   dueDate: CalendarDate;
+}
+
+/** F08B rule B9: a linked task or one of its subtasks, with the due date a move gives it. */
+export interface ShiftedTask {
+  id: string;
+  title: string;
+  parentId: string | null;
+  assigneeId: string | null;
+  dueDate: CalendarDate;
+  newDueDate: CalendarDate;
+  /** The date would fall before today and became today (edge case 7). */
+  clamped: boolean;
 }
 
 /** Rule 12: sending a linked task back; `response` is the client response that asked for it. */
@@ -89,6 +106,7 @@ export class PostTasks {
     private readonly notices: TaskNotices,
     private readonly reviews: TaskReviews,
     private readonly engagements: EngagementDirectory,
+    private readonly creation: TaskCreation,
   ) {}
 
   /** The tasks linked to each post, by link time. */
@@ -295,6 +313,134 @@ export class PostTasks {
     );
     if (!task) throw new Error(`Task ${id} was not linked to post ${post.id}`);
     return task;
+  }
+
+  /**
+   * F08B rule B2: a task of the wizard with its subtasks, stages and files (F06B's create), on
+   * the post's client and linked to it from the start. Returns whether a preview waits.
+   */
+  async createFull(
+    tx: Transaction,
+    post: PostRef,
+    input: CreateTask,
+    actor: CurrentUserInfo,
+  ): Promise<{ task: LinkedTask; preview: boolean }> {
+    await this.assertRoom(tx, post.id);
+    if (post.cycleLineId && input.cycleLineId) throw countedTwice();
+    const { id, preview } = await this.creation.createIn(
+      tx,
+      actor,
+      { ...input, type: 'work', clientId: post.clientId, needsClientApproval: false },
+      { postId: post.id },
+    );
+    const [task] = (await tx.select(linkedColumns).from(tasks).where(eq(tasks.id, id))).flatMap(
+      toLinked,
+    );
+    if (!task) throw new Error(`Task ${id} was not linked to post ${post.id}`);
+    return { task, preview };
+  }
+
+  /**
+   * F08B rule B9: the due dates a move by `workDays` gives the post's linked tasks that are not
+   * approved, delivered or cancelled, and their open subtasks; a subtask stays not after its
+   * parent. `lock` locks the rows for the shift.
+   */
+  async shiftPlan(
+    executor: Executor,
+    postId: string,
+    workDays: number,
+    today: CalendarDate,
+    holidays: readonly HolidayRange[],
+    lock = false,
+  ): Promise<ShiftedTask[]> {
+    const open = (status: TaskStatus) => !isTaskFinished(status) && status !== 'cancelled';
+    const columns = {
+      id: tasks.id,
+      title: tasks.title,
+      parentId: tasks.parentId,
+      assigneeId: tasks.assigneeId,
+      status: tasks.status,
+      dueDate: tasks.dueDate,
+    };
+    const linkedQuery = executor
+      .select(columns)
+      .from(tasks)
+      .where(and(eq(tasks.postId, postId), this.tasks.visibleSql()))
+      .orderBy(asc(tasks.postLinkedAt), asc(tasks.id));
+    const parents = (lock ? await linkedQuery.for('update') : await linkedQuery).filter((task) =>
+      open(task.status),
+    );
+    if (parents.length === 0) return [];
+    const childQuery = executor
+      .select(columns)
+      .from(tasks)
+      .where(
+        and(
+          inArray(
+            tasks.parentId,
+            parents.map((task) => task.id),
+          ),
+          this.tasks.visibleSql(),
+        ),
+      )
+      .orderBy(asc(tasks.parentId), asc(tasks.position));
+    const children = (lock ? await childQuery.for('update') : await childQuery).filter((task) =>
+      open(task.status),
+    );
+    const plan: ShiftedTask[] = [];
+    for (const parent of parents) {
+      const shifted = shiftDueDate(parent.dueDate, workDays, today, holidays);
+      plan.push({ ...parent, newDueDate: shifted.date, clamped: shifted.clamped });
+      for (const child of children.filter((task) => task.parentId === parent.id)) {
+        const moved = shiftDueDate(child.dueDate, workDays, today, holidays);
+        // F06B: a subtask is due no later than its parent.
+        const newDueDate = moved.date > shifted.date ? shifted.date : moved.date;
+        plan.push({ ...child, newDueDate, clamped: moved.clamped });
+      }
+    }
+    return plan.map(({ id, title, parentId, assigneeId, dueDate, newDueDate, clamped }) => ({
+      id,
+      title,
+      parentId,
+      assigneeId,
+      dueDate,
+      newDueDate,
+      clamped,
+    }));
+  }
+
+  /**
+   * F08B rule B9: moves the due dates of the plan in the move's transaction, done by the system
+   * for the post whatever the mover's task scope; each audited with reason `post_moved`. The due
+   * reminders of each task are voided; its assignee hears of it through the post's `post_moved`.
+   */
+  async shiftDueDates(
+    tx: Transaction,
+    postId: string,
+    workDays: number,
+    actor: AuditActor,
+    today: CalendarDate,
+    holidays: readonly HolidayRange[],
+  ): Promise<ShiftedTask[]> {
+    const plan = await this.shiftPlan(tx, postId, workDays, today, holidays, true);
+    const moved = plan.filter((task) => task.newDueDate !== task.dueDate);
+    const before = await this.notices.loadMany(
+      tx,
+      moved.map((task) => task.id),
+    );
+    for (const task of moved) {
+      await tx.update(tasks).set({ dueDate: task.newDueDate }).where(eq(tasks.id, task.id));
+      await recordAudit(tx, {
+        actor,
+        action: 'task.updated',
+        entityType: 'task',
+        entityId: task.id,
+        before: { dueDate: task.dueDate },
+        after: { dueDate: task.newDueDate, reason: 'post_moved', postId },
+      });
+    }
+    for (const row of before) await this.notices.sendChange(tx, row, actor.id);
+    return moved;
   }
 
   /**

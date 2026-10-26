@@ -348,6 +348,20 @@ export class TaskWorkflowService {
           actor: actorOf(actor),
         });
       }
+      // F08B: a delivered subtask of a linked task tells the post too (`post_task_ready`).
+      if (move === 'approve_subtask' && task.parentId) {
+        const [parent] = await tx
+          .select({ postId: tasks.postId })
+          .from(tasks)
+          .where(eq(tasks.id, task.parentId));
+        if (parent?.postId) {
+          await this.postHooks.approved(tx, {
+            postId: parent.postId,
+            task: { id, title: task.title },
+            actor: actorOf(actor),
+          });
+        }
+      }
       if (move === 'cancel') {
         await unlinkRemovedTask(tx, this.postHooks, task, 'cancelled', actorOf(actor));
       }

@@ -6,14 +6,17 @@ import {
   contentPillarSchema,
 } from './content-planning.js';
 import {
+  addDays,
   businessDate,
   type CalendarDate,
   calendarDateSchema,
   daysInclusive,
   type HolidayRange,
   instantSchema,
+  nthWorkDay,
   timeOfDaySchema,
   workDaysBefore,
+  workDaysBetween,
 } from './dates.js';
 import { type DepartmentCode, departmentCodeSchema } from './departments.js';
 import { clientRefSchema, personSchema } from './images.js';
@@ -301,6 +304,38 @@ export function postTaskDueDate(
 ): CalendarDate {
   const due = workDaysBefore(publishDate, 2, holidays);
   return due < today ? today : due;
+}
+
+/**
+ * F08B rule B9: the work days between the old and the new publish date, negative when the post
+ * moves earlier (Fridays and public holidays do not count, F17 rule B1).
+ */
+export function moveWorkDays(
+  from: CalendarDate,
+  to: CalendarDate,
+  holidays: readonly HolidayRange[] = [],
+): number {
+  if (to >= from) return workDaysBetween(addDays(from, 1), to, holidays).length;
+  return -workDaysBetween(addDays(to, 1), from, holidays).length;
+}
+
+/**
+ * F08B rule B9 and edge case 7: a due date moved by `workDays` work days; a date before today
+ * becomes today (`clamped`).
+ */
+export function shiftDueDate(
+  due: CalendarDate,
+  workDays: number,
+  today: CalendarDate,
+  holidays: readonly HolidayRange[] = [],
+): { date: CalendarDate; clamped: boolean } {
+  const date =
+    workDays > 0
+      ? nthWorkDay(addDays(due, 1), workDays, holidays)
+      : workDays < 0
+        ? workDaysBefore(due, -workDays, holidays)
+        : due;
+  return date < today ? { date: today, clamped: true } : { date, clamped: false };
 }
 
 // Inputs

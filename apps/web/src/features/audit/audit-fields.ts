@@ -60,6 +60,13 @@ const REFERENCE_FIELDS = new Set([
   'fromTaskId',
   // F08B: the approved review a publishing pack was read from.
   'fromReviewId',
+  // F08B: a post's pillar, occasion and idea, the tasks a move shifted, the occasions a client
+  // left out.
+  'pillarId',
+  'occasionId',
+  'ideaId',
+  'shiftedTaskIds',
+  'excludedOccasionIds',
 ]);
 
 /** The fields an entry shows: the changed ones, without links and references to other records. */

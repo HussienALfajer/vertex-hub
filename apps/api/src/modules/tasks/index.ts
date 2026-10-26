@@ -13,6 +13,7 @@ export {
   type PostTaskDraft,
   type PostTaskReturn,
   PostTasks,
+  type ShiftedTask,
 } from './post-tasks.js';
 export {
   type EditingTaskDraft,

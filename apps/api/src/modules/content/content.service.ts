@@ -1,5 +1,12 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
+import {
+  addDays,
   businessDate,
   type CalendarDate,
   type ContentCalendar,
@@ -7,16 +14,23 @@ import {
   type CreatePost,
   captionGroupsOf,
   type DuplicatePost,
+  type ErrorCode,
+  type ErrorResponse,
   type Following,
+  type HolidayRange,
   isPostContentEditable,
   isPostOpen,
   isPostOverdue,
   MEDIA_LAYOUT_LIMIT,
   type MyContentSummary,
+  nthWorkDay,
+  PLANNING_RULES,
   POST_CONTENT_FIELDS,
+  POST_LIMITS,
   POST_STATUSES,
   type Post,
   type PostCaption,
+  type PostChange,
   type PostDetail,
   type PostListQuery,
   type PostPage,
@@ -36,6 +50,7 @@ import {
 import {
   and,
   asc,
+  between,
   count,
   eq,
   gte,
@@ -59,9 +74,15 @@ import {
   UserDirectory,
 } from '../auth/index.js';
 import { ClientDirectory, type ClientSummary, clientRef } from '../clients/index.js';
-import { RecordFollowers } from '../notifications/index.js';
+import { FileAttachments } from '../files/index.js';
+import { HolidayCalendar } from '../hr/index.js';
+import { type Notice, RecordFollowers } from '../notifications/index.js';
 import { EngagementDirectory } from '../projects/index.js';
-import { countedTwice, PostTasks } from '../tasks/index.js';
+import { countedTwice, PostTasks, type ShiftedTask } from '../tasks/index.js';
+import { ContentIdeasService } from './content-ideas.service.js';
+import { ContentOccasionsService } from './content-occasions.service.js';
+import { ContentPlanner } from './content-planner.js';
+import { ContentSettingsService } from './content-settings.service.js';
 import {
   actorOf,
   assertPostWritable,
@@ -107,6 +128,41 @@ const returnedSql = sql`${contentPosts.status} = 'in_production' and coalesce((
       from ${postClientResponses} where ${postClientResponses.postId} = ${contentPosts.id}
   ) event order by event.at desc limit 1), false)`;
 
+/** F08B rule B2: the part of the wizard's save an error belongs to. */
+type Part = { part: 'captions' | 'files' | 'tasks' | 'links'; index: number };
+
+/**
+ * F08B rule B2: a coded error thrown while saving one part of the wizard names that part in its
+ * `details`, so the wizard opens its step; an error that names a part already (a subtask of a new
+ * task) keeps its own details under `cause`.
+ */
+async function inPart<T>(part: Part, save: () => Promise<T>): Promise<T> {
+  try {
+    return await save();
+  } catch (error) {
+    const body = error instanceof HttpException ? (error.getResponse() as ErrorResponse) : null;
+    if (body?.code && error instanceof HttpException) {
+      throw new CodedException(
+        error.getStatus() as ConstructorParameters<typeof CodedException>[0],
+        body.code as ErrorCode,
+        body.message,
+        { ...part, ...(body.details !== undefined && { cause: body.details }) },
+      );
+    }
+    throw error;
+  }
+}
+
+/** Open, not yet approved: what `post_at_risk` and the "At risk" view watch (F08B). */
+const NOT_APPROVED: PostStatus[] = ['idea', 'in_production', 'internal_review', 'awaiting_client'];
+
+/** With the client or past it: the account manager hears of a move (F08B `post_moved`). */
+const WITH_CLIENT: PostStatus[] = ['awaiting_client', 'approved', 'scheduled'];
+
+/** F08B `post_at_risk`: the last publish date the check covers from `today`. */
+export const atRiskUntil = (today: CalendarDate, holidays: readonly HolidayRange[]) =>
+  nthWorkDay(addDays(today, 1), PLANNING_RULES.atRiskWorkDays, holidays);
+
 /** Rule 3 and F08B rule A1: the content changes only in `idea` and `in_production`. */
 const contentLocked = (status: PostStatus) =>
   new CodedException(409, 'POST_LOCKED', `The content does not change on a post in ${status}`);
@@ -134,6 +190,12 @@ export class ContentService {
     private readonly reviewHooks: PostReviewHooks,
     private readonly followers: RecordFollowers,
     private readonly captions: PostCaptions,
+    private readonly attachments: FileAttachments,
+    private readonly settings: ContentSettingsService,
+    private readonly occasions: ContentOccasionsService,
+    private readonly ideas: ContentIdeasService,
+    private readonly planner: ContentPlanner,
+    private readonly holidays: HolidayCalendar,
   ) {}
 
   /** F16 rule B12: whether the actor follows a post they may read. */
@@ -174,12 +236,17 @@ export class ContentService {
       number
     >;
     for (const row of counted) counts[row.status] = row.value;
-    return { from: query.from, to: query.to, posts: await this.present(rows, now), counts };
+    const [posts, overlays] = await Promise.all([
+      this.present(rows, now),
+      this.planner.calendarOverlays(query.from, query.to, query.clientId),
+    ]);
+    return { from: query.from, to: query.to, posts, counts, ...overlays };
   }
 
   async list(actor: CurrentUserInfo, query: PostListQuery): Promise<PostPage> {
     if (query.archived && !holdsAll(actor, 'content.review')) throw new ForbiddenException();
     const now = new Date();
+    const today = businessDate(now);
     const filters: (SQL | undefined)[] = [
       query.archived ? isNotNull(contentPosts.archivedAt) : this.visibleSql(),
       ...this.filters(actor, query),
@@ -187,7 +254,14 @@ export class ContentService {
       query.from ? gte(contentPosts.publishDate, query.from) : undefined,
       query.to ? lte(contentPosts.publishDate, query.to) : undefined,
       query.q ? ilike(contentPosts.title, `%${escapeLike(query.q)}%`) : undefined,
-      query.view ? this.viewSql(actor, query.view, businessDate(now)) : undefined,
+      query.view
+        ? this.viewSql(
+            actor,
+            query.view,
+            today,
+            atRiskUntil(today, await this.holidays.from(today)),
+          )
+        : undefined,
     ];
     const where = and(...filters);
     const [rows, [total]] = await Promise.all([
@@ -211,17 +285,23 @@ export class ContentService {
   /** Counts for the sections of My posts. */
   async summary(actor: CurrentUserInfo): Promise<MyContentSummary> {
     const today = businessDate();
+    const until = atRiskUntil(today, await this.holidays.from(today));
+    const view = (name: NonNullable<PostListQuery['view']>) =>
+      this.viewSql(actor, name, today, until);
     const toReview = this.reviewScopeSql(actor);
     const [row] = await this.db
       .select({
-        publishToday: countWhere(this.viewSql(actor, 'publish_today', today)),
-        overdue: countWhere(this.viewSql(actor, 'overdue', today)),
-        returned: countWhere(this.viewSql(actor, 'returned', today)),
-        toReview: toReview ? countWhere(this.viewSql(actor, 'to_review', today)) : sql<null>`null`,
+        publishToday: countWhere(view('publish_today')),
+        overdue: countWhere(view('overdue')),
+        returned: countWhere(view('returned')),
+        atRisk: countWhere(view('at_risk')),
+        toReview: toReview ? countWhere(view('to_review')) : sql<null>`null`,
       })
       .from(contentPosts)
       .where(this.visibleSql());
-    return row ?? { publishToday: 0, overdue: 0, returned: 0, toReview: toReview ? 0 : null };
+    return (
+      row ?? { publishToday: 0, overdue: 0, returned: 0, atRisk: 0, toReview: toReview ? 0 : null }
+    );
   }
 
   async detail(actor: CurrentUserInfo, id: string): Promise<PostDetail> {
@@ -238,7 +318,7 @@ export class ContentService {
         this.reviewHooks.pending([id], this.db),
       ]);
     if (!item) throw new Error(`Post ${id} was not presented`);
-    const [people, taskLines] = await Promise.all([
+    const [people, taskLines, planning, occasion] = await Promise.all([
       this.users.summaries([
         post.createdById,
         ...(post.publishedById ? [post.publishedById] : []),
@@ -247,6 +327,10 @@ export class ContentService {
       this.engagements.cycleLines(
         content.tasks.flatMap((task) => (task.cycleLineId ? [task.cycleLineId] : [])),
       ),
+      this.settings.planningSettings(post.client),
+      post.occasionId
+        ? this.occasions.refs([post.occasionId]).then((refs) => refs.get(post.occasionId ?? ''))
+        : undefined,
     ]);
     const person = (userId: string) => personRef(people, userId);
     const pendingApproval = pending.get(id) ?? null;
@@ -274,7 +358,8 @@ export class ContentService {
       notes: post.notes,
       needsClientApproval: post.needsClientApproval,
       media: content.media,
-      checks: contentChecks(post, content),
+      checks: contentChecks(post, content, planning),
+      occasion: occasion ?? null,
       linkedTasks: content.tasks.map((task) => {
         const line = task.cycleLineId ? taskLines.get(task.cycleLineId) : undefined;
         return {
@@ -313,8 +398,14 @@ export class ContentService {
     };
   }
 
+  /**
+   * F08 rules 2 and 16, F08B rules B1–B3: the post with its captions, held files and their slide
+   * captions, the links of existing tasks, new tasks with their subtasks and the idea it comes
+   * from, in one transaction; one failing part saves nothing and the error names it. A post with
+   * a linked or new task starts in production.
+   */
   async create(actor: CurrentUserInfo, input: CreatePost): Promise<PostDetail> {
-    const id = await this.db.transaction(async (tx) => {
+    const { id, preview } = await this.db.transaction(async (tx) => {
       // The responsible person is checked under the lock user archiving takes (rule 28).
       await lockAccessChanges(tx);
       const client = await this.activeClient(tx, actor, input.clientId);
@@ -324,6 +415,15 @@ export class ContentService {
       const responsibleId = input.responsibleId ?? actor.id;
       await this.assertResponsible(tx, responsibleId, client);
       if (input.cycleLineId) await this.assertCycleLine(tx, client.id, input.cycleLineId);
+      await this.assertPlanningLinks(tx, client, input);
+      if (input.linkTaskIds.length + input.tasks.length > POST_LIMITS.tasks) {
+        throw new CodedException(
+          409,
+          'LIMIT_REACHED',
+          `A post links at most ${POST_LIMITS.tasks} tasks`,
+        );
+      }
+      const withTasks = input.linkTaskIds.length + input.tasks.length > 0;
       const [post] = await tx
         .insert(contentPosts)
         .values({
@@ -334,31 +434,106 @@ export class ContentService {
           notes: input.notes ?? null,
           publishDate: input.publishDate,
           publishTime: input.publishTime ?? null,
+          status: withTasks ? 'in_production' : 'idea',
           needsClientApproval: input.needsClientApproval,
           responsibleId,
           cycleLineId: input.cycleLineId,
+          pillarId: input.pillarId,
+          occasionId: input.occasionId,
           createdById: actor.id,
         })
         .returning();
       if (!post) throw new Error('Post insert returned no row');
-      const captions = this.captions.changes([], post.platforms, input.captions)?.after ?? [];
-      await this.captions.write(tx, post.id, captions);
-      await this.captions.sync(tx, post.id, post.platforms);
+      const captions = await inPart({ part: 'captions', index: 0 }, async () => {
+        const written = this.captions.changes([], post.platforms, input.captions)?.after ?? [];
+        await this.captions.write(tx, post.id, written);
+        await this.captions.sync(tx, post.id, post.platforms);
+        return written;
+      });
+
+      let preview = false;
+      const names = new Set<string>();
+      const layout: { fileItemId: string; caption: string | null }[] = [];
+      for (const [index, file] of input.files.entries()) {
+        const attached = await inPart({ part: 'files', index }, () =>
+          this.attachments.attachToPost(
+            tx,
+            actor,
+            { postId: post.id, clientId: client.id },
+            [file],
+            names,
+          ),
+        );
+        preview ||= attached.preview;
+        layout.push(
+          ...attached.itemIds.map((fileItemId) => ({ fileItemId, caption: file.slideCaption })),
+        );
+      }
+      if (layout.some((slide) => slide.caption)) {
+        await tx
+          .update(contentPosts)
+          .set({ mediaLayout: layout })
+          .where(eq(contentPosts.id, post.id));
+      }
+
+      const ref = { id: post.id, clientId: client.id, cycleLineId: post.cycleLineId };
+      const taskIds: string[] = [];
+      for (const [index, taskId] of input.linkTaskIds.entries()) {
+        const linked = await inPart({ part: 'links', index }, () =>
+          this.tasks.link(tx, ref, taskId, actorOf(actor)),
+        );
+        taskIds.push(linked.id);
+      }
+      for (const [index, task] of input.tasks.entries()) {
+        const created = await inPart({ part: 'tasks', index }, () =>
+          this.tasks.createFull(
+            tx,
+            ref,
+            { ...task, acceptLeave: task.acceptLeave ?? input.acceptLeave },
+            actor,
+          ),
+        );
+        preview ||= created.preview;
+        taskIds.push(created.task.id);
+      }
+
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'post.created',
         entityType: 'post',
         entityId: post.id,
-        after: { ...this.editable(post), captions: captionLengths(captions) },
+        after: {
+          ...this.editable(post),
+          captions: captionLengths(captions),
+          ...(input.files.length > 0 && { files: input.files.length }),
+          ...(taskIds.length > 0 && { taskIds }),
+          ...(input.ideaId && { ideaId: input.ideaId }),
+        },
       });
+      const noticePost = { ...post, client };
+      if (input.ideaId) await this.ideas.use(tx, actor, input.ideaId, noticePost);
       await this.notices.send(tx, [
-        this.notices.notice({ ...post, client }, 'post_assigned', [responsibleId], actor.id),
+        this.notices.notice(noticePost, 'post_assigned', [responsibleId], actor.id),
       ]);
       // F16 rule B12: the creator and the responsible follow the post.
       await this.notices.follow(tx, post.id, [actor.id, responsibleId]);
-      return post.id;
+      return { id: post.id, preview };
     });
+    if (preview) await this.attachments.queuePreviews();
     return this.detail(actor, id);
+  }
+
+  /** F08B rules C1 and C6: a live pillar, and an occasion that applies to the client. */
+  private async assertPlanningLinks(
+    tx: Transaction,
+    client: ClientSummary,
+    input: { pillarId?: string | null; occasionId?: string | null },
+  ): Promise<void> {
+    if (input.pillarId) await this.settings.assertLivePillar(tx, input.pillarId);
+    if (input.occasionId) {
+      const settings = await this.settings.planningSettings(client, tx);
+      await this.occasions.assertUsable(tx, input.occasionId, { id: client.id, settings });
+    }
   }
 
   /** Rule 3: which fields change in which status. */
@@ -405,7 +580,12 @@ export class ContentService {
       }
       if (!diff) {
         await this.writeCaptions(tx, actor, post, platforms, captions);
-        await this.notices.sendChange(tx, post, actor.id);
+        await this.notices.sendChange(
+          tx,
+          post,
+          actor.id,
+          await this.changedNotices(tx, post, ['captions'], actor.id),
+        );
         return;
       }
       if (
@@ -427,6 +607,9 @@ export class ContentService {
         const linked = (await this.tasks.linked([id], tx)).get(id) ?? [];
         if (linked.some((task) => task.cycleLineId)) throw countedTwice();
       }
+      if (diff.after.pillarId || diff.after.occasionId) {
+        await this.assertPlanningLinks(tx, post.client, diff.after);
+      }
       if (diff.after.publishedAt && new Date(diff.after.publishedAt) > new Date()) {
         throw new CodedException(400, 'INVALID_DATES', 'The publish time is in the future');
       }
@@ -439,38 +622,37 @@ export class ContentService {
       await this.writeCaptions(tx, actor, post, platforms, captions, diff);
       const responsibleId = diff.after.responsibleId;
       if (responsibleId) await this.notices.follow(tx, id, [responsibleId]);
-      // F16 part C: a new responsible or publish time closes what no longer applies; the
-      // previous responsible learns who holds the post now (rule 4).
-      const holder = responsibleId
-        ? (await this.users.summaries([responsibleId], tx)).get(responsibleId)
-        : undefined;
-      await this.notices.sendChange(
-        tx,
-        post,
-        actor.id,
-        responsibleId
-          ? [
-              this.notices.notice(
-                { ...post, ...changes },
-                'post_assigned',
-                [responsibleId],
-                actor.id,
-              ),
-              {
-                type: 'responsibility_moved',
-                recipients: [post.responsibleId],
-                actorId: actor.id,
-                subjectId: id,
-                subjectType: 'post',
-                data: {
-                  role: 'post_responsible',
-                  record: changes.title ?? post.title,
-                  holder: holder?.name ?? '',
-                },
-              },
-            ]
-          : [],
-      );
+      const after = { ...post, ...changes };
+      const notices: Notice[] = [];
+      // F16 part C: a new responsible or publish time closes what no longer applies; F08B: the
+      // previous responsible is told who holds the post now.
+      if (responsibleId) {
+        const holder = (await this.users.summaries([responsibleId], tx)).get(responsibleId);
+        notices.push(
+          this.notices.notice(after, 'post_assigned', [responsibleId], actor.id),
+          this.notices.notice(after, 'post_unassigned', [post.responsibleId], actor.id, {
+            holder: holder?.name ?? '',
+          }),
+        );
+      }
+      // F08B: a new publish date by edit is a move without a shift.
+      if (diff.after.publishDate) {
+        notices.push(
+          await this.movedNotice(
+            tx,
+            after,
+            { date: post.publishDate, time: toTimeOfDay(post.publishTime) },
+            [],
+            actor.id,
+          ),
+        );
+      }
+      const content: PostChange[] = [
+        ...(captions ? (['captions'] as const) : []),
+        ...(['platforms', 'type', 'title'] as const).filter((key) => key in diff.after),
+      ];
+      notices.push(...(await this.changedNotices(tx, after, content, actor.id)));
+      await this.notices.sendChange(tx, post, actor.id, notices);
     });
     return this.detail(actor, id);
   }
@@ -498,6 +680,8 @@ export class ContentService {
           publishDate,
           publishTime: source.publishTime,
           needsClientApproval: source.needsClientApproval,
+          // F08B rule A9: the pillar comes along; the occasion and the idea do not.
+          pillarId: source.pillarId,
           responsibleId: actor.id,
           createdById: actor.id,
         })
@@ -566,7 +750,12 @@ export class ContentService {
         before: layoutAudit(before),
         after: layoutAudit(input.items),
       });
-      await this.notices.sendChange(tx, post, actor.id);
+      await this.notices.sendChange(
+        tx,
+        post,
+        actor.id,
+        await this.changedNotices(tx, post, ['slides'], actor.id),
+      );
     });
     return this.detail(actor, id);
   }
@@ -680,6 +869,7 @@ export class ContentService {
     actor: CurrentUserInfo,
     view: NonNullable<PostListQuery['view']>,
     today: CalendarDate,
+    riskUntil: CalendarDate,
   ): SQL {
     const mine = eq(contentPosts.responsibleId, actor.id);
     const toPublish = inArray(contentPosts.status, TO_PUBLISH);
@@ -695,17 +885,27 @@ export class ContentService {
           eq(contentPosts.reviewStage, 'internal'),
           this.reviewScopeSql(actor) ?? sql`false`,
         ) as SQL;
+      case 'at_risk':
+        return and(
+          mine,
+          inArray(contentPosts.status, NOT_APPROVED),
+          between(contentPosts.publishDate, today, riskUntil),
+        ) as SQL;
     }
   }
 
   /** The filters the calendar and the list share. */
   private filters(
     actor: CurrentUserInfo,
-    query: Pick<PostListQuery, 'clientId' | 'platform' | 'type' | 'responsible' | 'reviewStage'>,
+    query: Pick<
+      PostListQuery,
+      'clientId' | 'pillarId' | 'platform' | 'type' | 'responsible' | 'reviewStage'
+    >,
   ): (SQL | undefined)[] {
     return [
       holdsAll(actor, 'content.read') ? undefined : sql`false`,
       query.clientId ? eq(contentPosts.clientId, query.clientId) : undefined,
+      query.pillarId ? eq(contentPosts.pillarId, query.pillarId) : undefined,
       query.platform ? sql`${query.platform} = any(${contentPosts.platforms})` : undefined,
       query.type ? eq(contentPosts.type, query.type) : undefined,
       query.responsible
@@ -726,10 +926,11 @@ export class ContentService {
 
   /** List items for post rows, with their people, media and linked tasks. */
   async present(rows: PostRow[], now: Date): Promise<Post[]> {
-    const [clients, people, work] = await Promise.all([
+    const [clients, people, work, pillars] = await Promise.all([
       this.clients.summaries(rows.map((row) => row.clientId)),
       this.users.summaries(rows.map((row) => row.responsibleId)),
       this.media.of(rows.map((row) => row.id)),
+      this.settings.pillarsById(rows.flatMap((row) => row.pillarId ?? [])),
     ]);
     return rows.map((row) => ({
       id: row.id,
@@ -751,6 +952,8 @@ export class ContentService {
         work.get(row.id)?.media.find((version) => version.previewStatus === 'ready')?.id ?? null,
       linkedTaskCount: work.get(row.id)?.tasks.length ?? 0,
       overdue: isPostOverdue(row, now),
+      pillar: row.pillarId ? (pillars.get(row.pillarId) ?? null) : null,
+      occasionId: row.occasionId,
     }));
   }
 
@@ -766,6 +969,8 @@ export class ContentService {
       needsClientApproval: post.needsClientApproval,
       responsibleId: post.responsibleId,
       cycleLineId: post.cycleLineId,
+      pillarId: post.pillarId,
+      occasionId: post.occasionId,
       publishedAt: post.publishedAt?.toISOString() ?? null,
       publishedLinks: post.publishedLinks,
     };
@@ -793,6 +998,70 @@ export class ContentService {
       before: { ...diff?.before, ...(captions && { captions: captionLengths(captions.before) }) },
       after: { ...diff?.after, ...(captions && { captions: captionLengths(captions.after) }) },
     });
+  }
+
+  /**
+   * F08B `post_changed`: content changed by someone other than the responsible tells the
+   * responsible and the followers (merged per post and day).
+   */
+  private async changedNotices(
+    tx: Transaction,
+    post: PostAccess,
+    changes: PostChange[],
+    actorId: string,
+  ): Promise<Notice[]> {
+    if (changes.length === 0 || post.responsibleId === actorId) return [];
+    const followers = await this.followers.recipients(
+      tx,
+      { type: 'post', id: post.id },
+      'content.read',
+    );
+    return [
+      this.notices.notice(
+        post,
+        'post_changed',
+        [post.responsibleId, ...followers].filter((id) => id !== actorId),
+        actorId,
+        { changes },
+      ),
+    ];
+  }
+
+  /**
+   * F08B `post_moved`: the responsible, the assignees of the open linked tasks and their open
+   * subtasks, and the account manager once the post is with the client or past it, with the old
+   * date and the tasks the move shifted.
+   */
+  async movedNotice(
+    tx: Transaction,
+    post: PostAccess,
+    previous: { date: CalendarDate; time: string | null },
+    shifted: readonly ShiftedTask[],
+    actorId: string,
+  ): Promise<Notice> {
+    const today = businessDate();
+    const open = await this.tasks.shiftPlan(
+      tx,
+      post.id,
+      0,
+      today,
+      await this.holidays.from(today, tx),
+    );
+    return this.notices.notice(
+      post,
+      'post_moved',
+      [
+        post.responsibleId,
+        ...open.map((task) => task.assigneeId),
+        ...(WITH_CLIENT.includes(post.status) ? [post.client.accountManagerId] : []),
+      ].filter((id) => id !== actorId),
+      actorId,
+      {
+        previousDate: previous.date,
+        previousTime: previous.time,
+        shiftedTasks: shifted.slice(0, 30).map((task) => task.title),
+      },
+    );
   }
 
   /** Rule 2: a non-archived client that is not ended, under the actor's edit scope. */

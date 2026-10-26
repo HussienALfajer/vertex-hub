@@ -6,6 +6,7 @@ import {
   isClientReturn,
   type PostCaption,
   type PostCheck,
+  type PostCheckSettings,
   type PostClientResponse,
   type PostDetail,
   type PostMedia as PostMediaVersion,
@@ -74,18 +75,16 @@ export function snapshotCaptions(
   );
 }
 
-/**
- * F08B rules A3–A4 over what a review looks at. X long posts arrive with the client's content
- * settings (F08B part C); until then X keeps its 280 characters.
- */
+/** F08B rules A3–A4 over what a review looks at, with the client's X long posts setting. */
 export function contentChecks(
   post: Pick<PostRow, 'type' | 'platforms'>,
   content: Pick<PostContent, 'captions' | 'media'>,
+  settings: PostCheckSettings,
 ): PostCheck[] {
   return postChecks(
     { type: post.type, platforms: post.platforms, captions: content.captions },
     content.media,
-    { xLongPosts: false },
+    { xLongPosts: settings.xLongPosts },
   );
 }
 
@@ -93,8 +92,9 @@ export function contentChecks(
 export function assertWithinLimits(
   post: Pick<PostRow, 'type' | 'platforms'>,
   content: Pick<PostContent, 'captions' | 'media'>,
+  settings: PostCheckSettings,
 ): void {
-  const blocking = blockingChecks(contentChecks(post, content));
+  const blocking = blockingChecks(contentChecks(post, content, settings));
   if (blocking.length > 0) {
     throw new CodedException(409, 'CAPTION_TOO_LONG', 'A caption is over its platform limit', {
       checks: blocking,

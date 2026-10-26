@@ -41,15 +41,23 @@ import {
   linkableTaskListSchema,
   linkableTaskQuerySchema,
   type MedicalReview,
+  type MovedPost,
+  type MovePost,
+  type MovePreviewQuery,
   type MyContentSummary,
   medicalReviewSchema,
+  movedPostSchema,
+  movePostSchema,
+  movePreviewQuerySchema,
   myContentSummarySchema,
   type PostDetail,
   type PostListQuery,
+  type PostMovePreview,
   type PostPage,
   type PostStatusChange,
   postDetailSchema,
   postListQuerySchema,
+  postMovePreviewSchema,
   postPageSchema,
   postStatusChangeSchema,
   type ReturnPostTask,
@@ -65,6 +73,7 @@ import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
 import { ContentService } from './content.service.js';
 import { PostLinksService } from './post-links.service.js';
+import { PostMovesService } from './post-moves.service.js';
 import { PostPack } from './post-pack.js';
 import { PostWorkflowService } from './post-workflow.service.js';
 
@@ -76,6 +85,7 @@ export class ContentController {
     private readonly workflow: PostWorkflowService,
     private readonly links: PostLinksService,
     private readonly pack: PostPack,
+    private readonly moves: PostMovesService,
   ) {}
 
   @Get('content/calendar')
@@ -122,10 +132,18 @@ export class ContentController {
   @RequirePermissions('content.manage')
   @SerializeOptions({ schema: postDetailSchema })
   @ApiCreatedResponse({
-    description: 'The new post, an idea (edit scope on the client)',
+    description:
+      'The new post with its captions, files, linked and new tasks, in one save (F08B rule B2): an idea, or in production with tasks (edit scope on the client)',
     standardSchema: postDetailSchema,
   })
-  @ApiConflictResponse({ description: '`CLIENT_ARCHIVED`, `CLIENT_ENDED`, `CYCLE_CLOSED`' })
+  @ApiBadRequestResponse({
+    description:
+      '`INVALID_CAPTION_GROUP`, `UPLOAD_NOT_FOUND`, `FILE_TYPE_BLOCKED`, `INVALID_LINK`, `INVALID_DATES`; `details.part` and `details.index` name the part of the wizard',
+  })
+  @ApiConflictResponse({
+    description:
+      '`CLIENT_ARCHIVED`, `CLIENT_ENDED`, `CYCLE_CLOSED`, `LIMIT_REACHED`, `TASK_ALREADY_LINKED`, `TASK_NOT_LINKABLE`, `POST_COUNTED_BY_TASK`, `ASSIGNEE_ON_LEAVE`, `IDEA_USED`',
+  })
   create(
     @CurrentUser() actor: CurrentUserInfo,
     @Body({ schema: createPostSchema }) input: CreatePost,
@@ -194,6 +212,43 @@ export class ContentController {
     @Body({ schema: updatePostSchema }) input: UpdatePost,
   ): Promise<PostDetail> {
     return this.content.update(actor, id, input);
+  }
+
+  @Get('content/posts/:id/move-preview')
+  @RequirePermissions('content.manage')
+  @SerializeOptions({ schema: postMovePreviewSchema })
+  @ApiOkResponse({
+    description:
+      'What moving the post to the date would shift: the open linked tasks and their open subtasks with their new due dates (F08B rule B7)',
+    standardSchema: postMovePreviewSchema,
+  })
+  @ApiBadRequestResponse({ description: '`INVALID_DATES`: a date in the past' })
+  @ApiConflictResponse({ description: '`POST_LOCKED`, `POST_ARCHIVED`' })
+  movePreview(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query({ schema: movePreviewQuerySchema }) query: MovePreviewQuery,
+  ): Promise<PostMovePreview> {
+    return this.moves.preview(actor, id, query.publishDate);
+  }
+
+  @Post('content/posts/:id/move')
+  @HttpCode(200)
+  @RequirePermissions('content.manage')
+  @SerializeOptions({ schema: movedPostSchema })
+  @ApiOkResponse({
+    description:
+      'The post on its new date, keeping its time, status and line; `shiftTasks` moves the open linked tasks by the same work days (F08B rules B8–B9)',
+    standardSchema: movedPostSchema,
+  })
+  @ApiBadRequestResponse({ description: '`INVALID_DATES`: a date in the past' })
+  @ApiConflictResponse({ description: '`POST_LOCKED` (published, cancelled), `POST_ARCHIVED`' })
+  move(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: movePostSchema }) input: MovePost,
+  ): Promise<MovedPost> {
+    return this.moves.move(actor, id, input);
   }
 
   @Put('content/posts/:id/layout')
