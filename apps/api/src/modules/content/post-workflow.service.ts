@@ -36,7 +36,12 @@ import {
 } from './post-access.js';
 import { PostNotices } from './post-notices.js';
 import { type PostReviewExit, PostReviewHooks } from './post-review-hooks.js';
-import { PostReviews } from './post-reviews.js';
+import {
+  assertWithinLimits,
+  PostReviews,
+  snapshotCaptions,
+  snapshotSlideCaptions,
+} from './post-reviews.js';
 
 /** Client responses (rule 24): recorded against the snapshot, with the contact who answered. */
 const RESPONSE_MOVES: readonly PostMove[] = ['client_approved', 'client_changes'];
@@ -117,9 +122,15 @@ export class PostWorkflowService implements OnModuleInit {
           'The responsible person is archived: name someone else first',
         );
       }
-      if (move === 'submit' && content.versionIds.length === 0 && !post.caption) {
+      if (
+        move === 'submit' &&
+        content.versionIds.length === 0 &&
+        !content.captions.some((caption) => caption.caption || caption.hashtags || caption.title)
+      ) {
         throw new CodedException(409, 'NOTHING_TO_APPROVE', 'Add a caption or media first');
       }
+      // F08B rule A3: the limits block the submission, and an internal pass re-checks them.
+      if (move === 'submit' || PASS_MOVES.includes(move)) assertWithinLimits(post, content);
       // Rule 10: the media of a linked task is its approved work.
       if (move === 'submit') await this.tasks.assertApproved(tx, id);
       if (move === 'schedule' && !post.publishTime) {
@@ -148,7 +159,12 @@ export class PostWorkflowService implements OnModuleInit {
           id,
           'internal',
           reviewer,
-          { ...post, versionIds: content.versionIds },
+          {
+            ...post,
+            versionIds: content.versionIds,
+            captions: content.captions,
+            slideCaptions: content.slideCaptions,
+          },
           note,
         );
         if (!medical) clearedReviewId = reviewId;
@@ -320,7 +336,18 @@ export class PostWorkflowService implements OnModuleInit {
       const note = input.note ?? null;
       if (input.decision === 'approve') {
         const internal = await this.reviews.startingPass(tx, id);
-        const reviewId = await this.reviews.recordPass(tx, id, 'medical', reviewer, internal, note);
+        const reviewId = await this.reviews.recordPass(
+          tx,
+          id,
+          'medical',
+          reviewer,
+          {
+            ...internal,
+            captions: snapshotCaptions(internal),
+            slideCaptions: snapshotSlideCaptions(internal),
+          },
+          note,
+        );
         const to = afterReview(post);
         await tx
           .update(contentPosts)

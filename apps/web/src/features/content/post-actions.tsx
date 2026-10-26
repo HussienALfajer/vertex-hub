@@ -87,6 +87,7 @@ import {
   ApprovalField,
   CaptionFields,
   CycleLineField,
+  firstGroupCaptions,
   NotesField,
   PlatformsField,
   type PostFormMethods,
@@ -747,8 +748,13 @@ function usePostForm(post: PostDetail): PostFormMethods {
       platforms: post.platforms,
       publishDate: post.publishDate,
       publishTime: post.publishTime,
-      caption: post.caption ?? '',
-      hashtags: post.hashtags ?? '',
+      captions: [
+        {
+          group: post.captions[0]?.group ?? 'facebook_instagram',
+          caption: post.captions[0]?.caption ?? '',
+          hashtags: post.captions[0]?.hashtags ?? '',
+        },
+      ],
       notes: post.notes ?? '',
       needsClientApproval: post.needsClientApproval,
       responsibleId: post.responsible.id,
@@ -845,8 +851,7 @@ function ContentForm({ post, onClose }: { post: PostDetail; onClose: () => void 
     const dirty = form.formState.dirtyFields;
     return save({
       ...(dirty.type && { type: values.type }),
-      ...(dirty.caption && { caption: values.caption ?? null }),
-      ...(dirty.hashtags && { hashtags: values.hashtags ?? null }),
+      ...(dirty.captions && { captions: firstGroupCaptions(post.platforms, values.captions) }),
     });
   });
   return (

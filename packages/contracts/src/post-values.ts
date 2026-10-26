@@ -42,3 +42,48 @@ export const POST_STATUSES = [
 export const postStatusSchema = z.enum(POST_STATUSES).meta({ id: 'PostStatus' });
 
 export type PostStatus = z.infer<typeof postStatusSchema>;
+
+/**
+ * Caption groups (spec F08B, ADR 0042): a post has one caption per group of its platforms.
+ * Facebook and Instagram share one; every other platform is its own group.
+ */
+export const CAPTION_GROUPS = [
+  'facebook_instagram',
+  'tiktok',
+  'x',
+  'linkedin',
+  'youtube',
+  'snapchat',
+  'google_business',
+] as const;
+
+export const captionGroupSchema = z.enum(CAPTION_GROUPS).meta({ id: 'CaptionGroup' });
+
+export type CaptionGroup = z.infer<typeof captionGroupSchema>;
+
+export const captionGroupOf = (platform: PostPlatform): CaptionGroup =>
+  platform === 'facebook' || platform === 'instagram' ? 'facebook_instagram' : platform;
+
+/** The groups of a post: those of its platforms, in the order of the platforms. */
+export const captionGroupsOf = (platforms: readonly PostPlatform[]): CaptionGroup[] => [
+  ...new Set(platforms.map(captionGroupOf)),
+];
+
+/** The platforms of a post that fall in a group, in the post's order. */
+export const platformsOfGroup = (
+  platforms: readonly PostPlatform[],
+  group: CaptionGroup,
+): PostPlatform[] => platforms.filter((platform) => captionGroupOf(platform) === group);
+
+/** One caption group's text (F08B rule A1). */
+export const postCaptionSchema = z
+  .object({
+    group: captionGroupSchema,
+    caption: z.string().nullable(),
+    hashtags: z.string().nullable(),
+    /** YouTube only. */
+    title: z.string().nullable(),
+  })
+  .meta({ id: 'PostCaption' });
+
+export type PostCaption = z.infer<typeof postCaptionSchema>;

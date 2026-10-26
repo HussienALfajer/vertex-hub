@@ -551,7 +551,9 @@
     "QUESTION_NOT_FOUND": "هذا السؤال غير موجود في هذه المهمة.",
     "QUESTION_NO_REPLY": "اكتب ردًّا أولًا. يعدّ السائل وحده سؤاله مُجابًا دون رد.",
     "QUESTION_CLOSED": "هذا السؤال مُجاب. يعيد السائل فتحه أولًا.",
-    "NOT_QUESTION_ASKER": "يعيد السائل وحده فتح سؤاله."
+    "NOT_QUESTION_ASKER": "يعيد السائل وحده فتح سؤاله.",
+    "CAPTION_TOO_LONG": "نص إحدى المنصات أطول من حدّها. اختصره قبل الإرسال للمراجعة.",
+    "INVALID_CAPTION_GROUP": "هذا النص لمنصة ليست من منصات المنشور."
   },
   "users": {
     "title": "الفريق",
@@ -1197,7 +1199,9 @@
         "task_returned": "أعاد مهمة مرتبطة بمنشور للتعديل",
         "duplicated": "كرّر منشورًا",
         "archived": "أرشف منشورًا",
-        "restored": "استعاد منشورًا"
+        "restored": "استعاد منشورًا",
+        "layout_changed": "رتّب شرائح منشور",
+        "pack_downloaded": "نزّل حزمة نشر منشور"
       },
       "shoot": {
         "created": "حجز جلسة تصوير",
@@ -1795,7 +1799,11 @@
       "attachments": "المرفقات",
       "briefFields": "حقول الموجز",
       "estimateMinutes": "التقدير بالدقائق",
-      "criteria": "معايير القبول"
+      "criteria": "معايير القبول",
+      "captions": "النصوص",
+      "layout": "الشرائح",
+      "media": "الوسائط",
+      "groups": "المنصات"
     },
     "checklistKinds": {
       "checklist": "قائمة التحقق",
@@ -1864,7 +1872,9 @@
     "invoiceNoun": "فاتورة",
     "quoteNoun": "عرض سعر",
     "numberedCycleOfRetainer": "{{cycle}} من {{retainer}}",
-    "nationalIdChanged": "تغيّر (لا تُسجَّل القيمة)"
+    "nationalIdChanged": "تغيّر (لا تُسجَّل القيمة)",
+    "captionLengths": "{{group}}: {{caption}} حرفًا، والوسوم {{hashtags}}",
+    "slideCaption": "شريحة، نصها {{length}} حرفًا"
   },
   "tasks": {
     "internal": "مهمة داخلية",
@@ -6370,6 +6380,15 @@
       "noContact": "لا جهة اتصال معتمِدة لهذا العميل.",
       "overLimit": "يُرسل أول {{n}} منشورًا بترتيب النشر، والباقي ({{rest}}) في رابط ثانٍ.",
       "loadError": "تعذّر تحميل المنشورات الجاهزة للإرسال"
+    },
+    "captionGroups": {
+      "facebook_instagram": "فيسبوك وإنستغرام",
+      "tiktok": "تيك توك",
+      "x": "إكس",
+      "linkedin": "لينكدإن",
+      "youtube": "يوتيوب",
+      "snapchat": "سناب شات",
+      "google_business": "غوغل للأعمال"
     }
   },
   "calendar": {

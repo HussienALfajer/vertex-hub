@@ -232,6 +232,7 @@ export function toVersion(
     previewStatus: version.previewStatus,
     width: version.width,
     height: version.height,
+    durationMs: version.durationMs,
     url: version.url,
     linkLabel: version.linkLabel,
     note: version.note,

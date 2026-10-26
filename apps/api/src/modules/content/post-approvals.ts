@@ -7,6 +7,7 @@ import {
   firstOfMonth,
   lastOfMonth,
   type PageQuery,
+  type PostCaption,
   type PostPlatform,
   type PostType,
   permissionScopes,
@@ -30,6 +31,7 @@ import { FileVersions } from '../files/index.js';
 import type { ResponseSummary } from '../tasks/index.js';
 import { ContentService } from './content.service.js';
 import { PostNotices, toTimeOfDay } from './post-notices.js';
+import { snapshotCaptions, snapshotSlideCaptions } from './post-reviews.js';
 
 type Executor = Database | Transaction;
 
@@ -55,11 +57,16 @@ export interface SendablePost {
   reviewId: string;
 }
 
-/** What a pass approved: the media in display order and the post as the client is shown it. */
+/** What a pass approved: the media in slide order and the post as the client is shown it. */
 export interface PostSnapshot {
   versionIds: string[];
+  /** Aligned with `versionIds` (F08B rule A7). */
+  slideCaptions: (string | null)[];
+  /** Of the first group. */
   caption: string | null;
   hashtags: string | null;
+  /** Per group of the snapshot's platforms; read as `caption` for every group before F08B. */
+  captions: PostCaption[];
   type: PostType;
   platforms: PostPlatform[];
   publishDate: CalendarDate;
@@ -206,8 +213,10 @@ export class PostApprovals {
       if (!pass.type || !pass.publishDate) continue;
       snapshots.set(pass.id, {
         versionIds: pass.versionIds,
+        slideCaptions: snapshotSlideCaptions(pass),
         caption: pass.caption,
         hashtags: pass.hashtags,
+        captions: snapshotCaptions(pass),
         type: pass.type,
         platforms: pass.platforms,
         publishDate: pass.publishDate,

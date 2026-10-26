@@ -181,6 +181,8 @@ export const fileVersions = pgTable(
     previewStatus: filePreviewStatusEnum('preview_status').notNull().default('none'),
     width: integer('width'),
     height: integer('height'),
+    /** Videos only: the length the browser read at upload (F08B); for the post checks. */
+    durationMs: integer('duration_ms'),
     url: text('url'),
     linkLabel: text('link_label'),
     note: text('note'),
@@ -239,6 +241,8 @@ export const fileUploads = pgTable(
     sha256: text('sha256').notNull(),
     width: integer('width'),
     height: integer('height'),
+    /** Videos only: the length the browser read at upload (F08B); for the post checks. */
+    durationMs: integer('duration_ms'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

@@ -170,6 +170,7 @@ describe('approval links (F09 rules 13–15, 20–23)', () => {
     const body = await opened.text();
     expect(publicApprovalSchema.parse(JSON.parse(body))).toEqual({
       clientName: tradeName,
+      clientImage: false,
       contactName: `جهة اتصال ${cast.run}`,
       accountManagerName: cast.am.name,
       message: 'نرجو الاعتماد قبل الخميس',

@@ -1705,7 +1705,38 @@
     "/api/files/uploads": {
       "post": {
         "operationId": "FileContentController_upload",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "width",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "height",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "durationMs",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400000
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1727,7 +1758,7 @@
         },
         "responses": {
           "201": {
-            "description": "Stored, waiting to be attached for 24 hours",
+            "description": "Stored, waiting to be attached for 24 hours. A video may carry the `width`, `height` and `durationMs` the browser read (F08B), as query parameters",
             "content": {
               "application/json": {
                 "schema": {
@@ -11282,8 +11313,83 @@
               }
             }
           },
+          "400": {
+            "description": "`INVALID_CAPTION_GROUP`"
+          },
           "409": {
             "description": "`POST_LOCKED`, `POST_ARCHIVED`, `INVALID_TRANSITION`, `CYCLE_CLOSED`, `POST_COUNTED_BY_TASK`"
+          }
+        },
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/content/posts/{id}/layout": {
+      "put": {
+        "operationId": "ContentController_setLayout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePostLayout"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The post with its media in the given slide order and slide captions (edit scope, idea and in production)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`INVALID_ORDER`: not every current medium once"
+          },
+          "409": {
+            "description": "`POST_LOCKED`, `POST_ARCHIVED`"
+          }
+        },
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/content/posts/{id}/pack": {
+      "get": {
+        "operationId": "ContentController_downloadPack",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The publishing pack, a zip: the media in slide order, a captions file per caption group and the links (edit scope)"
+          },
+          "409": {
+            "description": "`INVALID_TRANSITION`: not approved, scheduled or published"
           }
         },
         "tags": [
@@ -11326,7 +11432,7 @@
             }
           },
           "409": {
-            "description": "`INVALID_TRANSITION`, `NOTHING_TO_APPROVE`, `POST_TASKS_NOT_READY`, `REVIEW_CONTENT_CHANGED`, `PUBLISH_TIME_REQUIRED`, `POST_ARCHIVED`"
+            "description": "`INVALID_TRANSITION`, `NOTHING_TO_APPROVE`, `POST_TASKS_NOT_READY`, `REVIEW_CONTENT_CHANGED`, `PUBLISH_TIME_REQUIRED`, `POST_ARCHIVED`, `CAPTION_TOO_LONG` (`details.checks`)"
           }
         },
         "tags": [
@@ -17452,6 +17558,49 @@
         ]
       }
     },
+    "/api/public/approvals/{token}/client-image": {
+      "get": {
+        "operationId": "PublicApprovalsController_clientImage",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The client's image at its small size, for the post previews"
+          },
+          "404": {
+            "description": "`APPROVAL_LINK_INVALID`: unknown or revoked link, or its client or contact changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`APPROVAL_LINK_EXPIRED`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
     "/api/public/approvals/{token}/versions/{versionId}/content": {
       "get": {
         "operationId": "PublicApprovalsController_content",
@@ -20485,6 +20634,8 @@
           "post.duplicated",
           "post.archived",
           "post.restored",
+          "post.layout_changed",
+          "post.pack_downloaded",
           "shoot.created",
           "shoot.updated",
           "shoot.shots_changed",
@@ -53588,6 +53739,12 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
+          "durationMs": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "url": {
             "nullable": true,
             "type": "string"
@@ -53654,6 +53811,7 @@
           "previewStatus",
           "width",
           "height",
+          "durationMs",
           "url",
           "linkLabel",
           "note",
@@ -69817,15 +69975,12 @@
             "type": "string",
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
           },
-          "caption": {
-            "nullable": true,
-            "type": "string",
-            "maxLength": 5000
-          },
-          "hashtags": {
-            "nullable": true,
-            "type": "string",
-            "maxLength": 1000
+          "captions": {
+            "maxItems": 7,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostCaptionInput"
+            }
           },
           "notes": {
             "nullable": true,
@@ -69860,6 +70015,44 @@
           "platforms",
           "publishDate",
           "clientId"
+        ]
+      },
+      "PostCaptionInput": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/CaptionGroup"
+          },
+          "caption": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 5000
+          },
+          "hashtags": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 1000
+          },
+          "title": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "group"
+        ]
+      },
+      "CaptionGroup": {
+        "type": "string",
+        "enum": [
+          "facebook_instagram",
+          "tiktok",
+          "x",
+          "linkedin",
+          "youtube",
+          "snapchat",
+          "google_business"
         ]
       },
       "PostDetail": {
@@ -69987,6 +70180,12 @@
             "nullable": true,
             "type": "string"
           },
+          "captions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostCaption"
+            }
+          },
           "notes": {
             "nullable": true,
             "type": "string"
@@ -69998,6 +70197,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PostMedia"
+            }
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostCheck"
             }
           },
           "linkedTasks": {
@@ -70187,9 +70392,11 @@
           "overdue",
           "caption",
           "hashtags",
+          "captions",
           "notes",
           "needsClientApproval",
           "media",
+          "checks",
           "linkedTasks",
           "cycleLine",
           "contentToken",
@@ -70210,6 +70417,33 @@
           "readOnly",
           "permissions",
           "allowedTransitions"
+        ],
+        "additionalProperties": false
+      },
+      "PostCaption": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/CaptionGroup"
+          },
+          "caption": {
+            "nullable": true,
+            "type": "string"
+          },
+          "hashtags": {
+            "nullable": true,
+            "type": "string"
+          },
+          "title": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "caption",
+          "hashtags",
+          "title"
         ],
         "additionalProperties": false
       },
@@ -70261,6 +70495,28 @@
               "title"
             ],
             "additionalProperties": false
+          },
+          "slideCaption": {
+            "nullable": true,
+            "type": "string"
+          },
+          "width": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "height": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "durationMs": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -70271,9 +70527,74 @@
           "kind",
           "type",
           "previewStatus",
-          "task"
+          "task",
+          "slideCaption",
+          "width",
+          "height",
+          "durationMs"
         ],
         "additionalProperties": false
+      },
+      "PostCheck": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/PostCheckCode"
+          },
+          "group": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CaptionGroup"
+              }
+            ]
+          },
+          "platform": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PostPlatform"
+              }
+            ]
+          },
+          "mediaIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "actual": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "blocking": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "blocking"
+        ],
+        "additionalProperties": false
+      },
+      "PostCheckCode": {
+        "type": "string",
+        "enum": [
+          "caption_too_long",
+          "too_many_hashtags",
+          "title_too_long",
+          "caption_empty",
+          "title_missing",
+          "video_missing",
+          "video_too_long",
+          "aspect_ratio",
+          "too_many_slides",
+          "mixed_ratios",
+          "too_many_media"
+        ]
       },
       "PostTask": {
         "type": "object",
@@ -70397,6 +70718,19 @@
             "nullable": true,
             "type": "string"
           },
+          "captions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostCaption"
+            }
+          },
+          "slideCaptions": {
+            "type": "array",
+            "items": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
           "type": {
             "nullable": true,
             "allOf": [
@@ -70437,6 +70771,8 @@
           "versions",
           "caption",
           "hashtags",
+          "captions",
+          "slideCaptions",
           "type",
           "platforms",
           "publishDate",
@@ -70558,6 +70894,9 @@
           },
           "canArchive": {
             "type": "boolean"
+          },
+          "canDownloadPack": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -70567,7 +70906,8 @@
           "canMedicalReview",
           "canSendForApproval",
           "canRecordResponse",
-          "canArchive"
+          "canArchive",
+          "canDownloadPack"
         ],
         "additionalProperties": false,
         "description": "What the caller may do, for the UI"
@@ -70603,15 +70943,12 @@
             "type": "string",
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
           },
-          "caption": {
-            "nullable": true,
-            "type": "string",
-            "maxLength": 5000
-          },
-          "hashtags": {
-            "nullable": true,
-            "type": "string",
-            "maxLength": 1000
+          "captions": {
+            "maxItems": 7,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostCaptionInput"
+            }
           },
           "notes": {
             "nullable": true,
@@ -70645,6 +70982,36 @@
             }
           }
         }
+      },
+      "UpdatePostLayout": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "maxItems": 40,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fileItemId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "caption": {
+                  "nullable": true,
+                  "type": "string",
+                  "maxLength": 300
+                }
+              },
+              "required": [
+                "fileItemId"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
       },
       "PostStatusChange": {
         "type": "object",
@@ -82240,6 +82607,12 @@
                 "nullable": true,
                 "type": "string"
               },
+              "captions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PostCaption"
+                }
+              },
               "id": {
                 "type": "string",
                 "format": "uuid",
@@ -82256,6 +82629,7 @@
               "publishTime",
               "caption",
               "hashtags",
+              "captions",
               "id",
               "title"
             ],
@@ -82816,6 +83190,9 @@
           "clientName": {
             "type": "string"
           },
+          "clientImage": {
+            "type": "boolean"
+          },
           "contactName": {
             "type": "string"
           },
@@ -82840,6 +83217,7 @@
         },
         "required": [
           "clientName",
+          "clientImage",
           "contactName",
           "accountManagerName",
           "message",
@@ -82896,6 +83274,12 @@
               "hashtags": {
                 "nullable": true,
                 "type": "string"
+              },
+              "captions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PostCaption"
+                }
               }
             },
             "required": [
@@ -82904,7 +83288,8 @@
               "publishDate",
               "publishTime",
               "caption",
-              "hashtags"
+              "hashtags",
+              "captions"
             ],
             "additionalProperties": false
           },
@@ -82986,6 +83371,10 @@
           "linkLabel": {
             "nullable": true,
             "type": "string"
+          },
+          "slideCaption": {
+            "nullable": true,
+            "type": "string"
           }
         },
         "required": [
@@ -82997,7 +83386,8 @@
           "display",
           "previewAvailable",
           "linkUrl",
-          "linkLabel"
+          "linkLabel",
+          "slideCaption"
         ],
         "additionalProperties": false
       },

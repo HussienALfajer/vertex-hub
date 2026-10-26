@@ -1,11 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  blockingChecks,
+  captionGroupsOf,
   fileTypeOf,
   isClientReturn,
+  type PostCaption,
+  type PostCheck,
   type PostClientResponse,
   type PostDetail,
   type PostMedia as PostMediaVersion,
   type PostReview,
+  postChecks,
   postContentToken,
   type ReviewStage,
   type ReviewVersion,
@@ -20,6 +25,7 @@ import { ClientDirectory } from '../clients/index.js';
 import { FileVersions } from '../files/index.js';
 import type { LinkedTask } from '../tasks/index.js';
 import type { PostAccess, PostRow } from './post-access.js';
+import { PostCaptions, shownCaptions } from './post-captions.js';
 import { PostMedia } from './post-media.js';
 import { toTimeOfDay } from './post-notices.js';
 
@@ -27,10 +33,16 @@ type Executor = Database | Transaction;
 
 type ReviewRow = typeof postReviews.$inferSelect;
 
-/** What a review looks at (rule 11): the media, the caption and the hashtags. */
+/**
+ * What a review looks at (rule 11, F08B rule A7): the media in slide order with their captions,
+ * and the captions of the post's groups.
+ */
 export interface PostContent {
   media: PostMediaVersion[];
   versionIds: string[];
+  slideCaptions: (string | null)[];
+  /** One per group of the post's platforms. */
+  captions: PostCaption[];
   token: string;
   /** The tasks linked to the post, by link time. */
   tasks: LinkedTask[];
@@ -38,11 +50,61 @@ export interface PostContent {
   hasWork: boolean;
 }
 
-/** What a pass stores: the media in display order and the post as the client is shown it. */
+/** What a pass stores: the media in slide order and the post as the client is shown it. */
 type Snapshot = Pick<
   ReviewRow,
-  'versionIds' | 'caption' | 'hashtags' | 'type' | 'platforms' | 'publishDate' | 'publishTime'
->;
+  'versionIds' | 'type' | 'platforms' | 'publishDate' | 'publishTime'
+> & { captions: PostCaption[]; slideCaptions: (string | null)[] };
+
+/**
+ * F08B rule A7 and edge case 1: a pass's captions per group of its platforms; a pass from before
+ * F08B holds one caption, shown under every group.
+ */
+export function snapshotCaptions(
+  pass: Pick<ReviewRow, 'captions' | 'caption' | 'hashtags' | 'platforms'>,
+): PostCaption[] {
+  return (
+    pass.captions ??
+    captionGroupsOf(pass.platforms).map((group) => ({
+      group,
+      caption: pass.caption,
+      hashtags: pass.hashtags,
+      title: null,
+    }))
+  );
+}
+
+/**
+ * F08B rules A3–A4 over what a review looks at. X long posts arrive with the client's content
+ * settings (F08B part C); until then X keeps its 280 characters.
+ */
+export function contentChecks(
+  post: Pick<PostRow, 'type' | 'platforms'>,
+  content: Pick<PostContent, 'captions' | 'media'>,
+): PostCheck[] {
+  return postChecks(
+    { type: post.type, platforms: post.platforms, captions: content.captions },
+    content.media,
+    { xLongPosts: false },
+  );
+}
+
+/** Rule A3: a submission or an internal pass is refused while a limit is broken. */
+export function assertWithinLimits(
+  post: Pick<PostRow, 'type' | 'platforms'>,
+  content: Pick<PostContent, 'captions' | 'media'>,
+): void {
+  const blocking = blockingChecks(contentChecks(post, content));
+  if (blocking.length > 0) {
+    throw new CodedException(409, 'CAPTION_TOO_LONG', 'A caption is over its platform limit', {
+      checks: blocking,
+    });
+  }
+}
+
+/** A pass's slide captions, aligned with its versions; none before F08B. */
+export const snapshotSlideCaptions = (pass: Pick<ReviewRow, 'slideCaptions' | 'versionIds'>) =>
+  pass.slideCaptions ?? pass.versionIds.map(() => null);
 
 /** The review part of a post's detail. */
 type ReviewDetail = Pick<PostDetail, 'clearedReview' | 'reviewHistory' | 'clientResponses'>;
@@ -59,17 +121,23 @@ export class PostReviews {
     private readonly users: UserDirectory,
     private readonly clients: ClientDirectory,
     private readonly media: PostMedia,
+    private readonly captions: PostCaptions,
   ) {}
 
-  /** Rules 5 and 11: the media of the post now, in display order, with the content token. */
-  async content(
-    executor: Executor,
-    post: Pick<PostRow, 'id' | 'caption' | 'hashtags'>,
-  ): Promise<PostContent> {
-    const work = (await this.media.of([post.id], executor)).get(post.id);
+  /**
+   * Rules 5 and 11, F08B rules A6–A7: the media of the post now, in slide order, the captions of
+   * its groups and the content token.
+   */
+  async content(executor: Executor, post: Pick<PostRow, 'id' | 'platforms'>): Promise<PostContent> {
+    const [work, stored] = await Promise.all([
+      this.media.of([post.id], executor).then((media) => media.get(post.id)),
+      this.captions.of([post.id], executor).then((captions) => captions.get(post.id) ?? []),
+    ]);
     const versions = work?.media ?? [];
     const tasks = work?.tasks ?? [];
     const versionIds = versions.map((version) => version.id);
+    const slideCaptions = versions.map((version) => version.slideCaption);
+    const captions = shownCaptions(stored, post.platforms);
     return {
       tasks,
       hasWork: versions.length > 0 || tasks.length > 0,
@@ -82,9 +150,15 @@ export class PostReviews {
         type: fileTypeOf(version.kind, version.mimeType),
         previewStatus: version.previewStatus,
         task: version.task,
+        slideCaption: version.slideCaption,
+        width: version.width,
+        height: version.height,
+        durationMs: version.durationMs,
       })),
       versionIds,
-      token: postContentToken(versionIds, post.caption, post.hashtags),
+      slideCaptions,
+      captions,
+      token: postContentToken(versionIds, captions, slideCaptions),
     };
   }
 
@@ -106,8 +180,11 @@ export class PostReviews {
         note,
         reviewerId: reviewer.id,
         versionIds: snapshot.versionIds,
-        caption: snapshot.caption,
-        hashtags: snapshot.hashtags,
+        // The first group's text, as the previous release reads a snapshot (ADR 0042).
+        caption: snapshot.captions[0]?.caption ?? null,
+        hashtags: snapshot.captions[0]?.hashtags ?? null,
+        captions: snapshot.captions,
+        slideCaptions: snapshot.slideCaptions,
         type: snapshot.type,
         platforms: snapshot.platforms,
         publishDate: snapshot.publishDate,
@@ -129,7 +206,7 @@ export class PostReviews {
           const version = versions.get(id);
           return version ? [{ name: version.name, number: version.number }] : [];
         }),
-        hasCaption: !!snapshot.caption,
+        hasCaption: snapshot.captions.some((caption) => !!caption.caption),
       },
     });
     return review.id;
@@ -269,6 +346,8 @@ export class PostReviews {
       versions: versionsOf(review.versionIds),
       caption: review.caption,
       hashtags: review.hashtags,
+      captions: review.outcome === 'passed' ? snapshotCaptions(review) : [],
+      slideCaptions: review.outcome === 'passed' ? snapshotSlideCaptions(review) : [],
       type: review.type,
       platforms: review.platforms,
       publishDate: review.publishDate,

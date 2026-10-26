@@ -1,13 +1,19 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Inject, Injectable } from '@nestjs/common';
-import type { FilePreviewStatus, FileVersionKind } from '@vertex-hub/contracts';
+import { type FilePreviewStatus, type FileVersionKind, fileExtension } from '@vertex-hub/contracts';
 import { type Database, fileItems, fileVersions, type Transaction } from '@vertex-hub/db';
 import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
 import { auditRefs } from './file-access.js';
-import { FileContentService, type PreviewSize } from './file-content.service.js';
+import {
+  contentDisposition,
+  FileContentService,
+  type PreviewSize,
+} from './file-content.service.js';
+import { FileStorage } from './file-storage.js';
 import { clearFinal } from './files.service.js';
+import { textEntry, writeZip, type ZipEntry } from './zip-stream.js';
 
 type Executor = Database | Transaction;
 
@@ -28,6 +34,10 @@ export interface SentVersion extends VersionRef {
   previewStatus: FilePreviewStatus;
   url: string | null;
   linkLabel: string | null;
+  /** Measured at upload: images by the api, videos by the browser (F08B). */
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
   /** The version or its file was removed since. */
   removed: boolean;
 }
@@ -43,7 +53,61 @@ export class FileVersions {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly content: FileContentService,
+    private readonly storage: FileStorage,
   ) {}
+
+  /**
+   * F08B rule A11: sends a zip download named `name` of the given upload versions, each named
+   * `baseName` with its own extension, and of text files. Removed versions and links are left
+   * out: the caller lists links in a text file.
+   */
+  async sendArchive(
+    name: string,
+    files: readonly { versionId: string; baseName: string }[],
+    texts: readonly { name: string; text: string }[],
+    response: ServerResponse,
+  ): Promise<void> {
+    const ids = [...new Set(files.map((file) => file.versionId))];
+    const rows = ids.length
+      ? await this.db
+          .select({
+            id: fileVersions.id,
+            storageKey: fileVersions.storageKey,
+            originalName: fileVersions.originalName,
+          })
+          .from(fileVersions)
+          .innerJoin(fileItems, eq(fileItems.id, fileVersions.fileItemId))
+          .where(
+            and(
+              inArray(fileVersions.id, ids),
+              isNull(fileVersions.archivedAt),
+              isNull(fileItems.archivedAt),
+            ),
+          )
+      : [];
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const entries: ZipEntry[] = [];
+    for (const file of files) {
+      const row = byId.get(file.versionId);
+      if (!row?.storageKey) continue;
+      const key = row.storageKey;
+      const size = await this.storage.size(key);
+      if (size === null) continue;
+      const extension = row.originalName ? fileExtension(row.originalName) : null;
+      entries.push({
+        name: extension ? `${file.baseName}.${extension}` : file.baseName,
+        size,
+        read: () => this.storage.read(key),
+      });
+    }
+    entries.push(...texts.map((text) => textEntry(text.name, text.text)));
+    response.statusCode = 200;
+    response.setHeader('Content-Type', 'application/zip');
+    response.setHeader('Content-Disposition', contentDisposition(false, name));
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    await writeZip(entries, response);
+  }
 
   /** Versions by id with what an approval request shows of them, removed or not. */
   async sent(ids: readonly string[]): Promise<Map<string, SentVersion>> {
@@ -61,6 +125,9 @@ export class FileVersions {
         previewStatus: fileVersions.previewStatus,
         url: fileVersions.url,
         linkLabel: fileVersions.linkLabel,
+        width: fileVersions.width,
+        height: fileVersions.height,
+        durationMs: fileVersions.durationMs,
         versionArchivedAt: fileVersions.archivedAt,
         itemArchivedAt: fileItems.archivedAt,
       })
@@ -86,6 +153,18 @@ export class FileVersions {
     response: ServerResponse,
   ): Promise<void> {
     return this.content.sent(versionId, part, request, response);
+  }
+
+  /**
+   * F08B: a client's current image at its small size, for the post previews of the client page;
+   * the caller checked the link.
+   */
+  serveClientImage(
+    imageId: string,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
+    return this.content.image(imageId, 'sm', request, response);
   }
 
   /**
@@ -229,6 +308,9 @@ export class FileVersions {
         previewStatus: fileVersions.previewStatus,
         url: fileVersions.url,
         linkLabel: fileVersions.linkLabel,
+        width: fileVersions.width,
+        height: fileVersions.height,
+        durationMs: fileVersions.durationMs,
       })
       .from(fileVersions)
       .innerJoin(fileItems, eq(fileItems.id, fileVersions.fileItemId))
@@ -271,6 +353,9 @@ export class FileVersions {
         previewStatus: fileVersions.previewStatus,
         url: fileVersions.url,
         linkLabel: fileVersions.linkLabel,
+        width: fileVersions.width,
+        height: fileVersions.height,
+        durationMs: fileVersions.durationMs,
       })
       .from(fileVersions)
       .innerJoin(fileItems, eq(fileItems.id, fileVersions.fileItemId))

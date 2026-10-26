@@ -196,7 +196,7 @@ At most 50 non-archived per client (or agency) and kind.
 State: **open** (no post, not archived), **used** (`post_id`), **dropped** (archived). A used idea is never dropped.
 
 ### Changes to other modules
-- **`files` (F10):** the post owner policy allows 20 items (was 10). `file_uploads` and `file_versions` gain `duration_ms` (integer, optional). For a video, `POST /api/files/uploads` accepts `mediaInfo { width, height, durationMs }` read by the browser, stored on the upload and copied to the version; it is used only for warnings. Image width and height stay those `sharp` reads.
+- **`files` (F10):** the post owner policy allows 20 items (was 10). `file_uploads` and `file_versions` gain `duration_ms` (integer, optional). For a video, `POST /api/files/uploads` accepts the `mediaInfo` the browser read as query parameters (`?width=&height=&durationMs=`; settled in PR 1: the multipart body takes the file only), stored on the upload and copied to the version; it is used only for warnings. Image width and height stay those `sharp` reads.
 - **`tasks` (F06, F06B):** `PostTasks.create` takes F06B's creation payload (brief, estimate, assignee or queue, run mode, stages, subtasks, files) and links the new task in the same transaction; `PostTasks.shiftDueDates(postId, taskIds, workDays, actorId)` moves the due dates of linked tasks and their subtasks (rule B9) with reason `post_moved`.
 - **`notifications` (F16):** the types below; the weekly check is a source of `notifications.daily`.
 
@@ -214,7 +214,7 @@ The F08 post statuses and transitions do not change. F08 rules hold unless chang
 8. **What the client sees** (F08 rule 27 extended): per post item, tabs per caption group (or one text when all groups are the same), each with its preview, the slides in order with their captions, the publish date and time. One decision per post (F08).
 9. **Duplicate** copies the captions per group and the pillar; not the media, slides, occasion or idea.
 10. **Snippets and copy.** In any caption field: "Copy from" another group's caption and hashtags; "Insert" a snippet of the client or the agency (hashtag sets append to the hashtags, caption snippets insert at the cursor).
-11. **Publishing pack.** For an `approved`, `scheduled` or `published` post, edit-scope users copy each platform's caption with its hashtags (and the YouTube title) and download a zip of the media in slide order, named `<client>-<publish date>-<nn>.<ext>`, with a `captions.txt` per group and a `links.txt` for link versions. The pack reads the approved snapshot when there is one (`cleared_review_id`), else the current content.
+11. **Publishing pack.** For an `approved`, `scheduled` or `published` post, edit-scope users copy each platform's caption with its hashtags (and the YouTube title) and download a zip of the media in slide order, named `<client>-<publish date>-<nn>.<ext>`, with a `captions-<group>.txt` per group (the YouTube title, the caption, a blank line, the hashtags) and a `links.txt` for link versions (`<nn> <url>`, numbered with the slides). The pack reads the approved snapshot when there is one (`cleared_review_id`), else the current content.
 
 ### Part B — Creation and the calendar
 1. **The wizard** (`/content/new`, owner, 2026-10-26) has five steps:
@@ -252,7 +252,7 @@ The F08 post statuses and transitions do not change. F08 rules hold unless chang
 - Every state change writes an audit entry in the same transaction (AGENTS.md).
 
 ## API
-Schemas live in `packages/contracts/src/content.ts` (and `post-values.ts` for the lists and limits). The post detail gains `captions[]`, `mediaLayout`, `pillar`, `occasion`, `checks[]`, `permissions.canDownloadPack`; list and calendar items gain `pillar` and `occasionId`.
+Schemas live in `packages/contracts/src/content.ts` (and `post-values.ts` for the lists, `post-checks.ts` for the limits, media rules and `postChecks`). The post detail gains `captions[]`, `pillar`, `occasion`, `checks[]`, `permissions.canDownloadPack`, and its `media` follows the layout, each medium with its `slideCaption`, `width`, `height` and `durationMs` (settled in PR 1: the layout is the order of `media`, not a second list); list and calendar items gain `pillar` and `occasionId`.
 
 ### Posts
 | Method and path | Permission | Request | Response | Error codes |
@@ -294,7 +294,7 @@ Schemas live in `packages/contracts/src/content.ts` (and `post-values.ts` for th
 | `POST /api/content/ideas/:id/drop` · `/restore` | per rule C12 | `{ reason? }` · — | idea | 403, 404, `IDEA_USED` |
 
 ### Changes to other modules
-- **`approvals` (F09):** post items and the public page carry `captions[]` per group (from the snapshot, with the fallback for earlier rows), `slides[]` (version with its caption, in order), and the client's name and logo for the previews (F01C image, served to the link holder at its small size). No route is added.
+- **`approvals` (F09):** post items and the public page carry `captions[]` per group (from the snapshot, with the fallback for earlier rows), each post file its `slideCaption` (the files are the slides, in order), and the client's name and logo for the previews: `clientImage` says whether the client has one, served to the link holder at its small size by `GET /api/public/approvals/:token/client-image` (settled in PR 1: images need a session, so the link needs its own route).
 - **`files` (F10):** `mediaInfo` on uploads; `durationMs` on version responses; the post limit of 20.
 - **`tasks` (F06B):** `PostTasks.create` with the F06B payload, `PostTasks.shiftDueDates`.
 

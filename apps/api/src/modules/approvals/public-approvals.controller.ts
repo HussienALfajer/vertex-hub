@@ -126,6 +126,16 @@ export class PublicApprovalsController {
     });
   }
 
+  @Get('client-image')
+  @ApiOkResponse({ description: "The client's image at its small size, for the post previews" })
+  async clientImage(
+    @Param('token') token: string,
+    @Req() request: IncomingMessage,
+    @Res() response: ServerResponse,
+  ): Promise<void> {
+    await this.approvals.clientImage(token, request, response);
+  }
+
   @Get('versions/:versionId/content')
   @ApiOkResponse({
     description: 'The bytes of a snapshot version; a download only for other types',

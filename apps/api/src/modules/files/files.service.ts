@@ -69,6 +69,7 @@ type SourceValues = Pick<
   | 'sha256'
   | 'width'
   | 'height'
+  | 'durationMs'
   | 'previewStatus'
   | 'url'
   | 'linkLabel'
@@ -610,6 +611,7 @@ export class FilesService {
       sha256: upload.sha256,
       width: upload.width,
       height: upload.height,
+      durationMs: upload.durationMs,
       previewStatus:
         isPreviewableMimeType(upload.mimeType) && upload.sizeBytes <= FILE_PREVIEW_MAX_BYTES
           ? 'pending'

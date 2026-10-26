@@ -1,7 +1,9 @@
 import {
+  CAPTION_GROUPS,
   POST_PLATFORMS,
   POST_STATUSES,
   POST_TYPES,
+  type PostCaption,
   type PublishedLink,
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
@@ -17,6 +19,7 @@ import {
   text,
   time,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { approvalItems } from './approvals.js';
@@ -43,6 +46,14 @@ export const postPlatformEnum = pgEnum('post_platform', POST_PLATFORMS);
 
 export const postStatusEnum = pgEnum('post_status', POST_STATUSES);
 
+export const captionGroupEnum = pgEnum('caption_group', CAPTION_GROUPS);
+
+/** A slide of a post's media layout (F08B rule A6). */
+export interface MediaLayoutEntry {
+  fileItemId: string;
+  caption: string | null;
+}
+
 export const contentPosts = pgTable(
   'content_posts',
   {
@@ -54,8 +65,17 @@ export const contentPosts = pgTable(
     title: text('title').notNull(),
     type: postTypeEnum('type').notNull(),
     platforms: postPlatformEnum('platforms').array().notNull(),
+    /**
+     * The plain extract of the first caption group (F08B): search, notification texts and the
+     * previous release; written from `post_captions`, never edited directly.
+     */
     caption: text('caption'),
     hashtags: text('hashtags'),
+    /**
+     * F08B rule A6: the slide order of the post's media (its files and its linked tasks' finals,
+     * by file item) with each slide's caption; media not listed follow in F08 rule 5's order.
+     */
+    mediaLayout: jsonb('media_layout').$type<MediaLayoutEntry[]>().notNull().default([]),
     /** The internal brief for the team, never shown to the client. */
     notes: text('notes'),
     publishDate: date('publish_date', { mode: 'string' }).notNull(),
@@ -120,6 +140,36 @@ export const contentPosts = pgTable(
 );
 
 /**
+ * A post's caption per caption group (F08B rule A1, ADR 0042). Rows are never deleted: a group
+ * whose platforms leave the post is kept and ignored, and comes back with them.
+ */
+export const postCaptions = pgTable(
+  'post_captions',
+  {
+    id: id(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => contentPosts.id),
+    group: captionGroupEnum('group').notNull(),
+    caption: text('caption'),
+    hashtags: text('hashtags'),
+    /** YouTube only. */
+    title: text('title'),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex('post_captions_post_id_group_idx').on(table.postId, table.group),
+    check(
+      'post_captions_text_check',
+      sql`char_length(${table.caption}) between 1 and 5000
+        and char_length(${table.hashtags}) between 1 and 1000
+        and char_length(${table.title}) between 1 and 100`,
+    ),
+    check('post_captions_title_check', sql`${table.group} = 'youtube' or ${table.title} is null`),
+  ],
+);
+
+/**
  * Every pass and return of a post review (F08 rule 11); append-only. A pass holds the snapshot
  * it approved: the media versions in display order and the post as the client is shown it.
  */
@@ -139,6 +189,13 @@ export const postReviews = pgTable(
     versionIds: uuid('version_ids').array().notNull().default(sql`'{}'::uuid[]`),
     caption: text('caption'),
     hashtags: text('hashtags'),
+    /**
+     * F08B rule A7: passes only, the captions of the snapshot's groups; null on rows written
+     * before F08B, read as `caption` and `hashtags` for every group.
+     */
+    captions: jsonb('captions').$type<PostCaption[]>(),
+    /** F08B rule A7: passes only, aligned with `version_ids`; null on rows before F08B. */
+    slideCaptions: jsonb('slide_captions').$type<(string | null)[]>(),
     type: postTypeEnum('type'),
     platforms: postPlatformEnum('platforms').array().notNull().default(sql`'{}'::post_platform[]`),
     publishDate: date('publish_date', { mode: 'string' }),

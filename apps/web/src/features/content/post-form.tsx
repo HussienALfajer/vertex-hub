@@ -4,6 +4,7 @@ import {
   businessDate,
   type CreatePost,
   type CreatePostInput,
+  captionGroupsOf,
   createPostSchema,
   POST_LIMITS,
   POST_PLATFORMS,
@@ -271,12 +272,28 @@ function CharacterCount({ length, max }: { length: number; max: number }) {
   );
 }
 
-/** The caption and its hashtags: one text for every platform of the post, with their lengths. */
+/**
+ * Until the caption editor per platform (F08B PR 3), the form's one caption is the first caption
+ * group of the post's platforms.
+ */
+export function firstGroupCaptions(
+  platforms: readonly PostPlatform[],
+  captions: CreatePost['captions'],
+): CreatePost['captions'] {
+  const [group] = captionGroupsOf(platforms);
+  const [first] = captions;
+  return group && first ? [{ ...first, group }] : [];
+}
+
+/** The caption and its hashtags of the first caption group, with their lengths. */
 export function CaptionFields({ form }: { form: PostFormMethods }) {
   const { t } = useTranslation();
-  const [caption, hashtags] = useWatch({ control: form.control, name: ['caption', 'hashtags'] });
-  const captionError = form.formState.errors.caption;
-  const hashtagsError = form.formState.errors.hashtags;
+  const [caption, hashtags] = useWatch({
+    control: form.control,
+    name: ['captions.0.caption', 'captions.0.hashtags'],
+  });
+  const captionError = form.formState.errors.captions?.[0]?.caption;
+  const hashtagsError = form.formState.errors.captions?.[0]?.hashtags;
   return (
     <>
       <Field invalid={!!captionError}>
@@ -291,7 +308,7 @@ export function CaptionFields({ form }: { form: PostFormMethods }) {
           rows={5}
           dir="auto"
           placeholder={t('content.form.captionPlaceholder')}
-          {...form.register('caption')}
+          {...form.register('captions.0.caption')}
         />
         <FieldError match={!!captionError}>{t('content.form.errors.caption')}</FieldError>
       </Field>
@@ -307,7 +324,7 @@ export function CaptionFields({ form }: { form: PostFormMethods }) {
           rows={2}
           dir="auto"
           placeholder={t('content.form.hashtagsPlaceholder')}
-          {...form.register('hashtags')}
+          {...form.register('captions.0.hashtags')}
         />
         <FieldError match={!!hashtagsError}>{t('content.form.errors.hashtags')}</FieldError>
       </Field>
@@ -594,8 +611,7 @@ function NewPostForm({ client, defaultDate, onClose }: NewPostProps) {
       // A new post is never in the past (`INVALID_DATES`).
       publishDate: defaultDate && defaultDate > today ? defaultDate : today,
       publishTime: null,
-      caption: '',
-      hashtags: '',
+      captions: [{ group: 'facebook_instagram', caption: '', hashtags: '' }],
       notes: '',
       needsClientApproval: true,
       responsibleId: me.user.id,
@@ -604,7 +620,10 @@ function NewPostForm({ client, defaultDate, onClose }: NewPostProps) {
   const submit = form.handleSubmit(async (values) => {
     setFailure(null);
     try {
-      await create.mutateAsync(values);
+      await create.mutateAsync({
+        ...values,
+        captions: firstGroupCaptions(values.platforms, values.captions),
+      });
       toast.add({ title: t('content.new.created'), type: 'success' });
       onClose();
     } catch (error) {

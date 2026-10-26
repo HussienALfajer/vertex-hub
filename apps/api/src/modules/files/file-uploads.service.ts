@@ -12,6 +12,7 @@ import {
   fileExtension,
   isBlockedFile,
   isPreviewableMimeType,
+  type UploadMediaInfo,
 } from '@vertex-hub/contracts';
 import { type Database, fileUploads } from '@vertex-hub/db';
 import busboy from 'busboy';
@@ -55,6 +56,21 @@ interface Received {
   height: number | null;
 }
 
+/**
+ * F08B: what the browser read of a video, kept for the post checks' warnings only. Images keep
+ * the dimensions read here; other files take nothing.
+ */
+function withMediaInfo(received: Received, info: UploadMediaInfo) {
+  if (!received.mimeType.startsWith('video/')) return { ...received, durationMs: null };
+  const measured = info.width !== undefined && info.height !== undefined;
+  return {
+    ...received,
+    width: measured ? (info.width ?? null) : null,
+    height: measured ? (info.height ?? null) : null,
+    durationMs: info.durationMs ?? null,
+  };
+}
+
 const NO_DIMENSIONS = { width: null, height: null };
 
 /**
@@ -68,7 +84,11 @@ export class FileUploadsService {
     private readonly storage: FileStorage,
   ) {}
 
-  async upload(actor: CurrentUserInfo, request: IncomingMessage): Promise<FileUpload> {
+  async upload(
+    actor: CurrentUserInfo,
+    request: IncomingMessage,
+    mediaInfo: UploadMediaInfo = {},
+  ): Promise<FileUpload> {
     const declared = Number(request.headers['content-length'] ?? 0);
     if (declared > FILE_MAX_BYTES + MULTIPART_OVERHEAD) throw tooLarge();
     if ((await this.storage.freeBytes()) - declared < FILE_MIN_FREE_BYTES) throw storageFull();
@@ -87,7 +107,7 @@ export class FileUploadsService {
       if ((await this.storage.freeBytes()) < FILE_MIN_FREE_BYTES) throw storageFull();
       const [row] = await this.db
         .insert(fileUploads)
-        .values({ userId: actor.id, storageKey: key, ...received })
+        .values({ userId: actor.id, storageKey: key, ...withMediaInfo(received, mediaInfo) })
         .returning({ id: fileUploads.id });
       if (!row) throw new Error('Upload not recorded');
       return {

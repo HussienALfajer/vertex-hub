@@ -5,15 +5,18 @@ import {
   type ContentCalendar,
   type ContentCalendarQuery,
   type CreatePost,
+  captionGroupsOf,
   type DuplicatePost,
   type Following,
   isPostContentEditable,
   isPostOpen,
   isPostOverdue,
+  MEDIA_LAYOUT_LIMIT,
   type MyContentSummary,
   POST_CONTENT_FIELDS,
   POST_STATUSES,
   type Post,
+  type PostCaption,
   type PostDetail,
   type PostListQuery,
   type PostPage,
@@ -21,6 +24,7 @@ import {
   type PublishedLink,
   permissionScopes,
   type UpdatePost,
+  type UpdatePostLayout,
 } from '@vertex-hub/contracts';
 import {
   contentPosts,
@@ -69,10 +73,11 @@ import {
   postRights,
   readablePost,
 } from './post-access.js';
+import { captionLengths, PostCaptions } from './post-captions.js';
 import { PostMedia } from './post-media.js';
 import { PostNotices, toTimeOfDay } from './post-notices.js';
 import { PostReviewHooks } from './post-review-hooks.js';
-import { PostReviews } from './post-reviews.js';
+import { contentChecks, PostReviews } from './post-reviews.js';
 
 type Executor = Database | Transaction;
 
@@ -102,15 +107,17 @@ const returnedSql = sql`${contentPosts.status} = 'in_production' and coalesce((
       from ${postClientResponses} where ${postClientResponses.postId} = ${contentPosts.id}
   ) event order by event.at desc limit 1), false)`;
 
-/** The fields of a post an audit entry names; the caption and hashtags as lengths only. */
-function auditFields(fields: Record<string, unknown>): Record<string, unknown> {
-  const { caption, hashtags, ...rest } = fields;
-  return {
-    ...rest,
-    ...('caption' in fields && { captionLength: (caption as string | null)?.length ?? 0 }),
-    ...('hashtags' in fields && { hashtagsLength: (hashtags as string | null)?.length ?? 0 }),
-  };
-}
+/** Rule 3 and F08B rule A1: the content changes only in `idea` and `in_production`. */
+const contentLocked = (status: PostStatus) =>
+  new CodedException(409, 'POST_LOCKED', `The content does not change on a post in ${status}`);
+
+/** A layout as an audit entry keeps it: the order and the slide caption lengths. */
+const layoutAudit = (items: readonly { fileItemId: string; caption: string | null }[]) => ({
+  layout: items.map((item) => ({
+    fileItemId: item.fileItemId,
+    captionLength: item.caption?.length ?? 0,
+  })),
+});
 
 /** Posts of the content calendar (spec F08): calendar, lists, detail, create, edit, archive. */
 @Injectable()
@@ -126,6 +133,7 @@ export class ContentService {
     private readonly notices: PostNotices,
     private readonly reviewHooks: PostReviewHooks,
     private readonly followers: RecordFollowers,
+    private readonly captions: PostCaptions,
   ) {}
 
   /** F16 rule B12: whether the actor follows a post they may read. */
@@ -262,9 +270,11 @@ export class ContentService {
       },
       caption: post.caption,
       hashtags: post.hashtags,
+      captions: content.captions,
       notes: post.notes,
       needsClientApproval: post.needsClientApproval,
       media: content.media,
+      checks: contentChecks(post, content),
       linkedTasks: content.tasks.map((task) => {
         const line = task.cycleLineId ? taskLines.get(task.cycleLineId) : undefined;
         return {
@@ -321,8 +331,6 @@ export class ContentService {
           title: input.title,
           type: input.type,
           platforms: input.platforms,
-          caption: input.caption ?? null,
-          hashtags: input.hashtags ?? null,
           notes: input.notes ?? null,
           publishDate: input.publishDate,
           publishTime: input.publishTime ?? null,
@@ -333,12 +341,15 @@ export class ContentService {
         })
         .returning();
       if (!post) throw new Error('Post insert returned no row');
+      const captions = this.captions.changes([], post.platforms, input.captions)?.after ?? [];
+      await this.captions.write(tx, post.id, captions);
+      await this.captions.sync(tx, post.id, post.platforms);
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'post.created',
         entityType: 'post',
         entityId: post.id,
-        after: auditFields(this.editable(post)),
+        after: { ...this.editable(post), captions: captionLengths(captions) },
       });
       await this.notices.send(tx, [
         this.notices.notice({ ...post, client }, 'post_assigned', [responsibleId], actor.id),
@@ -357,27 +368,45 @@ export class ContentService {
       const post = await readablePost(tx, this.clients, actor, id, { forUpdate: true });
       if (!postRights(actor, post.client).edit) throw new ForbiddenException();
       assertPostWritable(post);
+      const { captions: captionInputs, ...fields } = input;
       const wanted = {
-        ...input,
-        ...(input.publishedAt && { publishedAt: new Date(input.publishedAt).toISOString() }),
+        ...fields,
+        ...(fields.publishedAt && { publishedAt: new Date(fields.publishedAt).toISOString() }),
       };
       const diff = changedFields(this.editable(post), wanted);
-      if (!diff) return;
-      const changed = Object.keys(diff.after) as (keyof typeof wanted)[];
+      const platforms = diff?.after.platforms ?? post.platforms;
+      const stored = (await this.captions.of([id], tx)).get(id) ?? [];
+      const captions = captionInputs
+        ? this.captions.changes(stored, platforms, captionInputs)
+        : null;
+      if (!diff && !captions) return;
+      const changed = [
+        ...(Object.keys(diff?.after ?? {}) as (keyof typeof wanted)[]),
+        ...(captions ? (['captions'] as const) : []),
+      ];
       const publishing = changed.filter((key) => key === 'publishedAt' || key === 'publishedLinks');
+      // F08B rule A2: a platform of a new caption group is content editing.
+      const oldGroups = captionGroupsOf(post.platforms);
+      const newGroup = captionGroupsOf(platforms).some((group) => !oldGroups.includes(group));
       const locked =
         post.status === 'cancelled' ||
         (post.status === 'published'
           ? publishing.length < changed.length
           : publishing.length > 0 ||
             (!isPostContentEditable(post.status) &&
-              changed.some((key) => (POST_CONTENT_FIELDS as readonly string[]).includes(key))));
+              (newGroup ||
+                changed.some((key) => (POST_CONTENT_FIELDS as readonly string[]).includes(key)))));
       if (locked) {
         throw new CodedException(
           409,
           'POST_LOCKED',
           `These fields do not change on a post in ${post.status}`,
         );
+      }
+      if (!diff) {
+        await this.writeCaptions(tx, actor, post, platforms, captions);
+        await this.notices.sendChange(tx, post, actor.id);
+        return;
       }
       if (
         diff.after.needsClientApproval === false &&
@@ -402,19 +431,12 @@ export class ContentService {
         throw new CodedException(400, 'INVALID_DATES', 'The publish time is in the future');
       }
       if (diff.after.publishedLinks) assertLinksMatch(diff.after.publishedLinks, post.platforms);
-      const { publishedAt, ...fields } = diff.after;
+      const { publishedAt, ...changes } = diff.after;
       await tx
         .update(contentPosts)
-        .set({ ...fields, ...(publishedAt && { publishedAt: new Date(publishedAt) }) })
+        .set({ ...changes, ...(publishedAt && { publishedAt: new Date(publishedAt) }) })
         .where(eq(contentPosts.id, id));
-      await recordAudit(tx, {
-        actor: actorOf(actor),
-        action: 'post.updated',
-        entityType: 'post',
-        entityId: id,
-        before: auditFields(diff.before),
-        after: auditFields(diff.after),
-      });
+      await this.writeCaptions(tx, actor, post, platforms, captions, diff);
       const responsibleId = diff.after.responsibleId;
       if (responsibleId) await this.notices.follow(tx, id, [responsibleId]);
       // F16 part C: a new responsible or publish time closes what no longer applies; the
@@ -429,7 +451,7 @@ export class ContentService {
         responsibleId
           ? [
               this.notices.notice(
-                { ...post, ...fields },
+                { ...post, ...changes },
                 'post_assigned',
                 [responsibleId],
                 actor.id,
@@ -442,7 +464,7 @@ export class ContentService {
                 subjectType: 'post',
                 data: {
                   role: 'post_responsible',
-                  record: fields.title ?? post.title,
+                  record: changes.title ?? post.title,
                   holder: holder?.name ?? '',
                 },
               },
@@ -481,6 +503,8 @@ export class ContentService {
         })
         .returning();
       if (!copy) throw new Error('Post insert returned no row');
+      // F08B rule A9: the captions per group, every stored group included.
+      await this.captions.write(tx, copy.id, (await this.captions.of([id], tx)).get(id) ?? []);
       await recordAudit(tx, {
         actor: actorOf(actor),
         action: 'post.duplicated',
@@ -496,6 +520,79 @@ export class ContentService {
       return copy.id;
     });
     return this.detail(actor, copyId);
+  }
+
+  /**
+   * F08B rule A6: the slide order of every current medium (the first 40 when there are more),
+   * each with its caption; content editing.
+   */
+  async setLayout(
+    actor: CurrentUserInfo,
+    id: string,
+    input: UpdatePostLayout,
+  ): Promise<PostDetail> {
+    await this.db.transaction(async (tx) => {
+      const post = await readablePost(tx, this.clients, actor, id, { forUpdate: true });
+      if (!postRights(actor, post.client).edit) throw new ForbiddenException();
+      assertPostWritable(post);
+      if (!isPostContentEditable(post.status)) throw contentLocked(post.status);
+      const work = (await this.media.of([id], tx)).get(id);
+      const media = [...new Set((work?.media ?? []).map((medium) => medium.fileItemId))];
+      const given = input.items.map((item) => item.fileItemId);
+      if (
+        given.length !== Math.min(media.length, MEDIA_LAYOUT_LIMIT) ||
+        given.some((itemId) => !media.includes(itemId))
+      ) {
+        throw new CodedException(
+          400,
+          'INVALID_ORDER',
+          'The layout lists every medium of the post once',
+        );
+      }
+      const before = (work?.media ?? []).map((medium) => ({
+        fileItemId: medium.fileItemId,
+        caption: medium.slideCaption,
+      }));
+      if (JSON.stringify(before.slice(0, given.length)) === JSON.stringify(input.items)) return;
+      await tx
+        .update(contentPosts)
+        .set({ mediaLayout: input.items })
+        .where(eq(contentPosts.id, id));
+      await recordAudit(tx, {
+        actor: actorOf(actor),
+        action: 'post.layout_changed',
+        entityType: 'post',
+        entityId: id,
+        before: layoutAudit(before),
+        after: layoutAudit(input.items),
+      });
+      await this.notices.sendChange(tx, post, actor.id);
+    });
+    return this.detail(actor, id);
+  }
+
+  /**
+   * F08B edge case 5: once a medium left the post (a task unlinked), its slide and slide caption
+   * leave the layout, audited.
+   */
+  async pruneLayout(tx: Transaction, actor: CurrentUserInfo, post: PostRow): Promise<void> {
+    if (post.mediaLayout.length === 0) return;
+    const media = new Set(
+      ((await this.media.of([post.id], tx)).get(post.id)?.media ?? []).map(
+        (medium) => medium.fileItemId,
+      ),
+    );
+    const kept = post.mediaLayout.filter((entry) => media.has(entry.fileItemId));
+    if (kept.length === post.mediaLayout.length) return;
+    await tx.update(contentPosts).set({ mediaLayout: kept }).where(eq(contentPosts.id, post.id));
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'post.layout_changed',
+      entityType: 'post',
+      entityId: post.id,
+      before: layoutAudit(post.mediaLayout),
+      after: layoutAudit(kept),
+    });
   }
 
   /** Archived = entered by mistake: hidden from calendars and counts, read-only. */
@@ -665,8 +762,6 @@ export class ContentService {
       platforms: post.platforms,
       publishDate: post.publishDate,
       publishTime: toTimeOfDay(post.publishTime),
-      caption: post.caption,
-      hashtags: post.hashtags,
       notes: post.notes,
       needsClientApproval: post.needsClientApproval,
       responsibleId: post.responsibleId,
@@ -674,6 +769,30 @@ export class ContentService {
       publishedAt: post.publishedAt?.toISOString() ?? null,
       publishedLinks: post.publishedLinks,
     };
+  }
+
+  /**
+   * Writes changed captions and the post's caption extract, and the `post.updated` entry with
+   * the changed fields and the captions as lengths per group.
+   */
+  private async writeCaptions(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    post: PostRow,
+    platforms: PostRow['platforms'],
+    captions: { before: PostCaption[]; after: PostCaption[] } | null,
+    diff?: { before: Record<string, unknown>; after: Record<string, unknown> },
+  ): Promise<void> {
+    if (captions) await this.captions.write(tx, post.id, captions.after);
+    if (captions || diff?.after.platforms) await this.captions.sync(tx, post.id, platforms);
+    await recordAudit(tx, {
+      actor: actorOf(actor),
+      action: 'post.updated',
+      entityType: 'post',
+      entityId: post.id,
+      before: { ...diff?.before, ...(captions && { captions: captionLengths(captions.before) }) },
+      after: { ...diff?.after, ...(captions && { captions: captionLengths(captions.after) }) },
+    });
   }
 
   /** Rule 2: a non-archived client that is not ended, under the actor's edit scope. */

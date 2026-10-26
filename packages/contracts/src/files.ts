@@ -314,6 +314,23 @@ export const setFinalSchema = z.object({ final: z.boolean() }).meta({ id: 'SetFi
 
 export type SetFinal = z.infer<typeof setFinalSchema>;
 
+/**
+ * F08B: a video's dimensions and length as the browser read them, sent with the upload as query
+ * parameters; used only for the post checks' warnings. Ignored for other files.
+ */
+export const uploadMediaInfoSchema = z.object({
+  width: z.coerce.number().int().min(1).max(100_000).optional(),
+  height: z.coerce.number().int().min(1).max(100_000).optional(),
+  durationMs: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 3600 * 1000)
+    .optional(),
+});
+
+export type UploadMediaInfo = z.infer<typeof uploadMediaInfoSchema>;
+
 // Responses
 
 export const fileUploadSchema = z
@@ -339,6 +356,8 @@ export const fileVersionSchema = z
     previewStatus: filePreviewStatusSchema,
     width: z.number().int().nullable(),
     height: z.number().int().nullable(),
+    /** Videos only, as the browser read it at upload (F08B). */
+    durationMs: z.number().int().nullable(),
     url: z.string().nullable(),
     linkLabel: z.string().nullable(),
     note: z.string().nullable(),

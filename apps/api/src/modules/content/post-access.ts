@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import {
   allowedPostTransitions,
   hasPermission,
+  hasPostPack,
   isPostContentEditable,
   type Permission,
   type PostPermissions,
@@ -141,6 +142,7 @@ export function postPermissions(
       canSendForApproval: withClient && !sending.waiting,
       canRecordResponse: withClient,
       canArchive: holdsAll(actor, 'content.review'),
+      canDownloadPack: !readOnly && rights.edit && hasPostPack(post.status),
     },
     allowedTransitions: readOnly ? [] : allowedPostTransitions(postState(post, hasWork), rights),
   };

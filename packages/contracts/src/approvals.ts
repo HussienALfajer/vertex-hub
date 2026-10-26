@@ -4,7 +4,7 @@ import { emailSummarySchema } from './email-basics.js';
 import { filePreviewStatusSchema, fileTypeSchema, fileVersionKindSchema } from './files.js';
 import { clientRefSchema, personSchema } from './images.js';
 import { pageQuerySchema, pageSchema, queryListSchema } from './lists.js';
-import { postPlatformSchema, postTypeSchema } from './post-values.js';
+import { postCaptionSchema, postPlatformSchema, postTypeSchema } from './post-values.js';
 import { optionalText } from './text.js';
 
 /*
@@ -197,8 +197,14 @@ const postSnapshotSchema = z.object({
   platforms: z.array(postPlatformSchema),
   publishDate: calendarDateSchema,
   publishTime: timeOfDaySchema.nullable(),
+  /** Of the first caption group. */
   caption: z.string().nullable(),
   hashtags: z.string().nullable(),
+  /**
+   * Per caption group of the snapshot's platforms (F08B rule A8); a snapshot from before F08B
+   * shows its single caption under every group.
+   */
+  captions: z.array(postCaptionSchema),
 });
 
 export const approvalItemSchema = z
@@ -305,6 +311,8 @@ export const publicApprovalFileSchema = z
     previewAvailable: z.boolean(),
     linkUrl: z.string().nullable(),
     linkLabel: z.string().nullable(),
+    /** Post items only: the slide's caption, seen by the client (F08B rule A8). */
+    slideCaption: z.string().nullable(),
   })
   .meta({ id: 'PublicApprovalFile' });
 
@@ -342,6 +350,8 @@ export type PublicApprovalItems = z.infer<typeof publicApprovalItemsSchema>;
 export const publicApprovalSchema = z
   .object({
     clientName: z.string(),
+    /** The client's image exists, served to the link holder for the post previews (F08B). */
+    clientImage: z.boolean(),
     contactName: z.string(),
     accountManagerName: z.string(),
     message: z.string().nullable(),

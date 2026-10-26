@@ -19,9 +19,10 @@ import {
   postTaskDueDate,
   postTaskTitle,
   returnPostTaskSchema,
+  updatePostLayoutSchema,
   updatePostSchema,
 } from './content.js';
-import { POST_PLATFORMS } from './post-values.js';
+import { POST_PLATFORMS, type PostCaption } from './post-values.js';
 
 const CLIENT = '0198f0c2-0000-7000-8000-000000000001';
 
@@ -64,14 +65,58 @@ describe('createPostSchema', () => {
     expect(createPostSchema.safeParse({ ...base, platforms: [] }).success).toBe(false);
     expect(createPostSchema.safeParse({ ...base, platforms: ['website'] }).success).toBe(false);
     expect(createPostSchema.safeParse({ ...base, title: 'x'.repeat(161) }).success).toBe(false);
-    expect(createPostSchema.safeParse({ ...base, caption: 'x'.repeat(5001) }).success).toBe(false);
-    expect(createPostSchema.safeParse({ ...base, hashtags: 'x'.repeat(1001) }).success).toBe(false);
+    const caption = (fields: object) => ({
+      ...base,
+      captions: [{ group: 'facebook_instagram', ...fields }],
+    });
+    expect(createPostSchema.safeParse(caption({ caption: 'x'.repeat(5001) })).success).toBe(false);
+    expect(createPostSchema.safeParse(caption({ hashtags: 'x'.repeat(1001) })).success).toBe(false);
     expect(createPostSchema.safeParse({ ...base, notes: 'x'.repeat(2001) }).success).toBe(false);
     expect(createPostSchema.safeParse({ ...base, publishTime: '25:00' }).success).toBe(false);
   });
 
   it('stores a blank caption as null', () => {
-    expect(createPostSchema.parse({ ...base, caption: '   ' }).caption).toBeNull();
+    const parsed = createPostSchema.parse({
+      ...base,
+      captions: [{ group: 'facebook_instagram', caption: '   ' }],
+    });
+    expect(parsed.captions).toEqual([
+      { group: 'facebook_instagram', caption: null, hashtags: null, title: null },
+    ]);
+  });
+
+  it('takes one caption per group, and a title on YouTube only', () => {
+    expect(createPostSchema.parse(base).captions).toEqual([]);
+    const twice = [{ group: 'x' }, { group: 'x', caption: 'b' }];
+    expect(createPostSchema.safeParse({ ...base, captions: twice }).success).toBe(false);
+    const titled = (group: string) => ({ ...base, captions: [{ group, title: 'A title' }] });
+    expect(createPostSchema.safeParse(titled('youtube')).success).toBe(true);
+    expect(createPostSchema.safeParse(titled('tiktok')).success).toBe(false);
+    expect(
+      createPostSchema.safeParse({
+        ...base,
+        captions: [{ group: 'youtube', title: 'x'.repeat(101) }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('updatePostLayoutSchema', () => {
+  const item = (n: number) => ({
+    fileItemId: `0198f0c2-0000-7000-8000-${String(n).padStart(12, '0')}`,
+  });
+
+  it('takes each medium once, at most 40, with captions up to 300 characters', () => {
+    expect(updatePostLayoutSchema.parse({ items: [{ ...item(1), caption: ' ' }] }).items).toEqual([
+      { ...item(1), caption: null },
+    ]);
+    expect(updatePostLayoutSchema.safeParse({ items: [item(1), item(1)] }).success).toBe(false);
+    const many = Array.from({ length: 41 }, (_, n) => item(n));
+    expect(updatePostLayoutSchema.safeParse({ items: many }).success).toBe(false);
+    expect(
+      updatePostLayoutSchema.safeParse({ items: [{ ...item(1), caption: 'x'.repeat(301) }] })
+        .success,
+    ).toBe(false);
   });
 });
 
@@ -211,16 +256,44 @@ describe('post transitions', () => {
 describe('postContentToken', () => {
   const versions = ['0198f0c2-0000-7000-8000-00000000000a', '0198f0c2-0000-7000-8000-00000000000b'];
 
-  it('changes with the media, the caption and the hashtags', () => {
-    const token = postContentToken(versions, 'Caption', '#tag');
-    expect(postContentToken(versions, 'Caption', '#tag')).toBe(token);
-    expect(postContentToken(versions.slice(0, 1), 'Caption', '#tag')).not.toBe(token);
-    expect(postContentToken(versions, 'Caption 2', '#tag')).not.toBe(token);
-    expect(postContentToken(versions, 'Caption', '#other')).not.toBe(token);
+  const caption = (fields: Partial<PostCaption> = {}): PostCaption => ({
+    group: 'facebook_instagram',
+    caption: 'Caption',
+    hashtags: '#tag',
+    title: null,
+    ...fields,
+  });
+
+  it('changes with the media, their order, the slide captions and every caption', () => {
+    const token = postContentToken(versions, [caption()], [null, null]);
+    expect(postContentToken(versions, [caption()], [null, null])).toBe(token);
+    expect(postContentToken(versions.slice(0, 1), [caption()], [null])).not.toBe(token);
+    expect(postContentToken([...versions].reverse(), [caption()], [null, null])).not.toBe(token);
+    expect(postContentToken(versions, [caption()], ['Slide', null])).not.toBe(token);
+    expect(postContentToken(versions, [caption({ caption: 'Caption 2' })], [null, null])).not.toBe(
+      token,
+    );
+    expect(postContentToken(versions, [caption({ hashtags: '#other' })], [null, null])).not.toBe(
+      token,
+    );
+    const youtube = caption({ group: 'youtube', title: 'Title' });
+    expect(postContentToken(versions, [caption(), youtube], [null, null])).not.toBe(token);
+    expect(
+      postContentToken(versions, [caption(), { ...youtube, title: 'Other' }], [null, null]),
+    ).not.toBe(postContentToken(versions, [caption(), youtube], [null, null]));
+  });
+
+  it('does not depend on the order the groups are given in', () => {
+    const youtube = caption({ group: 'youtube' });
+    expect(postContentToken([], [caption(), youtube], [])).toBe(
+      postContentToken([], [youtube, caption()], []),
+    );
   });
 
   it('tells the caption from the hashtags', () => {
-    expect(postContentToken([], 'a', null)).not.toBe(postContentToken([], null, 'a'));
+    expect(postContentToken([], [caption({ caption: 'a', hashtags: null })], [])).not.toBe(
+      postContentToken([], [caption({ caption: null, hashtags: 'a' })], []),
+    );
   });
 });
 
