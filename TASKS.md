@@ -25,7 +25,7 @@ Spec: `docs/specs/F06B-tasks-2.md` (Approved 2026-10-26) · ADR 0041 (and 0013, 
 - [x] api: one-transaction create (`TaskCreation`); `POST /tasks/readiness` (leave, overload against the F17 schedule through `hr`'s new `WorkCapacity`, Friday/holiday, brief missing, criteria); workload estimated vs capacity; `GET /tasks/tree` with the bottleneck; `TaskTemplates.snapshot` and the `TaskTemplateHooks` registry (the run recorded by `templates`); `POST /templates/from-task/:taskId`, `POST /templates/:id/task-draft`, task-kind editing by the creator; subtask add takes estimate, criteria, brief fields and files; `test/task-creation.test.ts`, `task-templates.test.ts`, `task-tree.test.ts`, `task-views.test.ts` adapted
 - [x] bridge: `openapi:export`, `api:generate`; fixtures (`canSaveTemplate`, `estimateMinutes`, `briefFields`, workload hours, template step fields); the template editor offers no `task` kind until PR 5's editor
 - [x] wiring: audit field labels (`briefFields`, `estimateMinutes`, `criteria`; `fromTaskId` as a reference), template kind labels, `docs/architecture.md`, the spec where PR 3 settled details
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+- [x] checks (full run: only load timeouts, each file passing on its own), reviewer (3 findings fixed), acceptance (owner), PR with auto-merge
 
 ## PR 4 — Task page, lists, board and My tasks (web)
 - [ ] ui: viewer component (image zoom/pan, video, next/previous) on the design-system page; rich-text editor with mentions and attachments (drag, paste)
