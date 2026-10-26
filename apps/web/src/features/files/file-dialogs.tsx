@@ -133,11 +133,14 @@ export function AddFilesDialog({
   allowLink,
   withConfidential,
   confidentialOnly,
+  initialFiles,
   onClose,
   finalFocus,
 }: {
   owner: FileOwnerRef;
   fileRole: FileRole;
+  /** Files dropped or pasted on the page that opened the dialog (F06B rule C3). */
+  initialFiles?: readonly File[];
   title: string;
   description: string;
   withNote?: boolean;
@@ -196,7 +199,13 @@ export function AddFilesDialog({
             </span>
           </label>
         )}
-        <UploadControl onAttach={onAttach} onDone={onDone} multiple allowLink={allowLink} />
+        <UploadControl
+          onAttach={onAttach}
+          onDone={onDone}
+          multiple
+          allowLink={allowLink}
+          initialFiles={initialFiles}
+        />
       </DialogContent>
     </Dialog>
   );

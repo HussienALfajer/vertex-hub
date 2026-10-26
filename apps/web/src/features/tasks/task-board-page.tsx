@@ -30,14 +30,21 @@ import {
   TooltipTrigger,
   toast,
 } from '@vertex-hub/ui';
-import { ArrowLeftIcon, BanIcon, KanbanIcon, MoveIcon, UserRoundIcon } from 'lucide-react';
+import {
+  ArrowLeftIcon,
+  BanIcon,
+  KanbanIcon,
+  ListTreeIcon,
+  MoveIcon,
+  UserRoundIcon,
+} from 'lucide-react';
 import { type DragEvent, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
-import { idParam, listParam } from '../../lib/search-params';
+import { flagParam, idParam, listParam } from '../../lib/search-params';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientListQuery } from '../clients/clients.queries';
@@ -58,8 +65,11 @@ import {
   BlockedBadge,
   formatDue,
   MedicalBadge,
+  OpenQuestionsBadge,
   OverLimitBadge,
   PriorityBadge,
+  SubtaskOfBadge,
+  SubtaskProgress,
   TaskOverdueBadge,
   TaskStatusBadge,
 } from './task-badges';
@@ -72,6 +82,8 @@ export interface TaskBoardSearch {
   /** `me` or a user id. */
   assignee?: string;
   clientId?: string;
+  /** F06B rule A13: hide subtasks. */
+  topLevel?: true;
 }
 
 /** Reads the board filters from the URL, dropping anything malformed. */
@@ -80,6 +92,7 @@ export function parseTaskBoardSearch(search: Record<string, unknown>): TaskBoard
     department: listParam(DEPARTMENT_CODES, search.department),
     assignee: search.assignee === 'me' ? 'me' : idParam(search.assignee),
     clientId: idParam(search.clientId),
+    topLevel: flagParam(search.topLevel),
   };
 }
 
@@ -95,6 +108,7 @@ export function TaskBoardPage({ search }: { search: TaskBoardSearch }) {
     department: search.department,
     assigneeId: search.assignee,
     clientId: search.clientId,
+    topLevel: search.topLevel ? 'true' : undefined,
   };
   const board = useQuery(taskBoardQuery(filters));
   const setFilter = (next: Partial<TaskBoardSearch>) =>
@@ -195,6 +209,17 @@ function BoardFilters({
         value={search.clientId ?? ALL}
         onChange={(value) => onChange({ clientId: value === ALL ? undefined : value })}
       />
+      <div className="md:col-span-4">
+        <Button
+          variant={search.topLevel ? 'secondary' : 'outline'}
+          size="sm"
+          aria-pressed={search.topLevel === true}
+          onClick={() => onChange({ topLevel: search.topLevel ? undefined : true })}
+        >
+          <ListTreeIcon />
+          {t('tasks.filters.hideSubtasks')}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -427,6 +452,11 @@ function BoardCard({
           <span className="truncate text-xs text-muted-foreground">
             {task.client?.name ?? t('tasks.internal')}
           </span>
+          {task.parent && (
+            <span className="mt-1 flex">
+              <SubtaskOfBadge parent={task.parent} />
+            </span>
+          )}
         </div>
         <MoveMenu task={task} onMove={onMove} />
       </div>
@@ -435,6 +465,8 @@ function BoardCard({
         {task.reviewStage === 'medical' && <MedicalBadge />}
         {task.blocked && <BlockedBadge />}
         {task.overLimitPending && <OverLimitBadge />}
+        <OpenQuestionsBadge open={task.openQuestions} />
+        {task.progress && <SubtaskProgress progress={task.progress} />}
       </div>
       <div className="flex items-center justify-between gap-2">
         <span className="flex flex-wrap items-center gap-1.5 text-xs tabular-nums text-muted-foreground">

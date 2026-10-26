@@ -297,6 +297,7 @@ import {
   type MyAttendanceToday,
   type MyClientsDashboard,
   type MyContentSummary,
+  type MyQuestion,
   type MyTaskSummary,
   manualLeadMoveRefusal,
   mentionedUserIds,
@@ -1463,6 +1464,13 @@ interface MockOptions {
   kiosk?: KioskMock;
   /** F01C: photos for Sara, Omar and Layan and a logo for Al Yasmin; none by default. */
   images?: boolean;
+  /**
+   * F06B: the seeded tasks as a parent with subtasks and open questions (`subtaskLinksSeed`), so
+   * lists, the board and My tasks show their badges; none by default.
+   */
+  subtasks?: boolean;
+  /** F06B rule B7: the questions waiting for the signed-in user's answer; none by default. */
+  questions?: MyQuestion[];
 }
 
 /** A P-256 public key as `GET /api/me/push/config` sends it (fake: no private key exists). */
@@ -1601,6 +1609,8 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     requests: [...sent.requests, ...planned.requests],
     outbox,
     leave,
+    links: options.subtasks ? subtaskLinksSeed() : undefined,
+    questions: options.questions ?? [],
     me: () => me,
   });
   const reportsApi = reportRoutes({
@@ -5299,7 +5309,30 @@ interface TaskState {
   outbox?: EmailRecord[];
   /** Approved leaves, for `ASSIGNEE_ON_LEAVE` (F17 rule B17). */
   leave?: LeaveState;
+  /** F06B: parents, progress and open questions of seeded tasks. */
+  links?: SubtaskLinks;
+  /** F06B rule B7: the questions waiting for the signed-in user. */
+  questions?: MyQuestion[];
   me: () => MeResponse;
+}
+
+/** F06B: which seeded tasks are subtasks of which, with the parents' progress and questions. */
+export interface SubtaskLinks {
+  parents: Record<string, string>;
+  progress: Record<string, NonNullable<Task['progress']>>;
+  questions: Record<string, Task['openQuestions']>;
+}
+
+/** The autumn menu as a parent of the dish shoot, with questions on both (F06B). */
+export function subtaskLinksSeed(): SubtaskLinks {
+  return {
+    parents: { [seedIds.dishShoot]: seedIds.autumnMenu },
+    progress: { [seedIds.autumnMenu]: { delivered: 1, total: 3 } },
+    questions: {
+      [seedIds.autumnMenu]: { total: 3, inSubtasks: 1 },
+      [seedIds.dishShoot]: { total: 1, inSubtasks: 0 },
+    },
+  };
 }
 
 const OPEN_TASK: TaskStatus[] = [...OPEN_TASK_STATUSES];
@@ -5319,6 +5352,8 @@ function taskRoutes({
   requests,
   outbox = [],
   leave = { requests: [], ledger: [] },
+  links,
+  questions = [],
   me,
 }: TaskState) {
   const holds = (permission: string, scope: string) =>
@@ -5520,9 +5555,12 @@ function taskRoutes({
       revisions: { clientCount: clientCount(task), limit: task.revisionLimit },
       overLimitPending: task.revisions.some((r) => r.overLimit && r.decision === null),
       postId: task.postId,
-      parent: null,
-      progress: null,
-      openQuestions: { total: 0, inSubtasks: 0 },
+      parent: (() => {
+        const parent = links?.parents[task.id] ? byId(links.parents[task.id] as string) : null;
+        return parent ? { id: parent.id, title: parent.title } : null;
+      })(),
+      progress: links?.progress[task.id] ?? null,
+      openQuestions: links?.questions[task.id] ?? { total: 0, inSubtasks: 0 },
       estimateMinutes: null,
     };
   };
@@ -5598,7 +5636,12 @@ function taskRoutes({
       author: r.authorId ? person(r.authorId) : null,
       createdAt: r.createdAt,
     })),
-    parent: null,
+    parent: links?.parents[task.id]
+      ? (() => {
+          const parent = byId(links.parents[task.id] as string) as TaskRecord;
+          return { id: parent.id, title: parent.title, status: parent.status };
+        })()
+      : null,
     runMode: null,
     stages: [],
     subtasks: [],
@@ -6065,9 +6108,17 @@ function taskRoutes({
           managed().length === 0
             ? null
             : count(open, (t) => t.assigneeId === null && managed().includes(t.department)),
-        questionsWaiting: 0,
+        questionsWaiting: questions.length,
       };
       return json(route, summaryBody);
+    }
+    if (path === '/api/me/questions') {
+      return json(route, {
+        items: questions,
+        total: questions.length,
+        page: 1,
+        pageSize: 50,
+      });
     }
     if (path === '/api/tasks' && method === 'GET') {
       const q = url.searchParams;

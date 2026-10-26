@@ -41,4 +41,5 @@ export * from './components/textarea';
 export * from './components/toast';
 export * from './components/toggle-group';
 export * from './components/tooltip';
+export * from './components/viewer';
 export { cn } from './lib/cn';

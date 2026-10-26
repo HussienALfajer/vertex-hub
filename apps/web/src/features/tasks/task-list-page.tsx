@@ -47,14 +47,17 @@ import {
 import {
   ArchiveIcon,
   CalendarClockIcon,
+  CircleHelpIcon,
   ClipboardCheckIcon,
   FilterXIcon,
   HourglassIcon,
   ListTodoIcon,
+  ListTreeIcon,
   MessageSquareWarningIcon,
   SearchIcon,
   SendIcon,
   StethoscopeIcon,
+  XIcon,
 } from 'lucide-react';
 import { useCallback, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -86,14 +89,17 @@ import {
   formatDue,
   MedicalBadge,
   NotInDepartmentBadge,
+  OpenQuestionsBadge,
   OverLimitBadge,
   PriorityBadge,
+  SubtaskOfBadge,
+  SubtaskProgress,
   TaskArchivedBadge,
   TaskOverdueBadge,
   TaskStatusBadge,
   useEngagementLabel,
 } from './task-badges';
-import { type TaskListFilters, taskListQuery } from './tasks.queries';
+import { type TaskListFilters, taskListQuery, taskQuery } from './tasks.queries';
 
 type TaskSort = (typeof TASK_SORTS)[number];
 
@@ -115,6 +121,12 @@ export interface TaskListSearch {
   overdue?: true;
   blocked?: true;
   overLimit?: true;
+  /** F06B rule A13: hide subtasks. */
+  topLevel?: true;
+  /** F06B rule B7: tasks with open questions. */
+  hasOpenQuestions?: true;
+  /** F06B rule A13: the subtasks of one parent. */
+  parentId?: string;
   createdBy?: 'me';
   reviewer?: 'me';
   /** Tasks in this stage of internal review (F09). */
@@ -153,6 +165,9 @@ export function parseTaskListSearch(search: Record<string, unknown>): TaskListSe
     overdue: flagParam(search.overdue),
     blocked: flagParam(search.blocked),
     overLimit: flagParam(search.overLimit),
+    topLevel: flagParam(search.topLevel),
+    hasOpenQuestions: flagParam(search.hasOpenQuestions),
+    parentId: idParam(search.parentId),
     createdBy: search.createdBy === 'me' ? 'me' : undefined,
     reviewer: search.reviewer === 'me' ? 'me' : undefined,
     reviewStage: oneOfParam(REVIEW_STAGES, search.reviewStage),
@@ -186,6 +201,9 @@ function filtersOf(search: TaskListSearch, archived: boolean): TaskListFilters {
     overdue: flag(search.overdue),
     blocked: flag(search.blocked),
     overLimit: flag(search.overLimit),
+    topLevel: flag(search.topLevel),
+    hasOpenQuestions: flag(search.hasOpenQuestions),
+    parentId: search.parentId,
     createdBy: search.createdBy,
     reviewer: search.reviewer,
     reviewStage: search.reviewStage,
@@ -382,6 +400,12 @@ function Filters({
     { key: 'overdue', icon: CalendarClockIcon, label: t('tasks.filters.overdue') },
     { key: 'blocked', icon: HourglassIcon, label: t('tasks.filters.blocked') },
     { key: 'overLimit', icon: MessageSquareWarningIcon, label: t('tasks.filters.overLimit') },
+    {
+      key: 'hasOpenQuestions',
+      icon: CircleHelpIcon,
+      label: t('tasks.filters.openQuestions'),
+    },
+    { key: 'topLevel', icon: ListTreeIcon, label: t('tasks.filters.hideSubtasks') },
   ] as const;
 
   return (
@@ -530,6 +554,12 @@ function Filters({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {search.parentId && (
+          <ParentFilter
+            parentId={search.parentId}
+            onClear={() => onChange({ parentId: undefined })}
+          />
+        )}
         {toggles.map(({ key, icon: Icon, label }) => (
           <Button
             key={key}
@@ -605,6 +635,20 @@ function Filters({
         )}
       </div>
     </div>
+  );
+}
+
+/** F06B rule A13: the list shows one parent's subtasks; the chip names it and clears it. */
+function ParentFilter({ parentId, onClear }: { parentId: string; onClear: () => void }) {
+  const { t } = useTranslation();
+  const parent = useQuery(taskQuery(parentId));
+  const title = parent.data?.title ?? '…';
+  return (
+    <Button variant="secondary" size="sm" aria-pressed onClick={onClear}>
+      <ListTreeIcon />
+      {t('tasks.filters.parent', { title })}
+      <XIcon />
+    </Button>
   );
 }
 
@@ -695,6 +739,11 @@ function TasksTable({
                       {t('tasks.types.client_request')}
                     </Badge>
                   )}
+                  {task.parent && (
+                    <span className="mt-1 flex">
+                      <SubtaskOfBadge parent={task.parent} />
+                    </span>
+                  )}
                 </span>
               </TableCell>
               <TableCell>
@@ -721,6 +770,7 @@ function TasksTable({
                   {task.reviewStage === 'medical' && <MedicalBadge />}
                   {task.blocked && <BlockedBadge />}
                   {task.overLimitPending && <OverLimitBadge />}
+                  <OpenQuestionsBadge open={task.openQuestions} />
                   {archived && <TaskArchivedBadge />}
                 </span>
               </TableCell>
@@ -735,6 +785,7 @@ function TasksTable({
               </TableCell>
               <TableCell>
                 <span className="flex flex-col items-start gap-1">
+                  {task.progress && <SubtaskProgress progress={task.progress} />}
                   <ChecklistCount checklist={task.checklist} />
                   {task.revisions.clientCount > 0 && (
                     <span className="text-xs text-muted-foreground">
