@@ -44,6 +44,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0038](0038-announcements-and-audiences.md) | Announcements and one audience resolver | Accepted |
 | [0039](0039-hr-attendance-proof-and-leave-ledger.md) | HR: one module, attendance proved by a rotating code, a passkey and the office network, leave as a ledger | Accepted |
 | [0040](0040-profile-images.md) | Profile images: one current image per record, cropped in the browser, served by immutable id | Accepted |
+| [0041](0041-subtasks-and-task-questions.md) | Subtasks as tasks under a parent, run modes through dependencies, questions in the task thread | Accepted |
 
 Template:
 
