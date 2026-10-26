@@ -34,6 +34,7 @@ import type {
 } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
+import { warningsOnDraft } from './task-wizard-draft';
 
 /** The list endpoint's query string as the API reads it: flags are `'true'` or `'false'`. */
 export type TaskListFilters = NonNullable<paths['/api/tasks']['get']['parameters']['query']>;
@@ -147,11 +148,23 @@ export const taskTreeQuery = (filters: TaskTreeFilters) =>
     queryFn: () => call(api.GET('/api/tasks/tree', { params: { query: filters } })),
   });
 
-/** F06B rule C5: the readiness warnings of a draft (none until it has one); they never block. */
-export const taskReadinessQuery = (input: TaskReadinessInput | null) =>
+/**
+ * F06B rule C5: the readiness warnings of a draft (none until it has one); they never block. Each
+ * warning names its subtask by its place in the draft (`warningsOnDraft`), so the last answer
+ * shown while the next one loads still points at the right subtasks.
+ */
+export const taskReadinessQuery = (
+  check: { input: TaskReadinessInput; subtaskIndexes: number[] } | null,
+) =>
   queryOptions({
-    queryKey: ['tasks', 'readiness', input] as const,
-    queryFn: input ? () => call(api.POST('/api/tasks/readiness', { body: input })) : skipToken,
+    queryKey: ['tasks', 'readiness', check] as const,
+    queryFn: check
+      ? async () => {
+          const answer = await call(api.POST('/api/tasks/readiness', { body: check.input }));
+          return { warnings: warningsOnDraft(answer.warnings, check.subtaskIndexes) };
+        }
+      : skipToken,
+    placeholderData: keepPreviousData,
     retry: false,
   });
 

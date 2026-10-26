@@ -98,7 +98,6 @@ import {
   type WizardMode,
   type WizardStep,
   type WizardValues,
-  warningsOnDraft,
 } from './task-wizard-draft';
 import {
   FilesStep,
@@ -251,11 +250,8 @@ export function NewTaskPage({ search }: { search: NewTaskSearch }) {
 
   // Rule C5: the warnings of the draft, shown in the preview and on Review; they never block.
   const readiness = useDebouncedValue(readinessInput(values, files, needsClientApproval), 500);
-  const warnings = useQuery(taskReadinessQuery(readiness?.input ?? null));
-  const currentWarnings =
-    readiness && warnings.data
-      ? warningsOnDraft(warnings.data.warnings, readiness.subtaskIndexes)
-      : undefined;
+  const warnings = useQuery(taskReadinessQuery(readiness));
+  const currentWarnings = readiness ? warnings.data?.warnings : undefined;
 
   // A client request needs a client under the user's client scope; changing the client may end it.
   const clientRequestLost = type === 'client_request' && !clientScope;
@@ -404,8 +400,7 @@ export function NewTaskPage({ search }: { search: NewTaskSearch }) {
     }
     let found: ReadinessWarning[] = [];
     try {
-      const answer = await queryClient.fetchQuery(taskReadinessQuery(check.input));
-      found = warningsOnDraft(answer.warnings, check.subtaskIndexes);
+      found = (await queryClient.fetchQuery(taskReadinessQuery(check))).warnings;
     } catch {
       // The check never blocks: without it, the task is saved as F06 did.
     }

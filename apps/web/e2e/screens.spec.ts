@@ -1154,6 +1154,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await scope.getByRole('combobox', { name: label, exact: true }).click();
         await page
           .getByRole('option', { name: new RegExp(`^${option}`) })
+          // A list opened before may stay in the page, hidden: pick from the open one.
+          .filter({ visible: true })
           .first()
           .click();
       };
