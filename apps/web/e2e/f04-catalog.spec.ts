@@ -118,11 +118,18 @@ test('build a monthly package from services', async ({ page }) => {
   await page.getByRole('option', { name: 'تصميم سوشال ميديا' }).click();
   await dialog.getByRole('combobox', { name: ar.catalog.packages.addItem }).click();
   await page.getByRole('option', { name: 'ريل' }).click();
-  // One-off and archived services are not offered for a monthly package.
-  await dialog.getByRole('combobox', { name: ar.catalog.packages.addItem }).click();
+  // One-off and archived services are not offered for a monthly package. The list opens and takes
+  // the focus before the checks: a hidden option proves nothing while it is still closed, and
+  // Escape pressed while the button still has the focus closes the dialog instead of the list.
+  const addItem = dialog.getByRole('combobox', { name: ar.catalog.packages.addItem });
+  await addItem.click();
+  await expect(page.getByRole('listbox')).toBeVisible();
+  await expect(addItem).not.toBeFocused();
   await expect(page.getByRole('option', { name: 'هوية بصرية' })).toBeHidden();
   await expect(page.getByRole('option', { name: 'تقرير أداء قديم' })).toBeHidden();
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('listbox')).toBeHidden();
+  await expect(dialog).toBeVisible();
   await dialog
     .getByLabel(fill(ar.catalog.packages.quantityOf, { name: 'تصميم سوشال ميديا' }))
     .fill('8');
