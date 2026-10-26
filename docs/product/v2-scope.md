@@ -134,6 +134,26 @@ Approved by the owner in full (2026-10-25).
   - An effort estimate in points or hours for the workload view (an estimate only; time tracking stays out).
   - A handover: when a stage ends, the next one receives a summary of what was done and its files.
 - **Notifications** (with the shared rules above): subtask assigned, subtask opened ("your turn"), stage finished, all subtasks approved (to the parent's assignee), subtask overdue holding the next one, question asked (important), question answered, question reminder and escalation, question turned into a subtask, handover received.
+- **Decided in the spec interview (owner, 2026-10-26):**
+  - **Subtasks:**
+    - a subtask is reviewed by the parent's assignee and its department managers, and approving it delivers it to the parent;
+    - the parent cannot be submitted for review before every subtask is delivered;
+    - after client changes the parent's assignee picks which subtasks to reopen;
+    - the parent's assignee and the parent's managers add, order and cancel subtasks, and a subtask for another department is a request to its queue unless the creator may assign there;
+    - the run mode can change at any time while the parent is open.
+  - **Questions:**
+    - "24 work hours" are 24 hours of work days (Fridays and public holidays skipped), so one work day, and the escalation comes after two;
+    - a department's manager answers or forwards a department question to a member;
+    - the brief uses the rich-text editor too.
+  - **Creation:**
+    - the wizard is the new-task screen, with "Create now" from its first step;
+    - department managers, account managers, the General Manager and Ops save tasks as templates;
+    - estimates are in hours, and "overloaded" means estimated hours due that week exceed the person's remaining scheduled hours (2 hours per unestimated task);
+    - acceptance criteria block the submission for review until ticked;
+    - brief fields exist for Design, Photography, Development, Content Management and Marketing;
+    - handovers are built automatically, with an optional note per subtask.
+
+  Spec: `docs/specs/F06B-tasks-2.md`, ADR 0041.
 
 ### F08B — Content 2.0
 Approved by the owner in full (2026-10-25).
