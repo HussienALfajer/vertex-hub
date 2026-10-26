@@ -385,6 +385,11 @@ describe('content (F08)', () => {
     expect(permissionScopes(operationsManager, 'content.review')).toEqual(['all']);
   });
 
+  it('lets every employee suggest ideas (F08B)', () => {
+    expect(permissionScopes(access(['employee']), 'content.suggest')).toEqual(['all']);
+    expect(permissionScopes(designManager, 'content.suggest')).toEqual(['all']);
+  });
+
   it('gives other departments and their managers nothing but reading', () => {
     expect(PERMISSION_MAP.department_manager['content.manage']).toBeUndefined();
     for (const user of [access(['employee']), designManager]) {

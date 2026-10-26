@@ -41,6 +41,8 @@ const NOT_BUSINESS_RECORDS: Record<string, string> = {
   task_client_responses: 'Append-only; a client decision is final and never archived (F09)',
   post_reviews: 'Append-only review history with its snapshots; never edited or archived (F08)',
   post_client_responses: 'Append-only; a client decision is final and never archived (F08)',
+  content_planning_settings:
+    'Settings: one agency row and one per client, edited in place, never archived (F08B)',
   post_captions:
     'Part of its post; a group leaving the post is kept and hidden, never archived (F08B, ADR 0042)',
   approval_requests: 'Revoked, never archived (F09, ADR 0020)',

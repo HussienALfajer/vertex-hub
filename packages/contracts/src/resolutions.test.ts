@@ -175,7 +175,25 @@ describe('post resolutions (F16 rule B5, part C)', () => {
     ]);
     expect(
       postResolutions({ ...post, status: 'awaiting_client' }, { ...post, status: 'approved' }),
-    ).toEqual([{ types: ['post_awaiting_client'], outcome: 'done' }]);
+    ).toEqual([{ types: ['post_awaiting_client', 'post_at_risk'], outcome: 'done' }]);
+  });
+
+  it('closes a post at risk once approved, and voids it when re-dated (F08B)', () => {
+    const production = { ...post, status: 'in_production' as const };
+    expect(postResolutions(production, { ...production, status: 'internal_review' })).toEqual([
+      { types: ['post_assigned', 'post_returned'], outcome: 'done' },
+    ]);
+    expect(postResolutions(production, { ...production, publishDate: '2026-10-30' })).toEqual([
+      {
+        types: [
+          'post_at_risk',
+          'post_publish_today',
+          'post_publish_overdue',
+          'post_publish_shortly',
+        ],
+        outcome: 'void',
+      },
+    ]);
   });
 
   it('closes the publish reminders when published and voids them when re-dated', () => {
@@ -188,7 +206,12 @@ describe('post resolutions (F16 rule B5, part C)', () => {
     ]);
     expect(postResolutions(scheduled, { ...scheduled, publishDate: '2026-10-21' })).toEqual([
       {
-        types: ['post_publish_today', 'post_publish_overdue', 'post_publish_shortly'],
+        types: [
+          'post_at_risk',
+          'post_publish_today',
+          'post_publish_overdue',
+          'post_publish_shortly',
+        ],
         outcome: 'void',
       },
     ]);

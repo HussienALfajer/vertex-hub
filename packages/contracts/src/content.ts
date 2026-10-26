@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { approvalVersionSchema, clientDecisionSchema, responseChannelSchema } from './approvals.js';
 import {
+  calendarIssueSchema,
+  calendarOccasionSchema,
+  contentPillarSchema,
+} from './content-planning.js';
+import {
   businessDate,
   type CalendarDate,
   calendarDateSchema,
@@ -29,6 +34,7 @@ import {
 } from './post-values.js';
 import { deliverableKindSchema } from './retainers.js';
 import {
+  createTaskSchema,
   pendingApprovalSchema,
   type ReviewStage,
   reviewContentToken,
@@ -366,7 +372,25 @@ const postFieldsSchema = z.object({
   responsibleId: z.uuid(),
   /** The retainer cycle line the post counts on directly (rule 16). */
   cycleLineId: z.uuid().nullable(),
+  /** F08B rule C1: a non-archived pillar (`INVALID_LINK`). */
+  pillarId: z.uuid().nullable(),
+  /** F08B rule C6: the occasion the post is for, applying to the client (`INVALID_LINK`). */
+  occasionId: z.uuid().nullable(),
 });
+
+/**
+ * F08B rule B1: a file held at creation (F10 rule 1), attached on save; the files are the post's
+ * first slides, in this order, each with its optional caption.
+ */
+export const postWizardFileSchema = z
+  .object({
+    uploadId: z.uuid(),
+    name: z.string().trim().min(1).max(120).optional(),
+    slideCaption: optionalText(POST_LIMITS.slideCaption).default(null),
+  })
+  .meta({ id: 'PostWizardFile' });
+
+export type PostWizardFile = z.infer<typeof postWizardFileSchema>;
 
 /**
  * The API checks what needs the database: the client (rule 2), the responsible person, the cycle
@@ -380,6 +404,24 @@ export const createPostSchema = postFieldsSchema
     responsibleId: z.uuid().optional(),
     cycleLineId: z.uuid().nullable().default(null),
     captions: postCaptionsInputSchema.default([]),
+    pillarId: z.uuid().nullable().default(null),
+    occasionId: z.uuid().nullable().default(null),
+    /** F08B rule C12: the idea the post comes from, marked used in the same save (`IDEA_USED`). */
+    ideaId: z.uuid().optional(),
+    files: z.array(postWizardFileSchema).max(POST_LIMITS.files).default([]),
+    /** F08B rule B1: existing open tasks of the client to link (F08 rule 6). */
+    linkTaskIds: z
+      .array(z.uuid())
+      .max(POST_LIMITS.tasks)
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'Each task once' })
+      .default([]),
+    /**
+     * F08B rule B1: new tasks with their subtasks (F06B's create payload); the client is the
+     * post's. With `linkTaskIds`, at most `POST_LIMITS.tasks` (`LIMIT_REACHED`).
+     */
+    tasks: z.array(createTaskSchema).max(POST_LIMITS.tasks).default([]),
+    /** F17 rule B17, for the new tasks' assignees. */
+    acceptLeave: z.boolean().optional(),
   })
   .partial({ publishTime: true, notes: true })
   .meta({ id: 'CreatePost' });
@@ -455,6 +497,43 @@ export type UpdatePostLayout = z.infer<typeof updatePostLayoutSchema>;
 
 export type UpdatePostLayoutInput = z.input<typeof updatePostLayoutSchema>;
 
+// The move (F08B rules B6–B9)
+
+export const movePreviewQuerySchema = z.object({ publishDate: calendarDateSchema });
+
+export type MovePreviewQuery = z.infer<typeof movePreviewQuerySchema>;
+
+export const postMovePreviewSchema = z
+  .object({
+    /** Work days between the old and new publish dates, negative when earlier. */
+    workDays: z.number().int(),
+    /** The open linked tasks and their open subtasks, with the dates the shift would give. */
+    tasks: z.array(
+      z.object({
+        id: z.uuid(),
+        title: z.string(),
+        parentId: z.uuid().nullable(),
+        dueDate: calendarDateSchema,
+        newDueDate: calendarDateSchema,
+        /** Rule B9 and edge case 7: the date would fall before today and became today. */
+        clamped: z.boolean(),
+      }),
+    ),
+    /** Rule B7: tick the shift when a task or subtask would be due after the new date. */
+    suggestShift: z.boolean(),
+  })
+  .meta({ id: 'PostMovePreview' });
+
+export type PostMovePreview = z.infer<typeof postMovePreviewSchema>;
+
+export const movePostSchema = z
+  .object({ publishDate: calendarDateSchema, shiftTasks: z.boolean().default(false) })
+  .meta({ id: 'MovePost' });
+
+export type MovePost = z.infer<typeof movePostSchema>;
+
+export type MovePostInput = z.input<typeof movePostSchema>;
+
 /** Rule 4: the copy keeps the publish date unless another is given. */
 export const duplicatePostSchema = z
   .object({ publishDate: calendarDateSchema.optional() })
@@ -522,6 +601,9 @@ export const postSchema = z
     thumbnailVersionId: z.uuid().nullable(),
     linkedTaskCount: z.number().int().min(0),
     overdue: z.boolean(),
+    /** F08B rule C1; an archived pillar shows muted. */
+    pillar: contentPillarSchema.nullable(),
+    occasionId: z.uuid().nullable(),
   })
   .meta({ id: 'Post' });
 
@@ -666,6 +748,8 @@ export const postDetailSchema = postSchema
     media: z.array(postMediaSchema),
     /** F08B rules A3–A4, for the client's settings. */
     checks: z.array(postCheckSchema),
+    /** F08B rule C6; an archived occasion shows muted. */
+    occasion: z.object({ id: z.uuid(), name: z.string(), archived: z.boolean() }).nullable(),
     /** By link time. */
     linkedTasks: z.array(postTaskSchema),
     cycleLine: z
@@ -705,10 +789,19 @@ export const postDetailSchema = postSchema
 
 export type PostDetail = z.infer<typeof postDetailSchema>;
 
+/** F08B rule B9: the post after a move, with the linked tasks whose due dates moved. */
+export const movedPostSchema = postDetailSchema
+  .extend({ shiftedTaskIds: z.array(z.uuid()) })
+  .meta({ id: 'MovedPost' });
+
+export type MovedPost = z.infer<typeof movedPostSchema>;
+
 // Calendar and lists
 
 const postFiltersSchema = z.object({
   clientId: z.uuid().optional(),
+  /** F08B. */
+  pillarId: z.uuid().optional(),
   status: queryListSchema(postStatusSchema).optional(),
   platform: postPlatformSchema.optional(),
   type: postTypeSchema.optional(),
@@ -738,6 +831,13 @@ export const contentCalendarSchema = z
     posts: z.array(postSchema),
     /** Posts of the range per status, under the same filters, the status filter aside. */
     counts: z.record(postStatusSchema, z.number().int().min(0)),
+    /**
+     * F08B rules C4–C6: the occasions on the range's days (with `clientId`, those applying to
+     * the client, with whether a post covers them).
+     */
+    occasions: z.array(calendarOccasionSchema),
+    /** F08B rule C10: the planning check's marks, per client, for the range. */
+    issues: z.array(calendarIssueSchema),
   })
   .meta({ id: 'ContentCalendar' });
 
@@ -747,7 +847,14 @@ export type ContentCalendar = z.infer<typeof contentCalendarSchema>;
  * The sections of My posts: `publish_today`, `overdue` and `returned` are posts the caller is
  * responsible for; `to_review` is posts in internal review under the caller's review scope.
  */
-export const POST_VIEWS = ['publish_today', 'overdue', 'to_review', 'returned'] as const;
+export const POST_VIEWS = [
+  'publish_today',
+  'overdue',
+  'to_review',
+  'returned',
+  /** F08B: posts of the caller not approved within two work days of their date. */
+  'at_risk',
+] as const;
 
 export const postViewSchema = z.enum(POST_VIEWS).meta({ id: 'PostView' });
 
@@ -780,6 +887,8 @@ export const myContentSummarySchema = z
     publishToday: z.number().int().min(0),
     overdue: z.number().int().min(0),
     returned: z.number().int().min(0),
+    /** F08B. */
+    atRisk: z.number().int().min(0),
     /** Null without `content.review`. */
     toReview: z.number().int().min(0).nullable(),
   })

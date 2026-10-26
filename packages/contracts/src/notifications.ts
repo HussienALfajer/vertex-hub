@@ -194,6 +194,15 @@ export const NOTIFICATION_TYPES = [
   'task_question_escalated',
   'task_question_converted',
   'task_blocked',
+  // F08B. A moved post's shifted tasks get `post_moved` instead of `task_changed` (another
+  // subject, so the content module sends only the first).
+  'post_moved',
+  'post_unassigned',
+  'post_at_risk',
+  'content_week_check',
+  'content_idea_added',
+  'content_idea_used',
+  'post_changed',
   // F16: the followers' status notices come last, after every other notice of the change.
   'task_progressed',
   'post_progressed',
@@ -211,6 +220,8 @@ export const NOTIFICATION_CATEGORIES = [
   'account',
   'announcements',
   'hr',
+  /** F08B: the content calendar's new notices. */
+  'content',
 ] as const;
 
 export const notificationCategorySchema = z
@@ -253,6 +264,10 @@ export const NOTIFICATION_SUBJECTS = [
   'kiosk',
   /** F17 part D: an attendance month, opened at its month sheet. */
   'attendance_month',
+  /** F08B: a week of the planning check (`contentWeekSubjectId`), opened at the Planning check. */
+  'content_week',
+  /** F08B: the ideas added on one day (`contentIdeasSubjectId`), opened at the ideas panel. */
+  'content_ideas',
 ] as const;
 
 export const notificationSubjectTypeSchema = z
@@ -460,6 +475,13 @@ const CATALOG: Record<
   task_question_escalated: { category: 'tasks', subject: 'task', mutable: false },
   task_question_converted: { category: 'tasks', subject: 'task', mutable: true },
   task_blocked: { category: 'tasks', subject: 'task', mutable: true },
+  post_moved: { category: 'content', subject: 'post', mutable: true },
+  post_unassigned: { category: 'content', subject: 'post', mutable: true },
+  post_changed: { category: 'content', subject: 'post', mutable: true },
+  post_at_risk: { category: 'content', subject: 'post', mutable: false },
+  content_week_check: { category: 'content', subject: 'content_week', mutable: true },
+  content_idea_added: { category: 'content', subject: 'content_ideas', mutable: true },
+  content_idea_used: { category: 'content', subject: 'post', mutable: true },
 };
 
 /*
@@ -667,6 +689,13 @@ const CHANNELS: Record<NotificationType, Channels> = {
   task_question_escalated: important('on'),
   task_question_converted: informational,
   task_blocked: informational,
+  post_moved: normal(),
+  post_unassigned: informational,
+  post_changed: normal(),
+  post_at_risk: important(),
+  content_week_check: normal(),
+  content_idea_added: informational,
+  content_idea_used: informational,
 };
 
 /*
@@ -937,6 +966,13 @@ const ENGINE: Record<NotificationType, Engine> = {
   task_question_escalated: action(),
   task_question_converted: info,
   task_blocked: mergedDaily,
+  post_moved: mergedDaily,
+  post_unassigned: info,
+  post_changed: mergedDaily,
+  post_at_risk: action(),
+  content_week_check: info,
+  content_idea_added: mergedDaily,
+  content_idea_used: info,
 };
 
 /**
@@ -1089,6 +1125,30 @@ const quoteData = z.object({
 const invoiceData = z.object({
   invoice: z.object({ displayNumber: nameSchema, client: nameSchema }),
 });
+
+/** F08B: what changed on a post that its responsible and followers are told about. */
+export const POST_CHANGES = ['captions', 'slides', 'platforms', 'type', 'title'] as const;
+
+export type PostChange = (typeof POST_CHANGES)[number];
+
+/** F08B `post_at_risk`: what an open post still waits on. */
+export const POST_RISK_WAITS = [
+  'production',
+  'tasks',
+  'internal_review',
+  'medical_review',
+  'client',
+] as const;
+
+export type PostRiskWait = (typeof POST_RISK_WAITS)[number];
+
+/** F08B: the subject of a week's planning check, from the week's first day (a Saturday). */
+export const contentWeekSubjectId = (from: CalendarDate): string =>
+  `00000000-0000-7000-8001-0000${from.replaceAll('-', '')}`;
+
+/** F08B: the subject of the ideas added on one day. */
+export const contentIdeasSubjectId = (date: CalendarDate): string =>
+  `00000000-0000-7000-8002-0000${date.replaceAll('-', '')}`;
 
 /** Part C rule 4: the roles on a record whose previous holder is told when they change. */
 export const RESPONSIBILITY_ROLES = [
@@ -1578,6 +1638,34 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   /** Rule B11: `questionId` is the question or comment turned into the subtask. */
   task_question_converted: questionData.extend({ subtask: nameSchema, question: z.boolean() }),
   task_blocked: taskData,
+  /** The post's new date; the previous one and the linked tasks whose due dates moved with it. */
+  post_moved: postData.extend({
+    previousDate: calendarDateSchema,
+    previousTime: timeOfDaySchema.nullable(),
+    shiftedTasks: z.array(nameSchema).max(30),
+  }),
+  post_unassigned: postData.extend({ holder: nameSchema }),
+  post_changed: postData.extend({ changes: z.array(z.enum(POST_CHANGES)).min(1) }),
+  /** What the post waits on: its tasks (by name), a review, or the client since a date. */
+  post_at_risk: postData.extend({
+    waitingOn: z.enum(POST_RISK_WAITS),
+    tasks: z.array(nameSchema).max(5),
+    clientSince: calendarDateSchema.nullable(),
+  }),
+  /** The clients with planning issues in the next 14 days, with their counts. */
+  content_week_check: z.object({
+    from: calendarDateSchema,
+    to: calendarDateSchema,
+    clients: z
+      .array(z.object({ name: nameSchema, issues: z.number().int().min(1) }))
+      .min(1)
+      .max(50),
+  }),
+  content_idea_added: z.object({
+    idea: z.string().max(NOTIFICATION_EXCERPT_MAX),
+    client: nameSchema.nullable(),
+  }),
+  content_idea_used: postData.extend({ idea: z.string().max(NOTIFICATION_EXCERPT_MAX) }),
 } satisfies Record<NotificationType, z.ZodType>;
 
 export type NotificationData<Type extends NotificationType> = z.infer<
@@ -2090,6 +2178,9 @@ export const NOTIFICATION_REMINDER_KINDS = [
   'attendance_check_out',
   /** F06B rule A14: once per overdue subtask and due date. */
   'subtask_holding_next',
+  /** F08B: once per post and publish date; once per week. */
+  'post_at_risk',
+  'content_week_check',
 ] as const;
 
 export type NotificationReminderKind = (typeof NOTIFICATION_REMINDER_KINDS)[number];

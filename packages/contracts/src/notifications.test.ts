@@ -125,6 +125,13 @@ describe('notification catalog', () => {
         'ad_deposit_recorded',
         'campaign_status_changed',
         'member_moved',
+        // F08B.
+        'post_moved',
+        'post_unassigned',
+        'post_changed',
+        'content_week_check',
+        'content_idea_added',
+        'content_idea_used',
       ].sort(),
     );
   });
@@ -138,6 +145,7 @@ describe('notification catalog', () => {
       ...notificationTypesOf('account'),
       ...notificationTypesOf('announcements'),
       ...notificationTypesOf('hr'),
+      ...notificationTypesOf('content'),
     ];
     expect(all.sort()).toEqual([...NOTIFICATION_TYPES].sort());
     expect(NOTIFICATION_CATALOG.tasks_generated.subject).toBe('template_run');
@@ -652,6 +660,8 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       'task_question_asked',
       'task_question_reminder',
       'task_question_escalated',
+      // F08B.
+      'post_at_risk',
     ]);
   });
 

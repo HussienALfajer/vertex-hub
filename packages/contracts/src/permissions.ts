@@ -31,6 +31,8 @@ export const PERMISSIONS = [
   'content.read',
   'content.manage',
   'content.review',
+  /** F08B: add ideas to the ideas bank. */
+  'content.suggest',
   'approvals.review_medical',
   'calendar.read',
   'shoots.manage',
@@ -108,6 +110,7 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
     'tasks.manage': 'assigned',
     'templates.read': 'all',
     'content.read': 'all',
+    'content.suggest': 'all',
     'calendar.read': 'all',
     'meetings.manage': 'assigned',
   },
