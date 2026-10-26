@@ -164,7 +164,7 @@ export class FileVersions {
     request: IncomingMessage,
     response: ServerResponse,
   ): Promise<void> {
-    return this.content.image(imageId, 'sm', request, response);
+    return this.content.image(imageId, 'sm', request, response, 'link');
   }
 
   /**

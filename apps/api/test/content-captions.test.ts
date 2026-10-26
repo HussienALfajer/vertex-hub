@@ -93,12 +93,12 @@ describe('captions, slides, checks and the pack (F08B part A)', () => {
   const MP4 = Buffer.from('000000186674797069736f6d0000020069736f6d69736f32', 'hex');
 
   /** An upload by the writer, with the media info a browser sends for a video. */
-  async function upload(bytes: Buffer, fileName: string, query = '') {
+  async function upload(bytes: Buffer, fileName: string, query = '', cookie = cast.writer.cookie) {
     const form = new FormData();
     form.append('file', new Blob([new Uint8Array(bytes)]), fileName);
     const response = await fetch(`${url}/api/files/uploads${query}`, {
       method: 'POST',
-      headers: { origin: ORIGIN, 'x-forwarded-for': clientIp(), cookie: cast.writer.cookie },
+      headers: { origin: ORIGIN, 'x-forwarded-for': clientIp(), cookie },
       body: form,
     });
     expect(response.status, await response.clone().text()).toBe(201);
@@ -516,6 +516,21 @@ describe('captions, slides, checks and the pack (F08B part A)', () => {
       expect((await client.get(`/api/public/approvals/${randomUUID()}/client-image`)).status).toBe(
         404,
       );
+      // Once it has one, the link holder sees it, never cached (F09 rule 23).
+      const logo = await upload(await png(200, 200), 'logo.png', '', cast.gm.cookie);
+      const set = await client.request('PUT', `/api/clients/${clientId}/image`, {
+        cookie: cast.gm.cookie,
+        body: { source: { uploadId: logo } },
+      });
+      expect(set.status, await set.clone().text()).toBe(200);
+      const withImage = publicApprovalSchema.parse(
+        await (await client.get(`/api/public/approvals/${token}`)).json(),
+      );
+      expect(withImage.clientImage).toBe(true);
+      const served = await client.get(`/api/public/approvals/${token}/client-image`);
+      expect(served.status).toBe(200);
+      expect(served.headers.get('content-type')).toMatch(/^image\//);
+      expect(served.headers.get('cache-control')).toBe('no-store');
 
       // A snapshot from before F08B shows its single caption under every group.
       await db
