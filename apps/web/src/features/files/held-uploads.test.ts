@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { namedFiles, screenshotName } from './held-uploads';
 
-const at = new Date(2026, 9, 26, 14, 5, 9);
+// 11:05:09 UTC is 14:05:09 in Asia/Damascus (UTC+3), whatever the machine's time zone.
+const at = new Date('2026-10-26T11:05:09Z');
 
 describe('screenshotName', () => {
-  it('names a screenshot by its local date and time', () => {
+  it('names a screenshot by its date and time in Damascus', () => {
     expect(screenshotName(at)).toBe('Screenshot 2026-10-26 14.05.09.png');
   });
 });

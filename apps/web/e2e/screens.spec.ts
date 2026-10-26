@@ -1144,6 +1144,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('heading', { name: ar.tasks.subtasks.title })).toBeVisible();
       await expect(page.getByRole('heading', { name: ar.tasks.thread.title })).toBeVisible();
       await expect(page.getByText('سأرسل الصور بمقاس 1080 × 1350.')).toBeVisible();
+      // Questions open, answered and forwarded (rules B4 and B5).
+      await expect(page.getByText('إلى قسم التصوير · حُوّل إلى كريم الزين')).toBeVisible();
       await expect(page.getByText(ar.tasks.page.submitBlockedTitle)).toBeVisible();
       await screenshot(page, testInfo, `task-subtasks-${colorScheme}`);
 
@@ -1153,6 +1155,13 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(viewer.getByText('menu-cover-v2.png')).toBeVisible();
       await viewer.getByRole('button', { name: ar.files.viewer.zoomIn }).click();
       await screenshot(page, testInfo, `task-viewer-${colorScheme}`);
+
+      // A video attached in the thread plays in the browser's player inside the viewer.
+      await page.keyboard.press('Escape');
+      await expect(viewer).toBeHidden();
+      await page.getByRole('button', { name: /menu-walkthrough\.mp4/ }).click();
+      await expect(viewer.locator('video')).toBeVisible();
+      await screenshot(page, testInfo, `task-viewer-video-${colorScheme}`);
     });
 
     test('reopen subtasks dialog (F06B)', async ({ page }, testInfo) => {
@@ -1214,12 +1223,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await files.scrollIntoViewIfNeeded();
       await screenshot(page, testInfo, `task-files-${colorScheme}`);
 
+      // Images open in the built-in viewer (F06B rule C4); a PDF keeps the browser's viewer.
       await files.getByRole('button', { name: 'عاين صور الأطباق' }).click();
       await expect(
         page.getByRole('dialog', { name: 'صور الأطباق' }).getByRole('img', { name: 'صور الأطباق' }),
       ).toBeVisible();
       await screenshot(page, testInfo, `file-preview-image-${colorScheme}`);
-      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('Escape');
+      await files.getByRole('button', { name: 'عاين دليل الهوية' }).click();
       await expect(
         page.getByRole('dialog', { name: 'دليل الهوية' }).locator('iframe'),
       ).toBeVisible();

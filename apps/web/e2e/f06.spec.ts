@@ -99,7 +99,11 @@ test('request → assign → work → internal return → client changes over th
   await page.getByRole('button', { name: ar.tasks.form.addItem, exact: true }).click();
   await page.getByRole('checkbox', { name: 'قص المقاسات' }).click();
   await expect(page.getByRole('checkbox', { name: 'قص المقاسات' })).toBeChecked();
-  await page.getByRole('button', { name: ar.tasks.links.add }).click();
+  // The thread's editor has a link button of the same name (F06B): the Links section's one.
+  await page
+    .locator('section', { has: page.getByRole('heading', { name: ar.tasks.links.title }) })
+    .getByRole('button', { name: ar.tasks.links.add })
+    .click();
   await page.getByRole('dialog').getByLabel(ar.tasks.links.url).fill('https://drive.google.com/x');
   await page.getByRole('dialog').getByRole('button', { name: ar.tasks.links.add }).click();
   await expect(page.getByText(ar.tasks.links.added)).toBeVisible();

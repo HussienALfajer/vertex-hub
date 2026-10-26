@@ -29,6 +29,9 @@ const omar = { id: seedIds.omar, name: 'عمر حداد', imageId: null };
 
 export const F06B_PARENT = seedIds.autumnMenu;
 
+/** A video attached in the thread; its content is served by `mockF06b`. */
+const F06B_VIDEO_VERSION = uuid(19602);
+
 /** The subtasks' ids are seeded tasks, so their files and pages answer from the main mock. */
 export const F06B_SUBTASKS = {
   copy: seedIds.octoberCover,
@@ -200,6 +203,7 @@ export function parentDetail(variant: Variant): TaskDetail {
       openQuestions: { total: revisions ? 0 : 2, inSubtasks: revisions ? 0 : 1 },
       estimateMinutes: 240,
     }),
+    parent: null,
     brief: 'ثلاث صفحات للمنيو الجديد بمقاس A4، بألوان الهوية الجديدة.',
     briefDoc,
     briefFields: {
@@ -400,16 +404,42 @@ export function parentThread(): TaskComment[] {
       }),
     ],
   };
+  const forwarded: TaskComment = {
+    ...message(19406, sara, 'هل نحتاج لقطات فيديو قصيرة للأطباق؟', '2026-10-09T07:00:00.000Z', {
+      kind: 'question',
+    }),
+    question: {
+      addressee: { ...karim, archived: false, inDepartment: true },
+      department: 'photography',
+      status: 'open',
+      answeredBy: null,
+      answeredAt: null,
+      canAnswer: false,
+      canReopen: false,
+      canForward: false,
+    },
+    replies: [],
+  };
   const text = `@{${layan.id}} أضفت ملاحظات المطعم على الألوان.`;
   const comment: TaskComment = {
     ...message(19405, omar, text, '2026-10-09T08:00:00.000Z', {
       mentions: [{ ...layan, archived: false }],
+      attachments: [
+        {
+          id: uuid(19601),
+          name: 'menu-walkthrough.mp4',
+          versionId: F06B_VIDEO_VERSION,
+          mimeType: 'video/mp4',
+          sizeBytes: 5_242_880,
+          previewReady: false,
+        },
+      ],
       convertedTask: { id: F06B_SUBTASKS.pages, title: 'تصميم صفحات المنيو' },
     }),
     question: null,
     replies: [],
   };
-  return [toKarim, toDesign, comment];
+  return [toKarim, toDesign, forwarded, comment];
 }
 
 /** Rule B7: Sara's question to Design waits for Layan, who manages it. */
@@ -434,6 +464,10 @@ export async function mockF06b(page: Page, variant: Variant = 'working'): Promis
   let detail = parentDetail(variant);
   let thread = parentThread();
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body });
+  await page.route(
+    (url) => url.pathname.startsWith(`/api/files/versions/${F06B_VIDEO_VERSION}/`),
+    (route) => route.fulfill({ status: 200, contentType: 'video/mp4', body: Buffer.alloc(0) }),
+  );
   await page.route(
     (url) => url.pathname.startsWith(`/api/tasks/${F06B_PARENT}`),
     async (route, request) => {

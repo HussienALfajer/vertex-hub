@@ -75,6 +75,10 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
     afterItemRemoved: heading,
   });
 
+  const deliverableActions = useViewerActions(actions, 'deliverable', openViewer);
+  const referenceActions = useViewerActions(actions, 'reference', openViewer);
+  const attachmentActions = useViewerActions(actions, 'attachment', openViewer);
+
   const total = task.fileCounts.deliverables + task.fileCounts.references;
   const rights = files.data?.rights;
   const deliverables = files.data?.items.filter((item) => item.role === 'deliverable') ?? [];
@@ -206,7 +210,7 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
                   <FileItemCard
                     key={item.id}
                     item={item}
-                    actions={actions}
+                    actions={deliverableActions}
                     finalMarkable={finalMarkable}
                     versionMark={versionMark(item)}
                   />
@@ -234,12 +238,12 @@ export function TaskFilesSection({ task }: { task: TaskDetail }) {
             {references.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('tasks.files.noReferences')}</p>
             ) : (
-              <ReferenceGrid items={references} actions={actions} onView={openViewer} />
+              <ReferenceGrid items={references} actions={referenceActions} />
             )}
           </Group>
           {attachments.length > 0 && (
             <Group title={t('tasks.files.inDiscussion')} count={attachments.length} action={null}>
-              <ReferenceGrid items={attachments} actions={actions} onView={openViewer} />
+              <ReferenceGrid items={attachments} actions={attachmentActions} />
             </Group>
           )}
           <SubtaskFinals task={task} onView={openViewer} />
@@ -310,11 +314,7 @@ function Group({
 }
 
 /** F06B rule C4: an uploaded image or video the browser shows, as the viewer takes it. */
-export function viewerItem(
-  item: FileItem,
-  version: FileVersion,
-  details?: string,
-): ViewerItem | null {
+export function viewerItem(name: string, version: FileVersion, details: string): ViewerItem | null {
   if (version.kind !== 'upload') return null;
   const image =
     version.type === 'image' &&
@@ -328,13 +328,56 @@ export function viewerItem(
       image && version.previewStatus === 'ready'
         ? filePreviewUrl(version.id)
         : fileContentUrl(version.id),
-    name: item.name,
-    details: details ?? version.uploadedBy.name,
+    name,
+    details,
     downloadHref: fileDownloadUrl(version.id),
   };
 }
 
 type OpenViewer = (items: ViewerItem[], index: number) => void;
+
+type ViewedRole = 'deliverable' | 'reference' | 'attachment';
+
+/** Rule C4: the viewer shows the version, the role and the uploader under the name. */
+function useViewerDetails() {
+  const { t } = useTranslation();
+  return (version: FileVersion, role: ViewedRole, from?: string) =>
+    [
+      t('tasks.files.viewerVersion', { n: formatNumber(version.number) }),
+      t(`tasks.files.roles.${role}`),
+      version.uploadedBy.name,
+      from,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+}
+
+/**
+ * The file actions with previews of images and videos in the viewer (rule C4) across the shown
+ * set; PDFs, links and other files keep F10's preview.
+ */
+function useViewerActions(
+  actions: FileItemActions,
+  role: ViewedRole,
+  onView: OpenViewer,
+): FileItemActions {
+  const details = useViewerDetails();
+  return {
+    ...actions,
+    onPreview: (entries, index) => {
+      const items = entries.map((entry) =>
+        viewerItem(entry.name, entry.version, details(entry.version, role)),
+      );
+      const target = items[index];
+      if (!target) {
+        actions.onPreview(entries, index);
+        return;
+      }
+      const viewable = items.filter((item): item is ViewerItem => item !== null);
+      onView(viewable, viewable.indexOf(target));
+    },
+  };
+}
 
 /**
  * F06B rule A7: the final deliverables of the delivered subtasks, under "From subtasks". Each
@@ -355,9 +398,10 @@ function SubtaskFinals({ task, onView }: { task: TaskDetail; onView: OpenViewer 
         .map((version) => ({ subtask, item, version })),
     ),
   );
+  const details = useViewerDetails();
   if (finals.length === 0) return null;
   const items = finals.map(({ subtask, item, version }) =>
-    viewerItem(item, version, subtask.title),
+    viewerItem(item.name, version, details(version, 'deliverable', subtask.title)),
   );
   const viewable = items.filter((item): item is ViewerItem => item !== null);
   return (
@@ -401,15 +445,7 @@ function SubtaskFinals({ task, onView }: { task: TaskDetail; onView: OpenViewer 
  * References and attachments: single uploads in a grid. Images and videos open in the viewer
  * (F06B rule C4) across the group; PDFs and other files keep F10's preview.
  */
-function ReferenceGrid({
-  items,
-  actions,
-  onView,
-}: {
-  items: FileItem[];
-  actions: FileItemActions;
-  onView: OpenViewer;
-}) {
+function ReferenceGrid({ items, actions }: { items: FileItem[]; actions: FileItemActions }) {
   const { t } = useTranslation();
   const restore = useRestoreFileItem(actions.owner);
   const shown = items.flatMap((item) => {
@@ -418,7 +454,6 @@ function ReferenceGrid({
   });
   const previewable = shown.filter(({ item }) => !item.archivedAt);
   const entries = previewable.map(({ item, version }) => ({ name: item.name, version }));
-  const viewable = previewable.flatMap(({ item, version }) => viewerItem(item, version) ?? []);
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
       {shown.map(({ item, version }) => {
@@ -436,17 +471,12 @@ function ReferenceGrid({
               disabled={removed}
               className="rounded-md focus-visible:outline-2 focus-visible:outline-ring"
               aria-label={t('files.previewNamed', { name: item.name })}
-              onClick={() => {
-                const at = viewable.findIndex((entry) => entry.key === version.id);
-                if (at >= 0) {
-                  onView(viewable, at);
-                  return;
-                }
+              onClick={() =>
                 actions.onPreview(
                   entries,
                   previewable.findIndex((entry) => entry.item.id === item.id),
-                );
-              }}
+                )
+              }
             >
               <FileThumbnail version={version} className="aspect-4/3 w-full" />
             </button>

@@ -4,7 +4,7 @@ import { DownloadIcon, FileIcon, FileVideoIcon, PaperclipIcon, XIcon } from 'luc
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../../lib/errors';
-import { formatFileSize } from '../../lib/format';
+import { formatFileSize, formatNumber } from '../../lib/format';
 import { useFileViewer, type ViewerItem } from '../files/file-viewer';
 import {
   fileContentUrl,
@@ -182,8 +182,11 @@ export function HeldUploadList({ held, max }: { held: HeldUploads; max: number }
 const isImage = (attachment: TaskAttachment) => attachment.mimeType.startsWith('image/');
 const isVideo = (attachment: TaskAttachment) => attachment.mimeType.startsWith('video/');
 
-/** The viewer's items of a message's images and videos. */
-export function attachmentViewerItems(attachments: readonly TaskAttachment[]): ViewerItem[] {
+/** The viewer's items of a message's images and videos; `details` says who and what (rule C4). */
+export function attachmentViewerItems(
+  attachments: readonly TaskAttachment[],
+  details: string,
+): ViewerItem[] {
   return attachments.flatMap((attachment): ViewerItem[] =>
     isImage(attachment) || isVideo(attachment)
       ? [
@@ -195,7 +198,7 @@ export function attachmentViewerItems(attachments: readonly TaskAttachment[]): V
                 ? filePreviewUrl(attachment.versionId)
                 : fileContentUrl(attachment.versionId),
             name: attachment.name,
-            details: formatFileSize(attachment.sizeBytes),
+            details,
             downloadHref: fileDownloadUrl(attachment.versionId),
           },
         ]
@@ -204,11 +207,26 @@ export function attachmentViewerItems(attachments: readonly TaskAttachment[]): V
 }
 
 /** A message's attachments: images and videos open in the viewer, other files download. */
-export function AttachmentList({ attachments }: { attachments: readonly TaskAttachment[] }) {
+export function AttachmentList({
+  attachments,
+  author,
+}: {
+  attachments: readonly TaskAttachment[];
+  /** Who attached them: the message's author. */
+  author: string;
+}) {
   const { t } = useTranslation();
   const { open, viewer } = useFileViewer();
   if (attachments.length === 0) return null;
-  const items = attachmentViewerItems(attachments);
+  // Attachments are single uploads (rule B2): always their first version.
+  const items = attachmentViewerItems(
+    attachments,
+    [
+      t('tasks.files.viewerVersion', { n: formatNumber(1) }),
+      t('tasks.files.roles.attachment'),
+      author,
+    ].join(' · '),
+  );
   return (
     <>
       <ul className="flex flex-wrap gap-2">

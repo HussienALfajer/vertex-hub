@@ -33,7 +33,8 @@ Spec: `docs/specs/F06B-tasks-2.md` (Approved 2026-10-26) · ADR 0041 (and 0013, 
 - [x] web unit: pasted screenshot naming (`held-uploads.test.ts`)
 - [x] e2e: `mockApi` options `subtasks` and `questions`, `f06b-fixtures.ts` (a parent by stages with its thread), `f06b-task-page.spec.ts`, screens (task page with subtasks and questions, viewer, reopen dialog, My tasks, list and board) in both themes
 - [x] fix found on the way: `useFocusAfterChange` ignores a list's first load (the Files section scrolled the page to its heading)
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+- [x] checks (full `pnpm verify` green), reviewer (7 findings fixed, plus the edit dialog's brief now rich text)
+- [ ] acceptance (owner), PR with auto-merge
 - "Save as template" in the header menu moves to PR 5 with its dialog and the template editor
 
 ## PR 5 — Creation wizard, Workload, tree and templates (web)

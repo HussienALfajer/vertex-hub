@@ -192,7 +192,7 @@ function AddCriterion({ task }: { task: TaskDetail }) {
           />
           <Button type="submit" variant="outline" disabled={add.isPending}>
             <PlusIcon />
-            {t('tasks.form.addItem')}
+            {t('tasks.criteria.add')}
           </Button>
         </div>
         <FieldError match={invalid}>{t('tasks.checklist.invalid')}</FieldError>

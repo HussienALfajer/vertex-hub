@@ -677,7 +677,7 @@ function Message({
             className="text-sm"
           />
         )}
-        <AttachmentList attachments={message.attachments} />
+        <AttachmentList attachments={message.attachments} author={message.author.name} />
         {message.convertedTask && (
           <Link
             to="/tasks/$taskId"

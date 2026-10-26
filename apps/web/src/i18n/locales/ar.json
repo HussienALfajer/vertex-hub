@@ -2404,7 +2404,13 @@
       "addedAfterReview": "أُضيف بعد المراجعة",
       "dropHint": "اسحب الملفات إلى هنا أو الصقها لإضافتها مراجع.",
       "fromSubtasks": "من المهام الفرعية",
-      "inDiscussion": "في النقاش"
+      "inDiscussion": "في النقاش",
+      "viewerVersion": "الإصدار {{n}}",
+      "roles": {
+        "deliverable": "مخرج",
+        "reference": "مرجع",
+        "attachment": "مرفق في النقاش"
+      }
     },
     "medicalBadge": "مراجعة طبية",
     "medicalStatus": "مراجعة داخلية · طبية",
@@ -2633,7 +2639,8 @@
         "reopenNote": "اكتب ما يجب تغييره.",
         "reopenPick": "اختر مهمة فرعية واحدة على الأقل.",
         "dueDate": "اختر موعدًا لا يتجاوز موعد المهمة الأم."
-      }
+      },
+      "seeInList": "اعرضها في القائمة"
     },
     "thread": {
       "title": "الأسئلة والنقاش",

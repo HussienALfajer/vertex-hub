@@ -1,4 +1,5 @@
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
   businessDate,
@@ -12,6 +13,7 @@ import {
   SUBTASK_RUN_MODES,
   type Subtask,
   type SubtaskRunMode,
+  TASK_STATUSES,
   type TaskBriefDoc,
   type TaskDetail,
   type TaskStage,
@@ -64,13 +66,14 @@ import {
   GripVerticalIcon,
   HandshakeIcon,
   HourglassIcon,
+  ListIcon,
   MoveIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
   RotateCcwIcon,
 } from 'lucide-react';
-import { type DragEvent, useId, useState } from 'react';
+import { type DragEvent, useId, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -79,6 +82,7 @@ import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/err
 import { formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
+import { clientQuery } from '../clients/clients.queries';
 import { useDepartmentNames } from '../projects/project-badges';
 import { assigneeLeaves, LeaveWarningDialog } from './leave-warning';
 import { BlockedBadge, formatDue, TaskOverdueBadge, TaskStatusBadge } from './task-badges';
@@ -141,10 +145,7 @@ export function SubtasksSection({ task }: { task: TaskDetail }) {
   const [adding, setAdding] = useState<{ stageId: string | null } | null>(null);
   const [reopening, setReopening] = useState(false);
   const [cancelling, setCancelling] = useState<Subtask | null>(null);
-  const shownCancelling = useShownWhileClosing(cancelling);
   const reorder = useReorderSubtasks(task.id);
-  const cancel = useMoveTask();
-  const [cancelReason, setCancelReason] = useState('');
   const [dragged, setDragged] = useState<string | null>(null);
   const live = task.subtasks.filter((subtask) => !isCancelled(subtask));
   const canReopen =
@@ -183,10 +184,7 @@ export function SubtasksSection({ task }: { task: TaskDetail }) {
         ? () => move(subtask.id, subtask.stageId, group[index + 2]?.id ?? null)
         : null,
     onMoveToStage: (stageId) => move(subtask.id, stageId, null),
-    onCancel: () => {
-      setCancelReason('');
-      setCancelling(subtask);
-    },
+    onCancel: () => setCancelling(subtask),
   });
 
   return (
@@ -202,6 +200,18 @@ export function SubtasksSection({ task }: { task: TaskDetail }) {
       }
       action={
         <span className="flex flex-wrap items-center gap-2">
+          {task.subtasks.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              render={
+                <Link to="/tasks/list" search={{ parentId: task.id, status: [...TASK_STATUSES] }} />
+              }
+            >
+              <ListIcon />
+              {t('tasks.subtasks.seeInList')}
+            </Button>
+          )}
           {canReopen && (
             <Button variant="outline" size="sm" onClick={() => setReopening(true)}>
               <RotateCcwIcon />
@@ -250,46 +260,98 @@ export function SubtasksSection({ task }: { task: TaskDetail }) {
       {canReopen && (
         <ReopenSubtasksDialog task={task} open={reopening} onClose={() => setReopening(false)} />
       )}
-      <ConfirmDialog
-        open={cancelling !== null}
-        onClose={() => setCancelling(null)}
-        title={t('tasks.subtasks.cancelTitle', { title: shownCancelling?.title ?? '' })}
-        body={t('tasks.subtasks.cancelBody')}
-        action={t('tasks.moves.cancel')}
-        destructive
-        pending={cancel.isPending}
-        onConfirm={async () => {
-          if (!cancelling) return;
-          await cancel.mutateAsync({
-            id: cancelling.id,
-            status: 'cancelled',
-            note: cancelReason.trim(),
-            overrideDependencies: false,
-          });
-          toast.add({ title: t('tasks.subtasks.cancelled'), type: 'success' });
-        }}
-      >
-        <CancelReason value={cancelReason} onChange={setCancelReason} />
-      </ConfirmDialog>
+      <CancelSubtaskDialog subtask={cancelling} onClose={() => setCancelling(null)} />
     </TaskSection>
   );
 }
 
-function CancelReason({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+/** The longest cancel reason the status change takes. */
+const REASON_MAX = 500;
+
+/** Cancels a subtask with its reason (F06's cancel); it no longer holds the ones after it. */
+function CancelSubtaskDialog({
+  subtask,
+  onClose,
+}: {
+  subtask: Subtask | null;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const id = useId();
+  const cancel = useMoveTask();
+  const shown = useShownWhileClosing(subtask);
+  const [reason, setReason] = useState('');
+  const [invalid, setInvalid] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  async function confirm() {
+    const note = reason.trim();
+    if (note.length === 0 || note.length > REASON_MAX) {
+      setInvalid(true);
+      field.current?.focus();
+      return;
+    }
+    if (!subtask) return;
+    setFailure(null);
+    try {
+      await cancel.mutateAsync({
+        id: subtask.id,
+        status: 'cancelled',
+        note,
+        overrideDependencies: false,
+      });
+      toast.add({ title: t('tasks.subtasks.cancelled'), type: 'success' });
+      onClose();
+    } catch (error) {
+      setFailure(errorMessage(t, error));
+    }
+  }
   return (
-    <Field>
-      <FieldLabel htmlFor={id}>{t('tasks.move.reason')}</FieldLabel>
-      <Textarea
-        id={id}
-        rows={3}
-        maxLength={2000}
-        placeholder={t('tasks.move.reasonPlaceholder')}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </Field>
+    <Dialog
+      open={subtask !== null}
+      onOpenChange={(open) => !open && onClose()}
+      onOpenChangeComplete={(open) => {
+        if (open) return;
+        setReason('');
+        setInvalid(false);
+        setFailure(null);
+      }}
+    >
+      <DialogContent closeLabel={t('common.close')}>
+        <DialogHeader>
+          <DialogTitle>
+            {t('tasks.subtasks.cancelTitle', { title: shown?.title ?? '' })}
+          </DialogTitle>
+          <DialogDescription>{t('tasks.subtasks.cancelBody')}</DialogDescription>
+        </DialogHeader>
+        <Field invalid={invalid}>
+          <FieldLabel htmlFor={id}>{t('tasks.move.reason')}</FieldLabel>
+          <Textarea
+            ref={field}
+            id={id}
+            rows={3}
+            maxLength={REASON_MAX}
+            placeholder={t('tasks.move.reasonPlaceholder')}
+            value={reason}
+            onChange={(event) => {
+              setInvalid(false);
+              setReason(event.target.value);
+            }}
+          />
+          <FieldError match={invalid}>{t('tasks.move.errors.reason')}</FieldError>
+        </Field>
+        {failure && <FormAlert>{failure}</FormAlert>}
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" type="button" />}>
+            {t('common.cancel')}
+          </DialogClose>
+          <Button variant="destructive" onClick={confirm} disabled={cancel.isPending}>
+            <BanIcon />
+            {t('tasks.moves.cancel')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -915,7 +977,7 @@ export function AddSubtaskDialog({
   prefill,
   onClose,
 }: {
-  parent: Pick<TaskDetail, 'id' | 'dueDate' | 'department' | 'runMode' | 'stages'>;
+  parent: Pick<TaskDetail, 'id' | 'dueDate' | 'department' | 'runMode' | 'stages' | 'client'>;
   stageId: string | null;
   prefill?: SubtaskPrefill;
   onClose: () => void;
@@ -944,7 +1006,9 @@ export function AddSubtaskDialog({
     },
   });
   const department = form.watch('department');
-  const { options } = useAssigneeOptions(department, null);
+  // Own-clients assign scope (rule A2): the subtask takes the parent's client.
+  const client = useQuery({ ...clientQuery(parent.client?.id ?? ''), enabled: !!parent.client });
+  const { options } = useAssigneeOptions(department, client.data?.accountManager.id ?? null);
   const errors = form.formState.errors;
 
   async function send(values: CreateSubtask, acceptLeave = false) {
