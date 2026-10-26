@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   allowedTaskTransitions,
   BOARD_STATUSES,
+  briefColumns,
   CLIENT_TEXT_MAX,
   canMakeTaskMove,
   commentExcerpt,
@@ -10,10 +11,10 @@ import {
   createTaskChecklistItemSchema,
   createTaskSchema,
   forwardQuestionSchema,
-  myQuestionsQuerySchema,
   isTaskBlocked,
   isTaskOverdue,
   medicalReviewSchema,
+  myQuestionsQuerySchema,
   reopenSubtasksSchema,
   reviewContentToken,
   revisionDecisionInputSchema,
@@ -25,8 +26,8 @@ import {
   type TaskRights,
   type TaskState,
   taskBoardQuerySchema,
-  taskClientTextInputSchema,
   taskBriefDocSchema,
+  taskClientTextInputSchema,
   taskCommentDocSchema,
   taskCommentInputSchema,
   taskCommentListQuerySchema,
@@ -35,8 +36,8 @@ import {
   taskListQuerySchema,
   taskMove,
   taskMoveNeedsNote,
-  taskStatusChangeSchema,
   taskQuestionInputSchema,
+  taskStatusChangeSchema,
   taskWorkloadQuerySchema,
   updateTaskChecklistItemSchema,
   updateTaskSchema,
@@ -741,7 +742,9 @@ describe('rich-text bodies (F06B rule B2)', () => {
     expect(taskCommentDocSchema.safeParse(textDoc('x'.repeat(4001))).success).toBe(false);
     const people = (count: number) => ({
       type: 'doc',
-      content: [{ type: 'paragraph', content: Array.from({ length: count }, (_, n) => mention(n)) }],
+      content: [
+        { type: 'paragraph', content: Array.from({ length: count }, (_, n) => mention(n)) },
+      ],
     });
     expect(taskCommentDocSchema.safeParse(people(20)).success).toBe(true);
     expect(taskCommentDocSchema.safeParse(people(21)).success).toBe(false);
@@ -753,21 +756,39 @@ describe('rich-text bodies (F06B rule B2)', () => {
   });
 });
 
+describe('briefColumns (F06B rule C1)', () => {
+  it('writes the plain brief from the document, or the document from the plain brief', () => {
+    expect(briefColumns({ briefDoc: textDoc('one', 'two') as never })).toEqual({
+      brief: 'one\ntwo',
+      briefDoc: textDoc('one', 'two'),
+    });
+    expect(briefColumns({ brief: 'one\ntwo' })).toEqual({
+      brief: 'one\ntwo',
+      briefDoc: textDoc('one', 'two'),
+    });
+    expect(briefColumns({ brief: null })).toEqual({ brief: null, briefDoc: null });
+    expect(briefColumns({ brief: 'x', briefDoc: null })).toEqual({ brief: null, briefDoc: null });
+    expect(briefColumns({})).toBeUndefined();
+  });
+});
+
 describe('taskCommentInputSchema', () => {
   it('defaults to no files and refuses an upload listed twice or more than 10', () => {
     expect(taskCommentInputSchema.parse({ bodyDoc: textDoc('Hi') }).files).toEqual([]);
-    const upload = (n: number) => ({ uploadId: `01a0e97d-0028-7d46-8479-${String(n).padStart(12, '0')}` });
+    const upload = (n: number) => ({
+      uploadId: `01a0e97d-0028-7d46-8479-${String(n).padStart(12, '0')}`,
+    });
     expect(
       taskCommentInputSchema.safeParse({ bodyDoc: textDoc('Hi'), files: [upload(1), upload(1)] })
         .success,
     ).toBe(false);
     const files = (count: number) => Array.from({ length: count }, (_, n) => upload(n));
-    expect(taskCommentInputSchema.safeParse({ bodyDoc: textDoc('Hi'), files: files(10) }).success).toBe(
-      true,
-    );
-    expect(taskCommentInputSchema.safeParse({ bodyDoc: textDoc('Hi'), files: files(11) }).success).toBe(
-      false,
-    );
+    expect(
+      taskCommentInputSchema.safeParse({ bodyDoc: textDoc('Hi'), files: files(10) }).success,
+    ).toBe(true);
+    expect(
+      taskCommentInputSchema.safeParse({ bodyDoc: textDoc('Hi'), files: files(11) }).success,
+    ).toBe(false);
   });
 });
 
@@ -777,9 +798,9 @@ describe('question inputs (F06B part B)', () => {
     expect(taskQuestionInputSchema.safeParse({ bodyDoc, addressedUserId: ids.user }).success).toBe(
       true,
     );
-    expect(taskQuestionInputSchema.safeParse({ bodyDoc, addressedDepartment: 'design' }).success).toBe(
-      true,
-    );
+    expect(
+      taskQuestionInputSchema.safeParse({ bodyDoc, addressedDepartment: 'design' }).success,
+    ).toBe(true);
     expect(taskQuestionInputSchema.safeParse({ bodyDoc }).success).toBe(false);
     expect(
       taskQuestionInputSchema.safeParse({

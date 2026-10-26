@@ -26,7 +26,14 @@ import {
 } from './lists.js';
 import { NOTIFICATION_EXCERPT_MAX } from './notifications.js';
 import { deliverableKindSchema } from './retainers.js';
-import { mentionedUserIds, replaceMentions, richTextPlain, richTextSchema } from './rich-text.js';
+import {
+  mentionedUserIds,
+  type RichTextDoc,
+  replaceMentions,
+  richTextFromPlain,
+  richTextPlain,
+  richTextSchema,
+} from './rich-text.js';
 import { httpUrlSchema, optionalText } from './text.js';
 import {
   revisionDecisionSchema,
@@ -528,6 +535,25 @@ export const taskCommentDocSchema = richTextSchema({
   .meta({ id: 'TaskCommentDoc' });
 
 export type TaskCommentDoc = z.infer<typeof taskCommentDocSchema>;
+
+/**
+ * F06B rule C1: the stored brief and its document from an input's `briefDoc` (the plain text
+ * written from it) or plain `brief` (a paragraph per line); undefined when neither is given.
+ */
+export function briefColumns(input: {
+  brief?: string | null;
+  briefDoc?: TaskBriefDoc | null;
+}): { brief: string | null; briefDoc: RichTextDoc | null } | undefined {
+  if (input.briefDoc !== undefined) {
+    return input.briefDoc
+      ? { brief: richTextPlain(input.briefDoc), briefDoc: input.briefDoc }
+      : { brief: null, briefDoc: null };
+  }
+  if (input.brief === undefined) return undefined;
+  return input.brief
+    ? { brief: input.brief, briefDoc: richTextFromPlain(input.brief) }
+    : { brief: null, briefDoc: null };
+}
 
 const checklistTextSchema = z.string().trim().min(1).max(200);
 

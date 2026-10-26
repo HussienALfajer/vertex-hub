@@ -8,6 +8,7 @@ import { ProjectsModule } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { OverLimitReminders } from './over-limit-reminders.js';
 import { PostTaskHooks } from './post-task-hooks.js';
+import { QuestionReminders } from './question-reminders.js';
 import { PostTasks } from './post-tasks.js';
 import { ShootTasks } from './shoot-tasks.js';
 import { SubtaskRuns } from './subtask-runs.js';
@@ -23,6 +24,8 @@ import { TaskLinks } from './task-links.js';
 import { TaskNotices } from './task-notices.js';
 import { TaskPartsController } from './task-parts.controller.js';
 import { TaskPartsService } from './task-parts.service.js';
+import { TaskQuestionsController } from './task-questions.controller.js';
+import { TaskQuestionsService } from './task-questions.service.js';
 import { TaskQueueHooks } from './task-queue-hooks.js';
 import { TaskReminders } from './task-reminders.js';
 import { TaskReports } from './task-reports.js';
@@ -53,8 +56,9 @@ import { TasksService } from './tasks.service.js';
  * `TaskGuards` registry for the `calendar` module (F11, ADR 0022), which it never imports, and
  * `TaskLinks` (task summaries) for the `campaigns` module (F12), and `TaskReports` for `reports` (F15).
  * Warns of an assignee's approved leave through `hr`'s `LeaveDirectory` and feeds open tasks into
- * its `LeaveWorkSources` (F17 rules B14 and B17). Owns subtasks, their stages and run (F06B,
- * ADR 0041).
+ * its `LeaveWorkSources` (F17 rules B14 and B17). Owns subtasks, their stages and run, and the
+ * questions of a task's thread (F06B, ADR 0041): attaches their files through `files`'
+ * `FileAttachments` and counts reminders in work hours with `hr`'s `HolidayCalendar`.
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule, HrModule],
@@ -65,6 +69,7 @@ import { TasksService } from './tasks.service.js';
     TaskReviewsController,
     TaskPartsController,
     TaskCommentsController,
+    TaskQuestionsController,
     TaskSubtasksController,
   ],
   providers: [
@@ -93,6 +98,8 @@ import { TasksService } from './tasks.service.js';
     TaskQueueHooks,
     SubtaskRuns,
     TaskSubtasksService,
+    TaskQuestionsService,
+    QuestionReminders,
   ],
   exports: [
     TaskGenerator,

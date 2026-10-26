@@ -2,10 +2,12 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nest
 import {
   type AuditAction,
   type AuditEntityType,
+  type ChecklistItemKind,
   type CreateTaskChecklistItem,
   type CreateTaskLink,
   type PersonRef,
   TASK_LIMITS,
+  type TaskRights,
   type TaskChecklist,
   type TaskChecklistItem,
   type TaskChecklistOrder,
@@ -20,15 +22,42 @@ import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, personRef, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { EngagementDirectory } from '../projects/index.js';
-import { actorOf, assertTaskWritable, readableTask, taskRights } from './task-access.js';
+import {
+  actorOf,
+  assertTaskWritable,
+  editsCriteria,
+  readableTask,
+  taskRights,
+  ticksCriteria,
+} from './task-access.js';
 
 type ChecklistRow = typeof taskChecklistItems.$inferSelect;
 
 type LinkRow = typeof taskLinks.$inferSelect;
 
+/** What a change of a checklist row needs: F06's work right, or F06B rule C6's criteria rights. */
+type ItemRight = 'work' | 'editCriteria' | 'tickCriteria';
+
+const RIGHTS: Record<ItemRight, (rights: TaskRights) => boolean> = {
+  work: (rights) => rights.work || rights.manage,
+  editCriteria: editsCriteria,
+  tickCriteria: ticksCriteria,
+};
+
+/** The right to add, rename, order or remove rows of a kind. */
+const writeRight = (kind: ChecklistItemKind): ItemRight =>
+  kind === 'criterion' ? 'editCriteria' : 'work';
+
+const LIMITS: Record<ChecklistItemKind, number> = {
+  checklist: TASK_LIMITS.checklist,
+  criterion: TASK_LIMITS.criteria,
+};
+
 /**
- * The checklist and the links of a task (spec F06, rule 15 and the actions table): the assignee,
- * the department manager and manage-scope holders change them.
+ * The checklist, the acceptance criteria and the links of a task (spec F06, rule 15 and the
+ * actions table; F06B rule C6): the assignee, the department manager and manage-scope holders
+ * change the checklist and links; manage scope writes the criteria, which the assignee, a
+ * reviewer or manage scope tick. The two kinds are ordered and limited apart.
  */
 @Injectable()
 export class TaskPartsService {
@@ -43,28 +72,29 @@ export class TaskPartsService {
     actor: CurrentUserInfo,
     taskId: string,
     input: CreateTaskChecklistItem,
+    kind: ChecklistItemKind = 'checklist',
   ): Promise<TaskChecklistItem> {
     const id = await this.db.transaction(async (tx) => {
-      await this.workableTask(tx, actor, taskId);
+      await this.workableTask(tx, actor, taskId, [writeRight(kind)]);
       const [current] = await tx
         .select({ total: count(), last: max(taskChecklistItems.position) })
         .from(taskChecklistItems)
-        .where(liveItems(taskId));
-      if ((current?.total ?? 0) >= TASK_LIMITS.checklist) {
-        throw new CodedException(409, 'LIMIT_REACHED', 'The checklist is full');
+        .where(liveItems(taskId, kind));
+      if ((current?.total ?? 0) >= LIMITS[kind]) {
+        throw new CodedException(409, 'LIMIT_REACHED', 'The list is full');
       }
       const position = (current?.last ?? 0) + 1;
       const [created] = await tx
         .insert(taskChecklistItems)
-        .values({ taskId, text: input.text, position })
+        .values({ taskId, text: input.text, kind, position })
         .returning({ id: taskChecklistItems.id });
       if (!created) throw new Error('Checklist insert returned no row');
       await this.audit(tx, actor, 'task_checklist_item.created', created.id, taskId, {
-        after: { text: input.text, position },
+        after: { kind, text: input.text, position },
       });
       return created.id;
     });
-    return this.checklistItem(taskId, id);
+    return this.checklistItem(taskId, id, kind);
   }
 
   /** Renames, ticks or unticks an item. */
@@ -73,10 +103,18 @@ export class TaskPartsService {
     taskId: string,
     itemId: string,
     input: UpdateTaskChecklistItem,
+    kind: ChecklistItemKind = 'checklist',
   ): Promise<TaskChecklistItem> {
     await this.db.transaction(async (tx) => {
-      await this.workableTask(tx, actor, taskId);
-      const item = await this.liveItem(tx, taskId, itemId);
+      const needs: ItemRight[] =
+        kind === 'criterion'
+          ? [
+              ...(input.text !== undefined ? (['editCriteria'] as const) : []),
+              ...(input.done !== undefined ? (['tickCriteria'] as const) : []),
+            ]
+          : ['work'];
+      await this.workableTask(tx, actor, taskId, needs);
+      const item = await this.liveItem(tx, taskId, itemId, kind);
       const change = changedFields({ text: item.text, done: !!item.doneAt }, input);
       if (!change) return;
       const done = change.after.done as boolean | undefined;
@@ -88,9 +126,12 @@ export class TaskPartsService {
           ...(done === false && { doneAt: null, doneById: null }),
         })
         .where(eq(taskChecklistItems.id, itemId));
-      await this.audit(tx, actor, 'task_checklist_item.updated', itemId, taskId, change);
+      await this.audit(tx, actor, 'task_checklist_item.updated', itemId, taskId, {
+        before: change.before,
+        after: { kind, ...change.after },
+      });
     });
-    return this.checklistItem(taskId, itemId);
+    return this.checklistItem(taskId, itemId, kind);
   }
 
   /** Rewrites positions from the given order; every non-archived item once. */
@@ -98,13 +139,14 @@ export class TaskPartsService {
     actor: CurrentUserInfo,
     taskId: string,
     order: TaskChecklistOrder,
+    kind: ChecklistItemKind = 'checklist',
   ): Promise<TaskChecklist> {
     await this.db.transaction(async (tx) => {
-      await this.workableTask(tx, actor, taskId);
+      await this.workableTask(tx, actor, taskId, [writeRight(kind)]);
       const current = await tx
         .select({ id: taskChecklistItems.id, position: taskChecklistItems.position })
         .from(taskChecklistItems)
-        .where(liveItems(taskId));
+        .where(liveItems(taskId, kind));
       const known = new Set(current.map((row) => row.id));
       const complete =
         order.ids.length === current.length &&
@@ -114,7 +156,7 @@ export class TaskPartsService {
         throw new CodedException(
           409,
           'INVALID_ORDER',
-          'The order must list every checklist item of the task once',
+          'The order must list every item of the list once',
         );
       }
       const positions = new Map(current.map((row) => [row.id, row.position]));
@@ -125,18 +167,23 @@ export class TaskPartsService {
         await tx.update(taskChecklistItems).set({ position }).where(eq(taskChecklistItems.id, id));
         await this.audit(tx, actor, 'task_checklist_item.reordered', id, taskId, {
           before: { position: before },
-          after: { position },
+          after: { kind, position },
         });
       }
     });
-    return { items: await this.checklist(taskId) };
+    return { items: await this.checklist(taskId, kind) };
   }
 
-  /** Removes an item from the checklist; the items after it move up. */
-  async archiveChecklistItem(actor: CurrentUserInfo, taskId: string, itemId: string) {
+  /** Removes an item from its list; the items after it move up. */
+  async archiveChecklistItem(
+    actor: CurrentUserInfo,
+    taskId: string,
+    itemId: string,
+    kind: ChecklistItemKind = 'checklist',
+  ) {
     await this.db.transaction(async (tx) => {
-      await this.workableTask(tx, actor, taskId);
-      const item = await this.liveItem(tx, taskId, itemId);
+      await this.workableTask(tx, actor, taskId, [writeRight(kind)]);
+      const item = await this.liveItem(tx, taskId, itemId, kind);
       await tx
         .update(taskChecklistItems)
         .set({ archivedAt: new Date() })
@@ -144,10 +191,10 @@ export class TaskPartsService {
       await tx
         .update(taskChecklistItems)
         .set({ position: sql`${taskChecklistItems.position} - 1` })
-        .where(and(liveItems(taskId), gt(taskChecklistItems.position, item.position)));
+        .where(and(liveItems(taskId, kind), gt(taskChecklistItems.position, item.position)));
       await this.audit(tx, actor, 'task_checklist_item.archived', itemId, taskId, {
         before: { archived: false, text: item.text },
-        after: { archived: true },
+        after: { kind, archived: true },
       });
     });
   }
@@ -195,8 +242,13 @@ export class TaskPartsService {
     });
   }
 
-  /** The task, locked, when the actor works it or holds manage scope and it is writable. */
-  private async workableTask(tx: Transaction, actor: CurrentUserInfo, taskId: string) {
+  /** The task, locked, when the actor holds each of `needs` (F06's work right by default) and it is writable. */
+  private async workableTask(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    taskId: string,
+    needs: readonly ItemRight[] = ['work'],
+  ) {
     const task = await readableTask(
       tx,
       { clients: this.clients, engagements: this.engagements },
@@ -205,26 +257,31 @@ export class TaskPartsService {
       { forUpdate: true },
     );
     const rights = taskRights(actor, task);
-    if (!rights.work && !rights.manage) throw new ForbiddenException();
+    if (!needs.every((need) => RIGHTS[need](rights))) throw new ForbiddenException();
     assertTaskWritable(task);
     return task;
   }
 
-  private async liveItem(tx: Transaction, taskId: string, itemId: string): Promise<ChecklistRow> {
+  private async liveItem(
+    tx: Transaction,
+    taskId: string,
+    itemId: string,
+    kind: ChecklistItemKind,
+  ): Promise<ChecklistRow> {
     const [item] = await tx
       .select()
       .from(taskChecklistItems)
-      .where(and(eq(taskChecklistItems.id, itemId), liveItems(taskId)))
+      .where(and(eq(taskChecklistItems.id, itemId), liveItems(taskId, kind)))
       .for('update');
     if (!item) throw new NotFoundException();
     return item;
   }
 
-  private async checklist(taskId: string): Promise<TaskChecklistItem[]> {
+  private async checklist(taskId: string, kind: ChecklistItemKind): Promise<TaskChecklistItem[]> {
     const rows = await this.db
       .select()
       .from(taskChecklistItems)
-      .where(liveItems(taskId))
+      .where(liveItems(taskId, kind))
       .orderBy(asc(taskChecklistItems.position));
     const people = await this.users.summaries(
       rows.flatMap((row) => (row.doneById ? [row.doneById] : [])),
@@ -239,8 +296,12 @@ export class TaskPartsService {
     }));
   }
 
-  private async checklistItem(taskId: string, itemId: string): Promise<TaskChecklistItem> {
-    const item = (await this.checklist(taskId)).find((i) => i.id === itemId);
+  private async checklistItem(
+    taskId: string,
+    itemId: string,
+    kind: ChecklistItemKind,
+  ): Promise<TaskChecklistItem> {
+    const item = (await this.checklist(taskId, kind)).find((i) => i.id === itemId);
     if (!item) throw new NotFoundException();
     return item;
   }
@@ -278,6 +339,10 @@ export class TaskPartsService {
   }
 }
 
-/** The non-archived checklist items of the task. */
-const liveItems = (taskId: string) =>
-  and(eq(taskChecklistItems.taskId, taskId), isNull(taskChecklistItems.archivedAt));
+/** The non-archived items of one kind of the task. */
+const liveItems = (taskId: string, kind: ChecklistItemKind) =>
+  and(
+    eq(taskChecklistItems.taskId, taskId),
+    eq(taskChecklistItems.kind, kind),
+    isNull(taskChecklistItems.archivedAt),
+  );

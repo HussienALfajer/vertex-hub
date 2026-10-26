@@ -188,6 +188,7 @@ describe('task views: board, workload, My tasks', () => {
       readyToSend: null,
       requestedByMe: 1,
       unassignedInMyDepartments: null,
+      questionsWaiting: 0,
     });
 
     const reviewBefore = (await summary(cast.designManager.cookie)).toReview;

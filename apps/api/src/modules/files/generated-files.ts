@@ -454,7 +454,7 @@ export class GeneratedFiles {
 }
 
 /** The uploaded name with its extension, cut to the item name limit. */
-function documentName(originalName: string): string {
+export function documentName(originalName: string): string {
   const dot = originalName.lastIndexOf('.');
   const extension = dot > 0 && originalName.length - dot <= 16 ? originalName.slice(dot) : '';
   const stem = originalName.slice(0, originalName.length - extension.length).trim();

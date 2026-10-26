@@ -376,6 +376,8 @@ export class NotificationCenter {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`${notice.type}:${recipientId}:${notice.subjectId}`}, 0))`,
     );
+    const { mergesOn } = NOTIFICATION_CATALOG[notice.type];
+    const mergeValue = mergesOn ? (data as Record<string, unknown>)[mergesOn] : undefined;
     const [open] = await tx
       .select({ id: notifications.id, data: notifications.data })
       .from(notifications)
@@ -391,6 +393,8 @@ export class NotificationCenter {
           NOTIFICATION_CATALOG[notice.type].mergesDaily
             ? gte(notifications.createdAt, businessInstant(businessDate(), '00:00'))
             : undefined,
+          // F06B: "merges per question" types merge only into the row of the same question.
+          mergesOn ? sql`${notifications.data}->>${mergesOn} = ${String(mergeValue)}` : undefined,
         ),
       )
       .limit(1)

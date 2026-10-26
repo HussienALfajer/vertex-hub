@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { DepartmentCode, TaskPriority, TaskStatus } from '@vertex-hub/contracts';
+import {
+  type DepartmentCode,
+  richTextFromPlain,
+  type TaskPriority,
+  type TaskStatus,
+} from '@vertex-hub/contracts';
 import {
   type Database,
   newId,
@@ -80,6 +85,8 @@ export class TaskGenerator {
     await tx.insert(tasks).values(
       drafts.map((draft) => ({
         ...valuesOf(draft),
+        // F06B rule C1: the brief's document, a paragraph per line.
+        briefDoc: draft.brief ? richTextFromPlain(draft.brief) : null,
         id: idOf(draft.key),
         type: 'work' as const,
         createdById: actor?.id ?? null,

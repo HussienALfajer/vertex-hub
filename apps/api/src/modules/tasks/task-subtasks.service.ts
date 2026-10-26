@@ -26,6 +26,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
+import { FileAttachments } from '../files/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { SubtaskRuns } from './subtask-runs.js';
 import {
@@ -42,6 +43,7 @@ import {
 } from './task-access.js';
 import { lockDependencyGraph } from './task-dependencies.js';
 import { TaskNotices } from './task-notices.js';
+import { TaskQuestionsService } from './task-questions.service.js';
 import { TaskReviews } from './task-reviews.js';
 import { TasksService } from './tasks.service.js';
 
@@ -64,18 +66,26 @@ export class TaskSubtasksService {
     private readonly runs: SubtaskRuns,
     private readonly notices: TaskNotices,
     private readonly reviews: TaskReviews,
+    private readonly questions: TaskQuestionsService,
+    private readonly attachments: FileAttachments,
   ) {}
 
   private get directories() {
     return { clients: this.clients, engagements: this.engagements };
   }
 
-  /** Rule A2: a subtask added to an open parent, checked as its own create. */
+  /**
+   * Rule A2: a subtask added to an open parent, checked as its own create; rule B11: made from a
+   * question or a comment of the parent's thread or of one of its subtasks'.
+   */
   async add(actor: CurrentUserInfo, parentId: string, input: CreateSubtask): Promise<TaskDetail> {
-    const id = await this.db.transaction(async (tx) => {
+    const { id, preview } = await this.db.transaction(async (tx) => {
       // The access lock comes first, as in every create with an assignee (F01 change).
       if (input.assigneeId) await lockAccessChanges(tx);
       const parent = await this.lockParent(tx, actor, parentId);
+      const source = input.fromCommentId
+        ? await this.questions.convertSource(tx, parentId, input.fromCommentId)
+        : null;
       const subtasks = await this.runs.subtasksOf(tx, parentId);
       const kept = subtasks.filter((s) => !s.archivedAt);
       if (kept.filter((s) => s.status !== 'cancelled').length >= SUBTASK_LIMITS.subtasks) {
@@ -106,6 +116,7 @@ export class TaskSubtasksService {
           type: 'work',
           title: input.title,
           brief: input.brief ?? null,
+          briefDoc: input.briefDoc,
           department: input.department,
           assigneeId: input.assigneeId,
           priority: input.priority,
@@ -131,10 +142,18 @@ export class TaskSubtasksService {
           parent: { id: parentId, position, stageId, assigneeId: parent.assigneeId },
         },
       );
+      const preview = source
+        ? await this.questions.converted(tx, actor, source, {
+            id: created,
+            title: input.title,
+            clientId: parent.clientId,
+          })
+        : false;
       await this.runs.sync(tx, parentId, actor.id);
       await this.runs.rearm(tx, parentId, actor.id);
-      return created;
+      return { id: created, preview };
     });
+    if (preview) await this.attachments.queuePreviews();
     return this.tasks.detail(actor, id);
   }
 

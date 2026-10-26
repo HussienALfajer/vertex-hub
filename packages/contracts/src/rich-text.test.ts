@@ -54,20 +54,22 @@ describe('the mention node (F06B, ADR 0038)', () => {
     ],
   };
 
-  it('is allowed only where mentions are, lowercased, without other attributes', () => {
+  it('is allowed only where mentions are, without other attributes', () => {
     const parsed = withMentions.parse(doc);
     expect(parsed.content[0]).toEqual({
       type: 'paragraph',
       content: [
         { type: 'text', text: 'Ask ' },
-        { type: 'mention', attrs: { userId: user } },
+        { type: 'mention', attrs: { userId: user.toUpperCase() } },
       ],
     });
     expect(plain.safeParse(doc).success).toBe(false);
   });
 
   it('is kept in the plain extract as a token', () => {
-    expect(richTextPlain(withMentions.parse(doc))).toBe(`Ask @{${user}}\n@{${other}}`);
+    const plain = richTextPlain(withMentions.parse(doc));
+    expect(plain).toBe(`Ask @{${user.toUpperCase()}}\n@{${other}}`);
+    expect(mentionedUserIds(plain)).toEqual([user, other]);
   });
 
   it('counts a document holding only mentions as not empty', () => {

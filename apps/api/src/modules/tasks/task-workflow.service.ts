@@ -26,6 +26,7 @@ import {
 import {
   type Database,
   type Transaction,
+  taskChecklistItems,
   taskDependencies,
   taskRevisions,
   tasks,
@@ -62,6 +63,7 @@ import {
 import { TaskGuards } from './task-guards.js';
 import { cancelledColumns, TaskHooksService } from './task-hooks.service.js';
 import { blocksDependents, TaskNotices } from './task-notices.js';
+import { restartQuestionClocks } from './task-questions.js';
 import { TaskReviews } from './task-reviews.js';
 import { TasksService } from './tasks.service.js';
 
@@ -179,6 +181,8 @@ export class TaskWorkflowService {
       if (!task.parentId && SUBTASK_HELD_MOVES.includes(move)) {
         await this.assertSubtasksDelivered(tx, id);
       }
+      // F06B rule C6: the acceptance criteria are ticked before every move to review.
+      if (move === 'submit' || move === 'resubmit') await this.assertCriteriaTicked(tx, id);
       // F08 rule 7: the client approves the post, and publishing it delivers the task.
       if (isRefusedOnLinkedTask(task, change.status)) {
         throw new CodedException(
@@ -352,6 +356,10 @@ export class TaskWorkflowService {
       if (move === 'reopen_client' || move === 'reopen_internal') {
         await unlinkRemovedTask(tx, this.postHooks, task, 'reopened', actorOf(actor));
       }
+      // F06B rule B10: a task back from delivered or cancelled restarts its open questions' clocks.
+      if (move === 'reopen' || move === 'reopen_client' || move === 'reopen_internal') {
+        await restartQuestionClocks(tx, [id], now);
+      }
       // F06B rule A11: cancelling a parent cancels its open subtasks with its reason.
       if (move === 'cancel' && !task.parentId && note) {
         await this.cancelSubtasks(tx, actor, id, note);
@@ -379,6 +387,25 @@ export class TaskWorkflowService {
       );
     });
     return this.tasks.detail(actor, id);
+  }
+
+  /** Rule C6: `CRITERIA_OPEN`, listing the live acceptance criteria not ticked yet. */
+  private async assertCriteriaTicked(tx: Transaction, taskId: string): Promise<void> {
+    const open = await tx
+      .select({ id: taskChecklistItems.id, text: taskChecklistItems.text })
+      .from(taskChecklistItems)
+      .where(
+        and(
+          eq(taskChecklistItems.taskId, taskId),
+          eq(taskChecklistItems.kind, 'criterion'),
+          isNull(taskChecklistItems.archivedAt),
+          isNull(taskChecklistItems.doneAt),
+        ),
+      )
+      .orderBy(asc(taskChecklistItems.position));
+    if (open.length > 0) {
+      throw new CodedException(409, 'CRITERIA_OPEN', 'Tick the acceptance criteria first', open);
+    }
   }
 
   /** Rule A8: `SUBTASKS_OPEN`, listing the live subtasks not delivered yet. */

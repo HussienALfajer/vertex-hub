@@ -42,7 +42,7 @@ const textNodeSchema = z.object({
 /** F06B: a mention of a user, kept in the extract as `@{userId}` (F06 rule 16). */
 const mentionNodeSchema = z.object({
   type: z.literal('mention'),
-  attrs: z.object({ userId: z.uuid().transform((id) => id.toLowerCase()) }),
+  attrs: z.object({ userId: z.uuid() }),
 });
 
 export type MentionNode = z.infer<typeof mentionNodeSchema>;

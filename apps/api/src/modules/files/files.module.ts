@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { NotificationsModule } from '../notifications/index.js';
+import { FileAttachments } from './file-attachments.js';
 import { FileContentController } from './file-content.controller.js';
 import { FileContentService } from './file-content.service.js';
 import { FileLibraryService } from './file-library.service.js';
@@ -21,7 +22,8 @@ import { LocalFileStorage } from './local-file-storage.js';
  * `file_versions`, `file_uploads` and `images` (stored for `auth` through its `UserImages`);
  * reads users through `auth`'s `UserDirectory` and notifies through `notifications`. Never
  * imports `tasks`, `clients` or `projects`: they register their owner policies in the exported
- * `FileOwnerRegistry`, and `tasks` calls the exported `FileVersions` in its transactions;
+ * `FileOwnerRegistry`, and `tasks` calls the exported `FileVersions` and `FileAttachments` (its
+ * thread's attachments, F06B) in its transactions;
  * `quotes` and `invoices` attach and serve their documents through `GeneratedFiles`. Works
  * the `files.preview` and `files.purge-uploads` jobs; the purge also runs the `FilePurges` other
  * modules register (`invoices`' statement PDFs).
@@ -31,6 +33,7 @@ import { LocalFileStorage } from './local-file-storage.js';
   controllers: [FileContentController, FilesController, ImagesController],
   providers: [
     { provide: FileStorage, useClass: LocalFileStorage },
+    FileAttachments,
     FileOwnerRegistry,
     FilePurges,
     FilesService,
@@ -41,6 +44,6 @@ import { LocalFileStorage } from './local-file-storage.js';
     GeneratedFiles,
     ImagesService,
   ],
-  exports: [FileOwnerRegistry, FilePurges, FileVersions, GeneratedFiles, ImagesService],
+  exports: [FileAttachments, FileOwnerRegistry, FilePurges, FileVersions, GeneratedFiles, ImagesService],
 })
 export class FilesModule {}

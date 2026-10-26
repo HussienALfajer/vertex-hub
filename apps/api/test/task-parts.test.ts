@@ -134,11 +134,17 @@ describe('task checklist and links (rule 15)', () => {
     );
 
     expect((await auditOf(crop.id)).map((e) => [e.action, e.after])).toEqual([
-      ['task_checklist_item.created', { taskId: task.id, text: 'Crop the photo', position: 1 }],
-      ['task_checklist_item.updated', { taskId: task.id, done: true }],
-      ['task_checklist_item.updated', { taskId: task.id, text: 'Crop', done: false }],
-      ['task_checklist_item.reordered', { taskId: task.id, position: 2 }],
-      ['task_checklist_item.archived', { taskId: task.id, archived: true }],
+      [
+        'task_checklist_item.created',
+        { taskId: task.id, kind: 'checklist', text: 'Crop the photo', position: 1 },
+      ],
+      ['task_checklist_item.updated', { taskId: task.id, kind: 'checklist', done: true }],
+      [
+        'task_checklist_item.updated',
+        { taskId: task.id, kind: 'checklist', text: 'Crop', done: false },
+      ],
+      ['task_checklist_item.reordered', { taskId: task.id, kind: 'checklist', position: 2 }],
+      ['task_checklist_item.archived', { taskId: task.id, kind: 'checklist', archived: true }],
     ]);
   });
 
