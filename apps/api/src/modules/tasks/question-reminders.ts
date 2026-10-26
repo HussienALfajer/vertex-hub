@@ -97,10 +97,7 @@ export class QuestionReminders implements OnModuleInit {
       const task = await this.notices.load(tx, question.taskId);
       const data = await this.comments.questionData(tx, question);
       let sent = 0;
-      const send = async (
-        kind: TimedReminderKind,
-        notice: Notice,
-      ) => {
+      const send = async (kind: TimedReminderKind, notice: Notice) => {
         const recorded = await this.timed.remindOnce(
           tx,
           { kind, subjectId: question.id, occursAt: question.clockStartedAt as Date },
@@ -141,10 +138,7 @@ export class QuestionReminders implements OnModuleInit {
    * Operations manager when the addressee manages it, has none, or the question is still with its
    * department's managers.
    */
-  private async escalationTargets(
-    tx: Transaction,
-    question: CommentRow,
-  ): Promise<string[]> {
+  private async escalationTargets(tx: Transaction, question: CommentRow): Promise<string[]> {
     const addressee = question.addressedUserId;
     if (addressee) {
       const primary = (await this.users.primaryDepartments([addressee], tx)).get(addressee);

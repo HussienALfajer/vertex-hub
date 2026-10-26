@@ -1,9 +1,10 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  richTextFromPlain,
   type TaskComment,
-  type TaskCommentInput,
+  type TaskCommentUpdate,
   type TaskDetail,
-  taskCommentInputSchema,
+  taskCommentUpdateSchema,
 } from '@vertex-hub/contracts';
 import {
   Avatar,
@@ -245,7 +246,7 @@ function Composer({
   inputRef: RefObject<HTMLTextAreaElement | null>;
   initial?: MentionDraft;
   submitLabel: string;
-  onSubmit: (input: TaskCommentInput) => Promise<void>;
+  onSubmit: (input: TaskCommentUpdate) => Promise<void>;
   onCancel?: () => void;
 }) {
   const { t } = useTranslation();
@@ -278,7 +279,10 @@ function Composer({
     // The keyboard shortcut reaches here too: never send the same comment twice.
     if (pending) return;
     setFailure(null);
-    const parsed = taskCommentInputSchema.safeParse({ body: toBody(draft) });
+    // F06B rule B2: the text goes as a rich-text document, each mention token a mention node.
+    const parsed = taskCommentUpdateSchema.safeParse({
+      bodyDoc: richTextFromPlain(toBody(draft).trim(), { mentions: true }),
+    });
     if (!parsed.success) {
       setInvalid(true);
       input.current?.focus();

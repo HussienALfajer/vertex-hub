@@ -6,9 +6,9 @@ import {
   REVISION_DECISIONS,
   REVISION_SOURCES,
   SUBTASK_RUN_MODES,
+  TASK_COMMENT_KINDS,
   TASK_PRIORITIES,
   TASK_STATUSES,
-  TASK_COMMENT_KINDS,
   TASK_TYPES,
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';

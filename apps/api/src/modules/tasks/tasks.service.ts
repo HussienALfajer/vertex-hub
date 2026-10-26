@@ -332,7 +332,9 @@ export class TasksService {
       ...item,
       brief: task.brief,
       // A brief written by the previous release has no document yet (expand only).
-      briefDoc: (row.briefDoc as TaskDetail['briefDoc']) ?? (task.brief ? richTextFromPlain(task.brief) : null),
+      briefDoc:
+        (row.briefDoc as TaskDetail['briefDoc']) ??
+        (task.brief ? richTextFromPlain(task.brief) : null),
       needsClientApproval: task.needsClientApproval,
       clientRequest:
         task.type === 'client_request' && task.requestedOn && task.requestScope

@@ -11,6 +11,7 @@ import {
   type AuditEntityType,
   BRAND_FILE_KINDS,
   CATALOG_BILLINGS,
+  CHECKLIST_ITEM_KINDS,
   CLIENT_DECISIONS,
   CLIENT_PLATFORMS,
   CLIENT_STATUSES,
@@ -39,6 +40,7 @@ import {
   POST_STATUSES,
   POST_TYPES,
   PROJECT_STATUSES,
+  QUESTION_STATUSES,
   QUOTE_REJECTION_REASONS,
   QUOTE_STATUSES,
   REQUEST_SCOPES,
@@ -246,6 +248,15 @@ function enumLabel(
     const kind = find(AMENDMENT_KINDS);
     if (kind) return t(`audit.amendmentKinds.${kind}`);
   }
+  // F06B: a checklist row's kind, and a question's state.
+  if (entityType === 'task_checklist_item' && field === 'kind') {
+    const kind = find(CHECKLIST_ITEM_KINDS);
+    if (kind) return t(`audit.checklistKinds.${kind}`);
+  }
+  if (entityType === 'task_comment' && field === 'questionStatus') {
+    const status = find(QUESTION_STATUSES);
+    if (status) return t(`audit.questionStatuses.${status}`);
+  }
   if (entityType === 'template_run' && field === 'trigger') {
     const trigger = find(TEMPLATE_RUN_TRIGGERS);
     if (trigger) return t(`audit.triggers.${trigger}`);
@@ -424,7 +435,10 @@ export function AuditValue({
     }
     return <span>{value ? t('common.yes') : t('common.no')}</span>;
   }
-  if (field === 'department' && DEPARTMENT_CODES.some((code) => code === value)) {
+  if (
+    (field === 'department' || field === 'addressedDepartment') &&
+    DEPARTMENT_CODES.some((code) => code === value)
+  ) {
     return <DepartmentItem code={value as DepartmentCode} />;
   }
   const label = enumLabel(t, entityType, field, value);

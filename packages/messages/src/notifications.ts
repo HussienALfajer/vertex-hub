@@ -1705,11 +1705,14 @@ function taskText(
       });
     }
     case 'task_question_converted':
-      return fill(text.task_question_converted[notification.data.question ? 'question' : 'comment'], {
-        actor,
-        task,
-        subtask: notification.data.subtask,
-      });
+      return fill(
+        text.task_question_converted[notification.data.question ? 'question' : 'comment'],
+        {
+          actor,
+          task,
+          subtask: notification.data.subtask,
+        },
+      );
     case 'task_assigned': {
       const parent = notification.data.task.parent;
       return parent

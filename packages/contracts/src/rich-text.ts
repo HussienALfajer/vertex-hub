@@ -47,18 +47,26 @@ const mentionNodeSchema = z.object({
 
 export type MentionNode = z.infer<typeof mentionNodeSchema>;
 
-type InlineNode = z.infer<typeof textNodeSchema> | MentionNode;
+type TextNode = z.infer<typeof textNodeSchema>;
 
-type Paragraph = { type: 'paragraph'; content?: InlineNode[] };
+type InlineNode = TextNode | MentionNode;
 
-export type ListNode =
-  | { type: 'bulletList'; content: ListItemNode[] }
-  | { type: 'orderedList'; attrs?: { start?: number }; content: ListItemNode[] };
+type Paragraph<Inline = InlineNode> = { type: 'paragraph'; content?: Inline[] };
 
-export type ListItemNode = { type: 'listItem'; content: (Paragraph | ListNode)[] };
+/** A list whose paragraphs hold `Inline` nodes: text only, or text and mentions. */
+export type ListNode<Inline = TextNode> =
+  | { type: 'bulletList'; content: ListItemNode<Inline>[] }
+  | { type: 'orderedList'; attrs?: { start?: number }; content: ListItemNode<Inline>[] };
+
+export type ListItemNode<Inline = TextNode> = {
+  type: 'listItem';
+  content: (Paragraph<Inline> | ListNode<Inline>)[];
+};
 
 /** The block schemas over one kind of inline content (with or without mentions). */
-function blockSchemas(inline: z.ZodType<InlineNode>) {
+function blockSchemas<Inline extends InlineNode>(inline: z.ZodType<Inline>) {
+  type Item = ListItemNode<Inline>;
+  type List = ListNode<Inline>;
   const inlineContent = z.array(inline).optional();
   const paragraphSchema = z.object({ type: z.literal('paragraph'), content: inlineContent });
   const headingSchema = z.object({
@@ -66,13 +74,13 @@ function blockSchemas(inline: z.ZodType<InlineNode>) {
     attrs: z.object({ level: z.literal(3) }),
     content: inlineContent,
   });
-  const listItemSchema: z.ZodType<ListItemNode> = z.lazy(() =>
+  const listItemSchema: z.ZodType<Item> = z.lazy(() =>
     z.object({
       type: z.literal('listItem'),
       content: z.array(z.union([paragraphSchema, listSchema])).min(1),
     }),
   );
-  const listSchema: z.ZodType<ListNode> = z.lazy(() =>
+  const listSchema: z.ZodType<List> = z.lazy(() =>
     z.union([
       z.object({ type: z.literal('bulletList'), content: z.array(listItemSchema).min(1) }),
       z.object({
@@ -85,8 +93,8 @@ function blockSchemas(inline: z.ZodType<InlineNode>) {
   return z.union([paragraphSchema, headingSchema, listSchema]);
 }
 
-const plainBlockSchema = blockSchemas(textNodeSchema);
-const mentionBlockSchema = blockSchemas(z.union([textNodeSchema, mentionNodeSchema]));
+const plainBlockSchema = blockSchemas<TextNode>(textNodeSchema);
+const mentionBlockSchema = blockSchemas<InlineNode>(z.union([textNodeSchema, mentionNodeSchema]));
 
 type DocNode = {
   type: string;
@@ -100,7 +108,11 @@ export type RichTextDoc = { type: 'doc'; content: readonly DocNode[] };
 
 function inlineText(nodes: readonly DocNode[]): string {
   return nodes
-    .map((node) => (node.type === 'mention' ? `@{${(node.attrs as MentionNode['attrs']).userId}}` : (node.text ?? '')))
+    .map((node) =>
+      node.type === 'mention'
+        ? `@{${(node.attrs as MentionNode['attrs']).userId}}`
+        : (node.text ?? ''),
+    )
     .join('');
 }
 
@@ -137,6 +149,11 @@ export function replaceMentions(text: string, replace: (userId: string) => strin
  * A plain text as a document: one paragraph per line, and `@{userId}` tokens as mention nodes
  * when `mentions` is set (the migration of old comments and briefs, F06B edge case 22).
  */
+export function richTextFromPlain(text: string): { type: 'doc'; content: Paragraph<TextNode>[] };
+export function richTextFromPlain(
+  text: string,
+  options: { mentions: boolean },
+): { type: 'doc'; content: Paragraph[] };
 export function richTextFromPlain(
   text: string,
   options: { mentions: boolean } = { mentions: false },
@@ -163,17 +180,24 @@ export function richTextFromPlain(
   };
 }
 
+/** A document of `block`s holding 1 to `maxText` characters of text (its plain extract). */
+function docSchema<Block extends z.ZodType<DocNode>>(block: Block, maxText: number) {
+  return z
+    .object({ type: z.literal('doc'), content: z.array(block).min(1) })
+    .refine((doc) => richTextPlain(doc).trim().length > 0, { message: 'The text is empty' })
+    .refine((doc) => richTextPlain(doc).length <= maxText, {
+      message: `The text holds more than ${maxText} characters`,
+    });
+}
+
 /**
  * A rich-text document holding 1 to `maxText` characters of text (its plain extract). Unknown
  * nodes, marks and attributes are refused or dropped (Zod objects strip unknown keys), so only the
  * allowed document is stored and rendered.
  */
-export function richTextSchema(options: { maxText: number; mentions?: boolean }) {
-  const block = options.mentions ? mentionBlockSchema : plainBlockSchema;
-  return z
-    .object({ type: z.literal('doc'), content: z.array(block).min(1) })
-    .refine((doc) => richTextPlain(doc).trim().length > 0, { message: 'The text is empty' })
-    .refine((doc) => richTextPlain(doc).length <= options.maxText, {
-      message: `The text holds more than ${options.maxText} characters`,
-    });
-}
+export const richTextSchema = (options: { maxText: number }) =>
+  docSchema(plainBlockSchema, options.maxText);
+
+/** The same document with mention nodes (F06B: comments, questions and replies). */
+export const mentionTextSchema = (options: { maxText: number }) =>
+  docSchema(mentionBlockSchema, options.maxText);

@@ -28,6 +28,7 @@ import { NOTIFICATION_EXCERPT_MAX } from './notifications.js';
 import { deliverableKindSchema } from './retainers.js';
 import {
   mentionedUserIds,
+  mentionTextSchema,
   type RichTextDoc,
   replaceMentions,
   richTextFromPlain,
@@ -525,10 +526,7 @@ export type TaskBriefDoc = z.infer<typeof taskBriefDocSchema>;
  * F06B rule B2: a comment, question or reply, with mention nodes (F06 rule 16); `body` keeps its
  * plain extract with `@{userId}` tokens. The API checks that mentioned users are active.
  */
-export const taskCommentDocSchema = richTextSchema({
-  maxText: TASK_TEXT_MAX.comment,
-  mentions: true,
-})
+export const taskCommentDocSchema = mentionTextSchema({ maxText: TASK_TEXT_MAX.comment })
   .refine((doc) => mentionedUserIds(richTextPlain(doc)).length <= MAX_COMMENT_MENTIONS, {
     message: `At most ${MAX_COMMENT_MENTIONS} people are mentioned in one comment`,
   })

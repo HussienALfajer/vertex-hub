@@ -7,11 +7,11 @@ import {
   type CreateTaskLink,
   type PersonRef,
   TASK_LIMITS,
-  type TaskRights,
   type TaskChecklist,
   type TaskChecklistItem,
   type TaskChecklistOrder,
   type TaskLink,
+  type TaskRights,
   type UpdateTaskChecklistItem,
 } from '@vertex-hub/contracts';
 import { type Database, type Transaction, taskChecklistItems, taskLinks } from '@vertex-hub/db';

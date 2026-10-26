@@ -13,7 +13,7 @@ import type {
   MedicalReview,
   RevisionDecisionInput,
   TaskClientTextInput,
-  TaskCommentInput,
+  TaskCommentUpdate,
   TaskDependenciesInput,
   TaskStatusChange,
   UpdateTask,
@@ -250,14 +250,15 @@ const commentPath = (id: string, commentId: string) => ({
 
 export const useAddComment = (id: string) =>
   useTasksMutation(
-    (input: TaskCommentInput) =>
-      call(api.POST('/api/tasks/{id}/comments', { ...path(id), body: input })),
+    // Attachments and replies come with the task page of F06B (PR 4).
+    (input: TaskCommentUpdate) =>
+      call(api.POST('/api/tasks/{id}/comments', { ...path(id), body: { ...input, files: [] } })),
     ownTask(id),
   );
 
 export const useEditComment = (id: string) =>
   useTasksMutation(
-    ({ commentId, ...input }: TaskCommentInput & { commentId: string }) =>
+    ({ commentId, ...input }: TaskCommentUpdate & { commentId: string }) =>
       call(
         api.PATCH('/api/tasks/{id}/comments/{commentId}', {
           ...commentPath(id, commentId),

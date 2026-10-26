@@ -44,6 +44,13 @@ import { LocalFileStorage } from './local-file-storage.js';
     GeneratedFiles,
     ImagesService,
   ],
-  exports: [FileAttachments, FileOwnerRegistry, FilePurges, FileVersions, GeneratedFiles, ImagesService],
+  exports: [
+    FileAttachments,
+    FileOwnerRegistry,
+    FilePurges,
+    FileVersions,
+    GeneratedFiles,
+    ImagesService,
+  ],
 })
 export class FilesModule {}

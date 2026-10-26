@@ -1,9 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto';
-import {
-  type AssignableRole,
-  type DepartmentCode,
-  richTextFromPlain,
-} from '@vertex-hub/contracts';
+import { type AssignableRole, type DepartmentCode, richTextFromPlain } from '@vertex-hub/contracts';
 import {
   accounts,
   adCampaigns,
@@ -102,9 +98,9 @@ import {
   taskRevisions,
   taskStages,
   tasks,
-  timedReminders,
   templateRuns,
   templateRunTasks,
+  timedReminders,
   userRoles,
   users,
   verifications,

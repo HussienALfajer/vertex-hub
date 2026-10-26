@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   mentionedUserIds,
+  mentionTextSchema,
   replaceMentions,
   richTextFromPlain,
   richTextPlain,
@@ -28,7 +29,7 @@ describe('mentionedUserIds', () => {
 });
 
 describe('the mention node (F06B, ADR 0038)', () => {
-  const withMentions = richTextSchema({ maxText: 100, mentions: true });
+  const withMentions = mentionTextSchema({ maxText: 100 });
   const plain = richTextSchema({ maxText: 100 });
   const doc = {
     type: 'doc',
@@ -109,6 +110,6 @@ describe('richTextFromPlain (F06B edge case 22)', () => {
     });
     expect(richTextPlain(doc)).toBe(text.replace(user.toUpperCase(), user));
     expect(richTextPlain(richTextFromPlain(text))).toBe(text);
-    expect(richTextSchema({ maxText: 100, mentions: true }).safeParse(doc).success).toBe(true);
+    expect(mentionTextSchema({ maxText: 100 }).safeParse(doc).success).toBe(true);
   });
 });

@@ -537,7 +537,13 @@
     "SUBTASK_DEPTH": "المهمة الفرعية لا تحوي مهامًا فرعية.",
     "SUBTASKS_OPEN": "لم تُسلَّم كل المهام الفرعية بعد. سلّمها أو ألغِها ثم أرسل المهمة للمراجعة.",
     "SUBTASK_DUE_AFTER_PARENT": "موعد المهمة الفرعية لا يتجاوز موعد المهمة الأم.",
-    "STAGE_NOT_EMPTY": "في هذه المرحلة مهام فرعية. انقلها أو ألغِها قبل حذف المرحلة."
+    "STAGE_NOT_EMPTY": "في هذه المرحلة مهام فرعية. انقلها أو ألغِها قبل حذف المرحلة.",
+    "CRITERIA_OPEN": "لم تُستوفَ كل معايير القبول بعد. علّمها قبل الإرسال للمراجعة.",
+    "INVALID_ADDRESSEE": "وجّه السؤال إلى زميل نشط غيرك، أو إلى قسم، أو إلى عضو في القسم المعني.",
+    "QUESTION_NOT_FOUND": "هذا السؤال غير موجود في هذه المهمة.",
+    "QUESTION_NO_REPLY": "اكتب ردًّا أولًا. يعدّ السائل وحده سؤاله مُجابًا دون رد.",
+    "QUESTION_CLOSED": "هذا السؤال مُجاب. يعيد السائل فتحه أولًا.",
+    "NOT_QUESTION_ASKER": "يعيد السائل وحده فتح سؤاله."
   },
   "users": {
     "title": "الفريق",
@@ -1141,7 +1147,12 @@
       "task_comment": {
         "created": "أضاف تعليقًا",
         "updated": "عدّل تعليقًا",
-        "archived": "أزال تعليقًا"
+        "archived": "أزال تعليقًا",
+        "question_asked": "طرح سؤالًا",
+        "question_forwarded": "حوّل سؤالًا",
+        "question_answered": "عدّ سؤالًا مُجابًا",
+        "question_reopened": "أعاد فتح سؤال",
+        "converted": "حوّل سؤالًا أو تعليقًا إلى مهمة فرعية"
       },
       "file_item": {
         "created": "أضاف ملفًا",
@@ -1769,7 +1780,19 @@
       "order": "الترتيب",
       "subtasks": "المهام الفرعية",
       "handoverNote": "ملاحظة التسليم",
-      "handover": "ملخّص التسليم"
+      "handover": "ملخّص التسليم",
+      "addressedDepartment": "القسم المسؤول",
+      "questionStatus": "حالة السؤال",
+      "answered": "مُجاب",
+      "attachments": "المرفقات"
+    },
+    "checklistKinds": {
+      "checklist": "قائمة التحقق",
+      "criterion": "معيار قبول"
+    },
+    "questionStatuses": {
+      "open": "مفتوح",
+      "answered": "مُجاب"
     },
     "kinds": {
       "activation": "تفعيل",
@@ -2015,7 +2038,8 @@
         "unassignedInMyDepartments": "بلا منفّذ في أقسامي",
         "requestedByMe": "طلبتُها",
         "medicalReview": "للمراجعة الطبية",
-        "readyToSend": "جاهزة للإرسال إلى العميل"
+        "readyToSend": "جاهزة للإرسال إلى العميل",
+        "questionsWaiting": "أسئلة تنتظر إجابتي"
       },
       "openApprovals": "افتح الموافقات"
     },
@@ -4868,7 +4892,12 @@
       "subtask_stage_finished": "انتهاء مرحلة من مهمتي",
       "subtasks_all_finished": "تسليم كل المهام الفرعية لمهمتي",
       "subtask_holding_next": "مهمة فرعية متأخرة تؤخّر ما بعدها",
-      "task_blocked": "مهمة عادت بانتظار مهام أخرى"
+      "task_blocked": "مهمة عادت بانتظار مهام أخرى",
+      "task_question_asked": "سؤال موجّه إليّ أو إلى قسمي",
+      "task_question_answered": "رد على سؤالي",
+      "task_question_reminder": "تذكير بسؤال ينتظر إجابتي",
+      "task_question_escalated": "سؤال تأخرت إجابته",
+      "task_question_converted": "تحويل سؤال أو تعليق إلى مهمة فرعية"
     },
     "priorities": {
       "critical": "حرج",
