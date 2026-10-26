@@ -685,13 +685,12 @@ describe('subtasks (F06B part A)', () => {
     await cast.moveOk(subtask.id, cast.designer.cookie, { status: 'in_progress' });
     await cast.moveOk(subtask.id, cast.designer.cookie, { status: 'internal_review' });
     expect(await summary()).toBe(before + 1);
-    expect(
-      (
-        await (
-          await client.get(`/api/tasks?reviewer=me&clientId=${clientId}`, cast.writer.cookie)
-        ).json()
-      ).items.map((t: { id: string }) => t.id),
-    ).toEqual([subtask.id]);
+    const toReview = taskPageSchema.parse(
+      await (
+        await client.get(`/api/tasks?reviewer=me&clientId=${clientId}`, cast.writer.cookie)
+      ).json(),
+    );
+    expect(toReview.items.map((t) => t.id)).toEqual([subtask.id]);
     // Their approval delivers it (rule A7).
     expect(
       (await cast.moveOk(subtask.id, cast.writer.cookie, { status: 'delivered' })).status,
