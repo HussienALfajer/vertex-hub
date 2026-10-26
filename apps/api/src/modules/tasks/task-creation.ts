@@ -71,10 +71,16 @@ export class TaskCreation {
     return this.tasks.detail(actor, id);
   }
 
-  private async createIn(
+  /**
+   * The save in the caller's transaction; `postId` links the new task to a post from the start
+   * (F08B rule B2, through `PostTasks`, which holds the post's lock). Call `queuePreviews` once
+   * the transaction committed when `preview` is true.
+   */
+  async createIn(
     tx: Transaction,
     actor: CurrentUserInfo,
     input: CreateTask,
+    options: { postId?: string } = {},
   ): Promise<{ id: string; preview: boolean }> {
     const { stages, subtasks, files, questions, templateId, ...task } = input;
     // The access lock comes first, as in every create with an assignee (F01 change); the run of
@@ -83,7 +89,10 @@ export class TaskCreation {
       await lockAccessChanges(tx);
     }
     if (subtasks.length > 0) await lockDependencyGraph(tx);
-    const id = await this.tasks.createIn(tx, actor, task, { checkLeave: true });
+    const id = await this.tasks.createIn(tx, actor, task, {
+      checkLeave: true,
+      postId: options.postId,
+    });
     const stageIds: string[] = [];
     for (const [index, stage] of stages.entries()) {
       stageIds.push(await this.runs.insertStage(tx, actorOf(actor), id, stage.name, index + 1));

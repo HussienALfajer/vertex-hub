@@ -26,6 +26,7 @@ import { ClientDirectory, ClientFlagHooks, type HealthcareChange } from '../clie
 import type { Notice } from '../notifications/index.js';
 import { PostTasks } from '../tasks/index.js';
 import { assertLinksMatch, ContentService } from './content.service.js';
+import { ContentSettingsService } from './content-settings.service.js';
 import {
   actorOf,
   assertPostWritable,
@@ -71,6 +72,7 @@ export class PostWorkflowService implements OnModuleInit {
     private readonly flagHooks: ClientFlagHooks,
     private readonly tasks: PostTasks,
     private readonly reviewHooks: PostReviewHooks,
+    private readonly settings: ContentSettingsService,
   ) {}
 
   onModuleInit(): void {
@@ -130,7 +132,9 @@ export class PostWorkflowService implements OnModuleInit {
         throw new CodedException(409, 'NOTHING_TO_APPROVE', 'Add a caption or media first');
       }
       // F08B rule A3: the limits block the submission, and an internal pass re-checks them.
-      if (move === 'submit' || PASS_MOVES.includes(move)) assertWithinLimits(post, content);
+      if (move === 'submit' || PASS_MOVES.includes(move)) {
+        assertWithinLimits(post, content, await this.settings.planningSettings(post.client, tx));
+      }
       // Rule 10: the media of a linked task is its approved work.
       if (move === 'submit') await this.tasks.assertApproved(tx, id);
       if (move === 'schedule' && !post.publishTime) {

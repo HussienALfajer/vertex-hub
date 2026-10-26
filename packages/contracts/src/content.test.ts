@@ -8,6 +8,7 @@ import {
   createPostTaskSchema,
   isClientReturn,
   isPostOverdue,
+  moveWorkDays,
   POST_STATUSES,
   type PostRights,
   type PostState,
@@ -19,6 +20,7 @@ import {
   postTaskDueDate,
   postTaskTitle,
   returnPostTaskSchema,
+  shiftDueDate,
   updatePostLayoutSchema,
   updatePostSchema,
 } from './content.js';
@@ -360,5 +362,36 @@ describe('sending a linked task back (rule 12)', () => {
     expect(isClientReturn({ kind: 'response', changesRequested: false })).toBe(false);
     expect(isClientReturn({ kind: 'review', changesRequested: true })).toBe(false);
     expect(isClientReturn(null)).toBe(false);
+  });
+});
+
+describe('moving a post (F08B rule B9)', () => {
+  // 2026-11-05 is a Thursday, 2026-11-06 a Friday.
+  const holidays = [{ startsOn: '2026-11-09', endsOn: '2026-11-09' }];
+
+  it('counts the work days between the dates, negative when earlier', () => {
+    expect(moveWorkDays('2026-11-05', '2026-11-08')).toBe(2);
+    expect(moveWorkDays('2026-11-08', '2026-11-05')).toBe(-2);
+    expect(moveWorkDays('2026-11-05', '2026-11-05')).toBe(0);
+    expect(moveWorkDays('2026-11-08', '2026-11-10', holidays)).toBe(1);
+  });
+
+  it('moves a due date by work days, never before today', () => {
+    expect(shiftDueDate('2026-11-05', 2, '2026-11-01')).toEqual({
+      date: '2026-11-08',
+      clamped: false,
+    });
+    expect(shiftDueDate('2026-11-08', -2, '2026-11-01')).toEqual({
+      date: '2026-11-05',
+      clamped: false,
+    });
+    expect(shiftDueDate('2026-11-08', 1, '2026-11-01', holidays)).toEqual({
+      date: '2026-11-10',
+      clamped: false,
+    });
+    expect(shiftDueDate('2026-11-03', -3, '2026-11-02')).toEqual({
+      date: '2026-11-02',
+      clamped: true,
+    });
   });
 });

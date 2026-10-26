@@ -8,12 +8,18 @@ import { ProjectsModule } from '../projects/index.js';
 import { TasksModule } from '../tasks/index.js';
 import { ContentController } from './content.controller.js';
 import { ContentService } from './content.service.js';
+import { ContentIdeasService } from './content-ideas.service.js';
+import { ContentOccasionsService } from './content-occasions.service.js';
+import { ContentPlanner } from './content-planner.js';
+import { ContentPlanningController } from './content-planning.controller.js';
 import { ContentReports } from './content-reports.js';
+import { ContentSettingsService } from './content-settings.service.js';
 import { PostApprovals } from './post-approvals.js';
 import { PostCaptions } from './post-captions.js';
 import { PostHooksService } from './post-hooks.service.js';
 import { PostLinksService } from './post-links.service.js';
 import { PostMedia } from './post-media.js';
+import { PostMovesService } from './post-moves.service.js';
 import { PostNotices } from './post-notices.js';
 import { PostPack } from './post-pack.js';
 import { PostReminders } from './post-reminders.js';
@@ -24,7 +30,9 @@ import { PostWorkflowService } from './post-workflow.service.js';
 
 /**
  * The content calendar (F08, ADR 0021; F08B, ADR 0042). Owns `content_posts`, `post_captions`,
- * `post_reviews` and `post_client_responses`. Reads users through `auth`'s `UserDirectory` and feeds open posts
+ * `post_reviews`, `post_client_responses` and the planning aids (`content_pillars`,
+ * `content_occasions`, `content_occasion_dates`, `content_planning_settings`, `content_snippets`,
+ * `content_ideas`). Reads users through `auth`'s `UserDirectory` and feeds open posts
  * into its `ResponsibilityRegistry`; reads clients through `ClientDirectory` and registers into
  * `ClientFlagHooks` for healthcare flag changes; reads cycle lines through `projects`'
  * `EngagementDirectory` and adds the posts counted directly to `WorkProgress`; registers the
@@ -46,7 +54,7 @@ import { PostWorkflowService } from './post-workflow.service.js';
     HrModule,
     TasksModule,
   ],
-  controllers: [ContentController],
+  controllers: [ContentController, ContentPlanningController],
   providers: [
     ContentService,
     PostWorkflowService,
@@ -62,6 +70,11 @@ import { PostWorkflowService } from './post-workflow.service.js';
     PostTeams,
     PostCaptions,
     PostPack,
+    PostMovesService,
+    ContentSettingsService,
+    ContentOccasionsService,
+    ContentIdeasService,
+    ContentPlanner,
   ],
   exports: [PostApprovals, PostReviewHooks, ContentReports, PostTeams],
 })

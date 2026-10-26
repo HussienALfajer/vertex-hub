@@ -317,11 +317,31 @@ describe('notification catalog of the workflow modules (F16 part C)', () => {
         body: { responsibleId: cast.contentManager.id },
       });
       expect(response.status, await response.clone().text()).toBe(200);
-      expect(await oneOf(cast.writer.id, 'responsibility_moved', post.id)).toMatchObject({
+      // F08B: `post_unassigned` replaces `responsibility_moved` for posts.
+      expect(await oneOf(cast.writer.id, 'post_unassigned', post.id)).toMatchObject({
         subjectType: 'post',
-        data: { role: 'post_responsible', record: post.title, holder: cast.contentManager.name },
+        data: { post: { title: post.title }, holder: cast.contentManager.name },
       });
+      expect(await rowsOf(cast.writer.id, 'responsibility_moved', post.id)).toEqual([]);
       expect((await oneOf(cast.writer.id, 'post_assigned', post.id)).resolution).toBe('void');
+    });
+
+    it('tells the responsible of content changed by someone else, never the one who changed it (F08B)', async () => {
+      const post = await cast.createPost(cast.contentManager.cookie, {
+        clientId,
+        responsibleId: cast.writer.id,
+      });
+      const edit = (cookie: string, title: string) =>
+        client.request('PATCH', `/api/content/posts/${post.id}`, { cookie, body: { title } });
+      const own = await edit(cast.writer.cookie, `${post.title} ١`);
+      expect(own.status, await own.clone().text()).toBe(200);
+      expect(await rowsOf(cast.writer.id, 'post_changed', post.id)).toEqual([]);
+      const other = await edit(cast.contentManager.cookie, `${post.title} ٢`);
+      expect(other.status, await other.clone().text()).toBe(200);
+      expect(await oneOf(cast.writer.id, 'post_changed', post.id)).toMatchObject({
+        data: { changes: ['title'] },
+      });
+      expect(await rowsOf(cast.contentManager.id, 'post_changed', post.id)).toEqual([]);
     });
 
     it('tells the account manager that a post was published', async () => {

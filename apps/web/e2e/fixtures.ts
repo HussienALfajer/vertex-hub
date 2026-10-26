@@ -7381,6 +7381,8 @@ function contentRoutes({
     thumbnailVersionId: mediaOf(post).find((m) => m.previewStatus === 'ready')?.id ?? null,
     linkedTaskCount: linked(post).length,
     overdue: overdue(post),
+    pillar: null,
+    occasionId: null,
   });
   const allowed = (post: PostRecord) =>
     readOnly(post)
@@ -7407,6 +7409,7 @@ function contentRoutes({
         healthcare: clientOf(post)?.isHealthcare ?? false,
       },
       responsible: { ...archivable(post.responsibleId), inScope: true, imageId: null },
+      occasion: null,
       caption: post.caption,
       hashtags: post.hashtags,
       captions: mockCaptions(post),
@@ -7543,6 +7546,8 @@ function contentRoutes({
     returned: (post) => post.responsibleId === me().user.id && returned(post),
     to_review: (post) =>
       post.status === 'internal_review' && post.reviewStage === 'internal' && rights(post).review,
+    // F08B: no fixture post is at risk yet; PR 4 mocks the section.
+    at_risk: () => false,
   };
   const live = () => posts.filter((post) => !post.archived && !clientOf(post)?.archived);
 
@@ -7564,6 +7569,7 @@ function contentRoutes({
         publishToday: count('publish_today'),
         overdue: count('overdue'),
         returned: count('returned'),
+        atRisk: count('at_risk'),
         toReview: reviewer ? count('to_review') : null,
       };
       return json(route, summaryBody);
@@ -7590,6 +7596,9 @@ function contentRoutes({
             inRange.filter((post) => post.status === status && matches(post, unfiltered)).length,
           ]),
         ) as ContentCalendar['counts'],
+        // F08B overlays: PR 4 mocks occasions and planning issues with the calendar screens.
+        occasions: [],
+        issues: [],
       };
       return json(route, calendar);
     }

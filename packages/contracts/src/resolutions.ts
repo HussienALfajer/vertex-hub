@@ -148,6 +148,7 @@ export const POST_ACTION_TYPES = [
   'post_publish_today',
   'post_publish_overdue',
   'post_publish_shortly',
+  'post_at_risk',
 ] as const satisfies readonly NotificationType[];
 
 /** The reminders of a post's publish date: done when it is published, void when re-dated. */
@@ -196,6 +197,11 @@ export function postResolutions(
   if (before.status === 'awaiting_client' && after.status !== 'awaiting_client') {
     done.push('post_awaiting_client');
   }
+  // F08B: a post at risk is done with once approved; a new date sends it again if still close.
+  const cleared = (post: PostResolutionState) =>
+    post.status === 'approved' || post.status === 'scheduled' || post.status === 'published';
+  if (!cleared(before) && cleared(after)) done.push('post_at_risk');
+  else if (before.publishDate !== after.publishDate) voided.push('post_at_risk');
   if (before.status !== 'published' && after.status === 'published') {
     done.push(...POST_PUBLISH_TYPES);
   } else if (before.publishDate !== after.publishDate || before.publishTime !== after.publishTime) {

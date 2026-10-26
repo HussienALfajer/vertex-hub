@@ -1,10 +1,17 @@
 import {
   CAPTION_GROUPS,
+  OCCASION_CALENDARS,
+  OCCASION_CATEGORIES,
+  type OccasionSkip,
+  PILLAR_COLORS,
+  type PillarTarget,
   POST_PLATFORMS,
   POST_STATUSES,
   POST_TYPES,
   type PostCaption,
+  type PostingWindow,
   type PublishedLink,
+  SNIPPET_KINDS,
 } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
@@ -13,6 +20,7 @@ import {
   check,
   date,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -78,6 +86,10 @@ export const contentPosts = pgTable(
     mediaLayout: jsonb('media_layout').$type<MediaLayoutEntry[]>().notNull().default([]),
     /** The internal brief for the team, never shown to the client. */
     notes: text('notes'),
+    /** F08B rule C1: one optional pillar. */
+    pillarId: uuid('pillar_id').references((): AnyPgColumn => contentPillars.id),
+    /** F08B rule C6: the occasion this post is for. */
+    occasionId: uuid('occasion_id').references((): AnyPgColumn => contentOccasions.id),
     publishDate: date('publish_date', { mode: 'string' }).notNull(),
     publishTime: time('publish_time'),
     status: postStatusEnum('status').notNull().default('idea'),
@@ -114,6 +126,8 @@ export const contentPosts = pgTable(
     index('content_posts_cleared_review_id_idx').on(table.clearedReviewId),
     index('content_posts_published_by_id_idx').on(table.publishedById),
     index('content_posts_created_by_id_idx').on(table.createdById),
+    index('content_posts_pillar_id_idx').on(table.pillarId),
+    index('content_posts_occasion_id_idx').on(table.occasionId),
     check(
       'content_posts_review_stage_check',
       sql`(${table.status} = 'internal_review') = (${table.reviewStage} is not null)`,
@@ -262,5 +276,190 @@ export const postClientResponses = pgTable(
       sql`${table.decision} <> 'changes_requested' or ${table.note} is not null`,
     ),
     check('post_client_responses_user_agent_check', sql`char_length(${table.userAgent}) <= 500`),
+  ],
+);
+
+/*
+ * F08B part C (ADR 0042): the planning aids of the content calendar, owned by `content`.
+ */
+
+export const pillarColorEnum = pgEnum('pillar_color', PILLAR_COLORS);
+
+export const occasionCategoryEnum = pgEnum('occasion_category', OCCASION_CATEGORIES);
+
+export const occasionCalendarEnum = pgEnum('occasion_calendar', OCCASION_CALENDARS);
+
+export const snippetKindEnum = pgEnum('snippet_kind', SNIPPET_KINDS);
+
+/** The agency's content pillars (rule C1); at most 10 non-archived, names unique among them. */
+export const contentPillars = pgTable(
+  'content_pillars',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    color: pillarColorEnum('color').notNull(),
+    /** Dense from 1. */
+    position: integer('position').notNull(),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    uniqueIndex('content_pillars_name_idx')
+      .on(sql`lower(${table.name})`)
+      .where(sql`${table.archivedAt} is null`),
+    check('content_pillars_name_check', sql`char_length(${table.name}) between 1 and 40`),
+    check('content_pillars_position_check', sql`${table.position} >= 1`),
+  ],
+);
+
+/**
+ * Occasions (rules C4–C6): a Gregorian or Hijri day each year, or one date; general, of a
+ * category, or of one client.
+ */
+export const contentOccasions = pgTable(
+  'content_occasions',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    category: occasionCategoryEnum('category').notNull(),
+    /** An occasion of one client only; its category is ignored. */
+    clientId: uuid('client_id').references(() => clients.id),
+    calendar: occasionCalendarEnum('calendar').notNull(),
+    month: integer('month'),
+    day: integer('day'),
+    date: date('date', { mode: 'string' }),
+    durationDays: integer('duration_days').notNull().default(1),
+    leadDays: integer('lead_days').notNull().default(7),
+    createdById: uuid('created_by_id').references(() => users.id),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('content_occasions_client_id_idx').on(table.clientId),
+    index('content_occasions_created_by_id_idx').on(table.createdById),
+    check('content_occasions_name_check', sql`char_length(${table.name}) between 1 and 80`),
+    check(
+      'content_occasions_rule_check',
+      sql`case when ${table.calendar} = 'once'
+        then ${table.date} is not null and ${table.month} is null and ${table.day} is null
+        else ${table.date} is null and ${table.month} between 1 and 12
+          and ${table.day} between 1 and (case when ${table.calendar} = 'hijri' then 30 else 31 end) end`,
+    ),
+    check(
+      'content_occasions_days_check',
+      sql`${table.durationDays} between 1 and 31 and ${table.leadDays} between 0 and 30`,
+    ),
+  ],
+);
+
+/** A manager's confirmed start of an occasion in a Gregorian year (rule C5). */
+export const contentOccasionDates = pgTable(
+  'content_occasion_dates',
+  {
+    id: id(),
+    occasionId: uuid('occasion_id')
+      .notNull()
+      .references(() => contentOccasions.id),
+    year: integer('year').notNull(),
+    startDate: date('start_date', { mode: 'string' }).notNull(),
+    confirmedById: uuid('confirmed_by_id')
+      .notNull()
+      .references(() => users.id),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    // Archived = back to the computed date: one live row per occasion and year.
+    uniqueIndex('content_occasion_dates_occasion_id_idx')
+      .on(table.occasionId, table.year)
+      .where(sql`${table.archivedAt} is null`),
+    index('content_occasion_dates_confirmed_by_id_idx').on(table.confirmedById),
+  ],
+);
+
+/** The agency's planning settings (`client_id` null) and one row per client (rules C1–C7). */
+export const contentPlanningSettings = pgTable(
+  'content_planning_settings',
+  {
+    id: id(),
+    clientId: uuid('client_id').references(() => clients.id),
+    postingTimes: jsonb('posting_times').$type<PostingWindow[]>().notNull().default([]),
+    pillarTargets: jsonb('pillar_targets').$type<PillarTarget[]>().notNull().default([]),
+    maxGapDays: integer('max_gap_days').notNull().default(3),
+    occasionCategories: occasionCategoryEnum('occasion_categories')
+      .array()
+      .notNull()
+      .default(sql`'{general}'::occasion_category[]`),
+    excludedOccasionIds: uuid('excluded_occasion_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    skippedOccasions: jsonb('skipped_occasions').$type<OccasionSkip[]>().notNull().default([]),
+    xLongPosts: boolean('x_long_posts').notNull().default(false),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex('content_planning_settings_client_id_idx').on(table.clientId),
+    uniqueIndex('content_planning_settings_agency_idx')
+      .on(sql`(${table.clientId} is null)`)
+      .where(sql`${table.clientId} is null`),
+    check('content_planning_settings_gap_check', sql`${table.maxGapDays} between 1 and 14`),
+  ],
+);
+
+/** Hashtag sets and caption snippets of a client, or of the agency (rule A10). */
+export const contentSnippets = pgTable(
+  'content_snippets',
+  {
+    id: id(),
+    clientId: uuid('client_id').references(() => clients.id),
+    kind: snippetKindEnum('kind').notNull(),
+    name: text('name').notNull(),
+    body: text('body').notNull(),
+    createdById: uuid('created_by_id')
+      .notNull()
+      .references(() => users.id),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('content_snippets_client_id_idx').on(table.clientId, table.kind),
+    index('content_snippets_created_by_id_idx').on(table.createdById),
+    check('content_snippets_name_check', sql`char_length(${table.name}) between 1 and 60`),
+    check(
+      'content_snippets_body_check',
+      sql`char_length(${table.body}) between 1 and (case when ${table.kind} = 'hashtags' then 1000 else 2000 end)`,
+    ),
+  ],
+);
+
+/** The ideas bank (rule C12): open, used (`post_id`) or dropped (archived). */
+export const contentIdeas = pgTable(
+  'content_ideas',
+  {
+    id: id(),
+    text: text('text').notNull(),
+    clientId: uuid('client_id').references(() => clients.id),
+    pillarId: uuid('pillar_id').references(() => contentPillars.id),
+    occasionId: uuid('occasion_id').references(() => contentOccasions.id),
+    /** Set once when the idea becomes a post; never changes after. */
+    postId: uuid('post_id').references(() => contentPosts.id),
+    dropReason: text('drop_reason'),
+    createdById: uuid('created_by_id')
+      .notNull()
+      .references(() => users.id),
+    ...timestamps(),
+    archivedAt: archivedAt(),
+  },
+  (table) => [
+    index('content_ideas_client_id_idx').on(table.clientId),
+    index('content_ideas_pillar_id_idx').on(table.pillarId),
+    index('content_ideas_occasion_id_idx').on(table.occasionId),
+    index('content_ideas_post_id_idx').on(table.postId),
+    index('content_ideas_created_by_id_idx').on(table.createdById, table.createdAt),
+    check('content_ideas_text_check', sql`char_length(${table.text}) between 1 and 300`),
+    check(
+      'content_ideas_state_check',
+      sql`(${table.postId} is null or ${table.archivedAt} is null)
+        and (${table.dropReason} is null or ${table.archivedAt} is not null)
+        and char_length(${table.dropReason}) between 1 and 300`,
+    ),
   ],
 );

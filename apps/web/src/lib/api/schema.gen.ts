@@ -3476,6 +3476,38 @@ export interface paths {
         patch: operations["ContentController_update"];
         trace?: never;
     };
+    "/api/content/posts/{id}/move-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentController_movePreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/posts/{id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentController_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/content/posts/{id}/layout": {
         parameters: {
             query?: never;
@@ -3646,6 +3678,374 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ContentController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentPlanningController_agencySettings"];
+        put: operations["ContentPlanningController_updateAgencySettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/clients/{clientId}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentPlanningController_clientSettings"];
+        put: operations["ContentPlanningController_updateClientSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/clients/{clientId}/occasion-skips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentPlanningController_skipOccasion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/clients/{clientId}/occasion-skips/{occasionId}/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ContentPlanningController_unskipOccasion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/pillars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentPlanningController_pillars"];
+        put?: never;
+        post: operations["ContentPlanningController_createPillar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/pillars/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ContentPlanningController_orderPillars"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/pillars/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ContentPlanningController_updatePillar"];
+        trace?: never;
+    };
+    "/api/content/pillars/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentPlanningController_archivePillar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/pillars/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentPlanningController_restorePillar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/occasions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentPlanningController_listOccasions"];
+        put?: never;
+        post: operations["ContentPlanningController_createOccasion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/occasions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ContentPlanningController_updateOccasion"];
+        trace?: never;
+    };
+    "/api/content/occasions/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentPlanningController_archiveOccasion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/occasions/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentPlanningController_restoreOccasion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/occasions/{id}/dates/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ContentPlanningController_confirmOccasionDate"];
+        post?: never;
+        delete: operations["ContentPlanningController_clearOccasionDate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/snippets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentPlanningController_snippets"];
+        put?: never;
+        post: operations["ContentPlanningController_createSnippet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/snippets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ContentPlanningController_updateSnippet"];
+        trace?: never;
+    };
+    "/api/content/snippets/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentPlanningController_archiveSnippet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentPlanningController_listIdeas"];
+        put?: never;
+        post: operations["ContentPlanningController_createIdea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/ideas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ContentPlanningController_updateIdea"];
+        trace?: never;
+    };
+    "/api/content/ideas/{id}/drop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentPlanningController_dropIdea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/ideas/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentPlanningController_restoreIdea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/planning": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentPlanningController_planning"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/grid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContentPlanningController_grid"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6281,9 +6681,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings" | "hr_request" | "hr_opinion" | "leave_balance" | "attendance_passkey" | "attendance_kiosk" | "attendance" | "attendance_item" | "attendance_punch" | "attendance_month" | "task_stage";
+        AuditEntityType: "user" | "department" | "client" | "client_contact" | "client_platform_account" | "client_note" | "project" | "project_milestone" | "retainer" | "retainer_cycle" | "retainer_charge" | "retainer_term" | "retainer_amendment" | "extra_work" | "task" | "task_checklist_item" | "task_link" | "task_comment" | "template" | "template_run" | "file_item" | "approval_request" | "post" | "content_pillar" | "content_occasion" | "content_settings" | "content_snippet" | "content_idea" | "shoot" | "meeting" | "catalog_service" | "catalog_package" | "quote_settings" | "contract_settings" | "quote" | "invoice_settings" | "invoice" | "payment" | "project_expense" | "ad_campaign" | "ad_campaign_update" | "ad_wallet" | "ad_wallet_entry" | "lead" | "lead_note" | "client_report" | "retainer_cycle_report" | "retainer_contract" | "retainer_contract_annex" | "notification_policy" | "announcement" | "announcement_template" | "employee_file" | "salary_change" | "work_schedule" | "holiday" | "hr_settings" | "hr_request" | "hr_opinion" | "leave_balance" | "attendance_passkey" | "attendance_kiosk" | "attendance" | "attendance_item" | "attendance_punch" | "attendance_month" | "task_stage";
         /** @enum {string} */
-        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "user.image_set" | "user.image_removed" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client.image_set" | "client.image_removed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project.image_set" | "project.image_removed" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer.image_set" | "retainer.image_removed" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "post.layout_changed" | "post.pack_downloaded" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated" | "hr_request.created" | "hr_request.approved" | "hr_request.rejected" | "hr_request.cancelled" | "hr_request.recounted" | "hr_opinion.created" | "leave_balance.adjusted" | "leave_balance.opening" | "task.leave_accepted" | "attendance_passkey.registered" | "attendance_passkey.activated" | "attendance_passkey.revoked" | "attendance_kiosk.created" | "attendance_kiosk.pairing_started" | "attendance_kiosk.paired" | "attendance_kiosk.archived" | "attendance.punch_refused" | "attendance_item.justified" | "attendance_item.decided" | "attendance_item.voided" | "attendance_punch.rejected" | "attendance_month.closed" | "attendance_month.reopened" | "task.run_mode_changed" | "task.subtasks_reordered" | "task.subtasks_reopened" | "task.handover_noted" | "task_stage.created" | "task_stage.updated" | "task_stage.archived" | "task_stage.finished" | "task_comment.question_asked" | "task_comment.question_forwarded" | "task_comment.question_answered" | "task_comment.question_reopened" | "task_comment.converted";
+        AuditAction: "user.created" | "user.updated" | "user.roles_changed" | "user.departments_changed" | "user.archived" | "user.restored" | "user.link_issued" | "user.password_set" | "user.password_changed" | "user.two_factor_enabled" | "user.two_factor_disabled" | "user.two_factor_reset" | "user.backup_codes_regenerated" | "user.profile_updated" | "user.session_signed_out" | "user.sessions_signed_out" | "user.image_set" | "user.image_removed" | "department.updated" | "client.created" | "client.updated" | "client.status_changed" | "client.account_manager_changed" | "client.healthcare_changed" | "client.archived" | "client.restored" | "client.brand_kit_updated" | "client.emailed" | "client.image_set" | "client.image_removed" | "client_contact.created" | "client_contact.updated" | "client_contact.archived" | "client_platform_account.created" | "client_platform_account.updated" | "client_platform_account.archived" | "client_note.created" | "client_note.updated" | "client_note.archived" | "project.created" | "project.updated" | "project.project_manager_changed" | "project.status_changed" | "project.money_updated" | "project.archived" | "project.restored" | "project.image_set" | "project.image_removed" | "project_milestone.created" | "project_milestone.updated" | "project_milestone.reordered" | "project_milestone.completed" | "project_milestone.reopened" | "project_milestone.archived" | "retainer.created" | "retainer.updated" | "retainer.backdated" | "retainer.status_changed" | "retainer.deliverables_updated" | "retainer.money_updated" | "retainer.archived" | "retainer.restored" | "retainer.image_set" | "retainer.image_removed" | "retainer_cycle.created" | "retainer_cycle.closed" | "retainer_cycle.line_updated" | "retainer_cycle.line_added" | "retainer_cycle.adjusted" | "retainer_charge.created" | "retainer_charge.amount_changed" | "retainer_charge.cancelled" | "retainer_charge.split" | "retainer_charge.settled_outside" | "retainer_term.created" | "retainer_term.updated" | "retainer_term.end_action_changed" | "retainer_term.cancelled" | "retainer_term.started" | "retainer_term.completed" | "retainer_term.renewed" | "retainer_amendment.created" | "retainer_amendment.approved" | "retainer_amendment.rejected" | "retainer_amendment.withdrawn" | "retainer_amendment.applied" | "retainer_amendment.cancelled" | "extra_work.created" | "extra_work.updated" | "extra_work.billing_changed" | "extra_work.archived" | "task.created" | "task.updated" | "task.assigned" | "task.department_changed" | "task.status_changed" | "task.dependencies_updated" | "task.archived" | "task.restored" | "task.revision_decided" | "task.request_scope_changed" | "task.extra_work_moved" | "task.reviewed" | "task.client_text_updated" | "task.client_response_recorded" | "task_checklist_item.created" | "task_checklist_item.updated" | "task_checklist_item.reordered" | "task_checklist_item.archived" | "task_link.created" | "task_link.archived" | "task_comment.created" | "task_comment.updated" | "task_comment.archived" | "template.created" | "template.updated" | "template.assignees_updated" | "template.archived" | "template.restored" | "template_run.created" | "retainer.template_changed" | "file_item.created" | "file_item.renamed" | "file_item.confidential_changed" | "file_item.archived" | "file_item.restored" | "file_version.created" | "file_version.archived" | "file_version.restored" | "file_version.final_set" | "file_version.final_cleared" | "approval_request.created" | "approval_request.link_reissued" | "approval_request.revoked" | "approval_request.emailed" | "approval_item.responded" | "approval_item.withdrawn" | "post.created" | "post.updated" | "post.status_changed" | "post.reviewed" | "post.client_response_recorded" | "post.task_linked" | "post.task_unlinked" | "post.task_returned" | "post.duplicated" | "post.archived" | "post.restored" | "post.layout_changed" | "post.pack_downloaded" | "post.moved" | "content_pillar.created" | "content_pillar.updated" | "content_pillar.reordered" | "content_pillar.archived" | "content_pillar.restored" | "content_occasion.created" | "content_occasion.updated" | "content_occasion.archived" | "content_occasion.restored" | "content_occasion.date_confirmed" | "content_occasion.date_cleared" | "content_settings.updated" | "content_snippet.created" | "content_snippet.updated" | "content_snippet.archived" | "content_idea.created" | "content_idea.updated" | "content_idea.dropped" | "content_idea.restored" | "content_idea.used" | "shoot.created" | "shoot.updated" | "shoot.shots_changed" | "shoot.shot_ticked" | "shoot.shot_unticked" | "shoot.completed" | "shoot.cancelled" | "shoot.reopened" | "shoot.archived" | "shoot.restored" | "meeting.created" | "meeting.updated" | "meeting.cancelled" | "meeting.archived" | "meeting.restored" | "catalog_service.created" | "catalog_service.updated" | "catalog_service.archived" | "catalog_service.restored" | "catalog_package.created" | "catalog_package.updated" | "catalog_package.archived" | "catalog_package.restored" | "quote_settings.updated" | "notification_policy.updated" | "contract_settings.updated" | "contract_settings.articles_updated" | "quote.created" | "quote.updated" | "quote.approval_requested" | "quote.approval_withdrawn" | "quote.approval_approved" | "quote.approval_returned" | "quote.sent" | "quote.extended" | "quote.expired" | "quote.rejected" | "quote.accepted" | "quote.version_created" | "quote.superseded" | "quote.archived" | "quote.emailed" | "invoice_settings.updated" | "invoice.created" | "invoice.updated" | "invoice.archived" | "invoice.issued" | "invoice.due_date_changed" | "invoice.voided" | "invoice.overdue" | "invoice.services_changed" | "invoice.emailed" | "payment.recorded" | "payment.voided" | "payment.emailed" | "project_expense.created" | "project_expense.updated" | "project_expense.archived" | "ad_campaign.created" | "ad_campaign.updated" | "ad_campaign.status_changed" | "ad_campaign.archived" | "ad_campaign.restored" | "ad_campaign_update.created" | "ad_campaign_update.updated" | "ad_campaign_update.archived" | "ad_wallet.threshold_changed" | "ad_wallet.low_balance" | "ad_wallet.low_balance_cleared" | "ad_wallet_entry.recorded" | "ad_wallet_entry.voided" | "ad_wallet_entry.emailed" | "lead.created" | "lead.updated" | "lead.stage_changed" | "lead.owner_changed" | "lead.follow_up_changed" | "lead.lost" | "lead.reopened" | "lead.converted" | "lead.archived" | "lead.restored" | "lead_note.created" | "lead_note.updated" | "lead_note.archived" | "client_report.summary_changed" | "retainer_cycle_report.summary_changed" | "retainer_contract.created" | "retainer_contract.updated" | "retainer_contract.discarded" | "retainer_contract.issued" | "retainer_contract.signed" | "retainer_contract.voided" | "retainer_contract_annex.issued" | "retainer_contract_annex.signed" | "retainer_contract_annex.voided" | "announcement.sent" | "announcement.scheduled" | "announcement.schedule_cancelled" | "announcement.edited" | "announcement.withdrawn" | "announcement.archived" | "announcement_poll.closed" | "announcement_template.created" | "announcement_template.updated" | "announcement_template.archived" | "employee_file.updated" | "employee_file.payout_changed" | "employee_file.service_ended" | "employee_file.service_end_cleared" | "salary_change.created" | "salary_change.archived" | "work_schedule.created" | "work_schedule.updated" | "work_schedule.archived" | "holiday.created" | "holiday.updated" | "holiday.archived" | "hr_settings.updated" | "hr_request.created" | "hr_request.approved" | "hr_request.rejected" | "hr_request.cancelled" | "hr_request.recounted" | "hr_opinion.created" | "leave_balance.adjusted" | "leave_balance.opening" | "task.leave_accepted" | "attendance_passkey.registered" | "attendance_passkey.activated" | "attendance_passkey.revoked" | "attendance_kiosk.created" | "attendance_kiosk.pairing_started" | "attendance_kiosk.paired" | "attendance_kiosk.archived" | "attendance.punch_refused" | "attendance_item.justified" | "attendance_item.decided" | "attendance_item.voided" | "attendance_punch.rejected" | "attendance_month.closed" | "attendance_month.reopened" | "task.run_mode_changed" | "task.subtasks_reordered" | "task.subtasks_reopened" | "task.handover_noted" | "task_stage.created" | "task_stage.updated" | "task_stage.archived" | "task_stage.finished" | "task_comment.question_asked" | "task_comment.question_forwarded" | "task_comment.question_answered" | "task_comment.question_reopened" | "task_comment.converted";
         /** @description Audit entries, newest first */
         AuditPage: {
             items: components["schemas"]["AuditEntry"][];
@@ -6421,7 +6821,7 @@ export interface components {
             scopes: components["schemas"]["PermissionScope"][];
         };
         /** @enum {string} */
-        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "retainers.approve_reduction" | "tasks.read" | "tasks.request" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "content.review" | "approvals.review_medical" | "calendar.read" | "shoots.manage" | "meetings.manage" | "campaigns.read" | "campaigns.manage" | "campaigns.fund" | "invoices.read" | "invoices.manage" | "invoices.send" | "payments.manage" | "expenses.manage" | "reports.read" | "reports.finance" | "audit.read" | "notifications.policy" | "announcements.manage" | "employees.read" | "employees.manage" | "salaries.read" | "salaries.manage" | "payouts.manage" | "hr.read" | "hr.manage" | "hr.approve";
+        Permission: "users.read" | "users.manage" | "clients.read" | "clients.manage" | "clients.log" | "leads.read" | "leads.manage" | "catalog.read" | "catalog.manage" | "quotes.read" | "quotes.manage" | "quotes.approve_discount" | "projects.read" | "projects.manage" | "retainers.approve_reduction" | "tasks.read" | "tasks.request" | "tasks.work" | "tasks.manage" | "templates.read" | "templates.manage" | "content.read" | "content.manage" | "content.review" | "content.suggest" | "approvals.review_medical" | "calendar.read" | "shoots.manage" | "meetings.manage" | "campaigns.read" | "campaigns.manage" | "campaigns.fund" | "invoices.read" | "invoices.manage" | "invoices.send" | "payments.manage" | "expenses.manage" | "reports.read" | "reports.finance" | "audit.read" | "notifications.policy" | "announcements.manage" | "employees.read" | "employees.manage" | "salaries.read" | "salaries.manage" | "payouts.manage" | "hr.read" | "hr.manage" | "hr.approve";
         /** @enum {string} */
         PermissionScope: "all" | "department" | "own_clients" | "assigned";
         UpdateOwnProfile: {
@@ -6645,7 +7045,7 @@ export interface components {
             email: string;
         };
         /** @enum {string} */
-        NotificationCategory: "tasks" | "reminders" | "calendar" | "clients_projects" | "account" | "announcements" | "hr";
+        NotificationCategory: "tasks" | "reminders" | "calendar" | "clients_projects" | "account" | "announcements" | "hr" | "content";
         /** @enum {string} */
         NotificationInbox: "needs_you" | "fyi" | "done" | "snoozed";
         /** @description Critical first, then newest `updatedAt` first (F16 rule B6) */
@@ -15445,6 +15845,448 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** @enum {string} */
+            type: "post_moved";
+            data: {
+                post: {
+                    title: string;
+                    client: string;
+                    /** Format: date */
+                    publishDate: string;
+                    publishTime: string | null;
+                };
+                /** Format: date */
+                previousDate: string;
+                previousTime: string | null;
+                shiftedTasks: string[];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "post_unassigned";
+            data: {
+                post: {
+                    title: string;
+                    client: string;
+                    /** Format: date */
+                    publishDate: string;
+                    publishTime: string | null;
+                };
+                holder: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "post_at_risk";
+            data: {
+                post: {
+                    title: string;
+                    client: string;
+                    /** Format: date */
+                    publishDate: string;
+                    publishTime: string | null;
+                };
+                /** @enum {string} */
+                waitingOn: "production" | "tasks" | "internal_review" | "medical_review" | "client";
+                tasks: string[];
+                /** Format: date */
+                clientSince: string | null;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "content_week_check";
+            data: {
+                /** Format: date */
+                from: string;
+                /** Format: date */
+                to: string;
+                clients: {
+                    name: string;
+                    issues: number;
+                }[];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "content_idea_added";
+            data: {
+                idea: string;
+                client: string | null;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "content_idea_used";
+            data: {
+                post: {
+                    title: string;
+                    client: string;
+                    /** Format: date */
+                    publishDate: string;
+                    publishTime: string | null;
+                };
+                idea: string;
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
+            type: "post_changed";
+            data: {
+                post: {
+                    title: string;
+                    client: string;
+                    /** Format: date */
+                    publishDate: string;
+                    publishTime: string | null;
+                };
+                changes: ("captions" | "slides" | "platforms" | "type" | "title")[];
+            };
+        } | {
+            /** Format: uuid */
+            id: string;
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /**
+                 * Format: uuid
+                 * @default null
+                 */
+                imageId: string | null;
+            } | null;
+            subject: {
+                type: components["schemas"]["NotificationSubjectType"];
+                /** Format: uuid */
+                id: string;
+            };
+            count: number;
+            read: boolean;
+            /** @default normal */
+            priority: components["schemas"]["NotificationPriority"];
+            /** @default info */
+            box: components["schemas"]["NotificationBox"];
+            /** @default fyi */
+            inbox: components["schemas"]["NotificationInbox"];
+            /** @default null */
+            resolution: {
+                outcome: components["schemas"]["NotificationResolution"];
+                by: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                    /**
+                     * Format: uuid
+                     * @default null
+                     */
+                    imageId: string | null;
+                } | null;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @default null
+             */
+            snoozedUntil: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @enum {string} */
             type: "task_progressed";
             data: {
                 task: {
@@ -15521,7 +16363,7 @@ export interface components {
             };
         };
         /** @enum {string} */
-        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead" | "user" | "campaign" | "department" | "announcement" | "holiday" | "hr_request" | "attendance_day" | "attendance_item" | "attendance_date" | "kiosk" | "attendance_month";
+        NotificationSubjectType: "task" | "client" | "project" | "retainer" | "template_run" | "approval_request" | "post" | "shoot" | "meeting" | "quote" | "invoice" | "lead" | "user" | "campaign" | "department" | "announcement" | "holiday" | "hr_request" | "attendance_day" | "attendance_item" | "attendance_date" | "kiosk" | "attendance_month" | "content_week" | "content_ideas";
         /** @enum {string} */
         NotificationPriority: "critical" | "important" | "normal" | "informational";
         /** @enum {string} */
@@ -15559,7 +16401,7 @@ export interface components {
         /** @enum {string} */
         PunchDirection: "in" | "out";
         /** @enum {string} */
-        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "invoice_draft_created" | "invoice_due_soon" | "payment_recorded" | "payment_voided" | "invoice_voided" | "ad_deposit_recorded" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "campaign_assigned" | "campaign_status_changed" | "campaign_end_passed" | "department_manager_assigned" | "member_moved" | "member_archived_open_work" | "security_new_device" | "security_notice" | "push_device_lost" | "announcement" | "announcement_ack_reminder" | "announcement_ack_summary" | "poll_closing" | "poll_results" | "contract_ending" | "probation_ending" | "employee_leaving" | "salary_changed" | "holiday_changed" | "hr_request_submitted" | "hr_request_decided" | "colleague_on_leave" | "leave_balance_adjusted" | "attendance_item_raised" | "attendance_items_pending" | "attendance_item_decided" | "attendance_check_in_missing" | "attendance_check_out_missing" | "field_punch_recorded" | "field_punch_rejected" | "shoot_check_in_missing" | "kiosk_offline" | "attendance_month_closed" | "action_reminder" | "action_escalated" | "action_escalated_top" | "profile_changed" | "client_logo_changed" | "project_image_changed" | "retainer_image_changed" | "subtask_turn" | "subtask_handover" | "subtask_stage_finished" | "subtasks_all_finished" | "subtask_holding_next" | "task_question_asked" | "task_question_answered" | "task_question_reminder" | "task_question_escalated" | "task_question_converted" | "task_blocked" | "task_progressed" | "post_progressed";
+        NotificationType: "task_assigned" | "task_mentioned" | "task_returned" | "task_review_requested" | "task_medical_review_requested" | "task_awaiting_client" | "task_over_limit" | "approval_responded" | "approval_no_response" | "approval_expired" | "task_changed" | "task_commented" | "task_file_added" | "task_requested" | "tasks_generated" | "task_approved" | "task_opened" | "request_finished" | "task_delivered" | "post_returned" | "post_review_requested" | "post_medical_review_requested" | "post_awaiting_client" | "post_assigned" | "post_approved" | "post_task_ready" | "post_task_unlinked" | "shoot_booked" | "shoot_dropped" | "shoot_changed" | "meeting_invited" | "meeting_dropped" | "meeting_changed" | "task_due_soon" | "task_overdue" | "task_overdue_escalated" | "task_over_limit_pending" | "post_publish_today" | "post_publish_overdue" | "shoot_upcoming" | "shoot_not_closed" | "meeting_upcoming" | "client_account_manager_assigned" | "project_manager_assigned" | "retainer_renewal_due" | "retainer_behind" | "retainer_term_renewed" | "retainer_cycle_report_ready" | "retainer_amendment_pending" | "retainer_amendment_decided" | "quote_approval_requested" | "quote_approval_decided" | "quote_accepted" | "invoice_overdue" | "invoice_paid" | "ad_budget_low" | "email_failed" | "lead_assigned" | "lead_won" | "lead_follow_up_overdue" | "lead_follow_up_due" | "task_reopened" | "task_revision_decided" | "task_due_shortly" | "post_published" | "post_cancelled" | "post_file_added" | "post_publish_shortly" | "responsibility_moved" | "approval_opened" | "approval_completed" | "shoot_starting" | "meeting_starting" | "shoot_completed" | "client_status_changed" | "client_healthcare_changed" | "lead_lost" | "quote_expiring" | "quote_expired" | "quote_rejected" | "invoice_draft_created" | "invoice_due_soon" | "payment_recorded" | "payment_voided" | "invoice_voided" | "ad_deposit_recorded" | "project_status_changed" | "milestone_completed" | "extra_work_created" | "retainer_status_changed" | "contract_signed" | "contract_voided" | "campaign_assigned" | "campaign_status_changed" | "campaign_end_passed" | "department_manager_assigned" | "member_moved" | "member_archived_open_work" | "security_new_device" | "security_notice" | "push_device_lost" | "announcement" | "announcement_ack_reminder" | "announcement_ack_summary" | "poll_closing" | "poll_results" | "contract_ending" | "probation_ending" | "employee_leaving" | "salary_changed" | "holiday_changed" | "hr_request_submitted" | "hr_request_decided" | "colleague_on_leave" | "leave_balance_adjusted" | "attendance_item_raised" | "attendance_items_pending" | "attendance_item_decided" | "attendance_check_in_missing" | "attendance_check_out_missing" | "field_punch_recorded" | "field_punch_rejected" | "shoot_check_in_missing" | "kiosk_offline" | "attendance_month_closed" | "action_reminder" | "action_escalated" | "action_escalated_top" | "profile_changed" | "client_logo_changed" | "project_image_changed" | "retainer_image_changed" | "subtask_turn" | "subtask_handover" | "subtask_stage_finished" | "subtasks_all_finished" | "subtask_holding_next" | "task_question_asked" | "task_question_answered" | "task_question_reminder" | "task_question_escalated" | "task_question_converted" | "task_blocked" | "post_moved" | "post_unassigned" | "post_at_risk" | "content_week_check" | "content_idea_added" | "content_idea_used" | "post_changed" | "task_progressed" | "post_progressed";
         /** @enum {string} */
         ProfileChange: "photo" | "name" | "title" | "phone" | "skills";
         /** @enum {string} */
@@ -18112,7 +18954,6 @@ export interface components {
                         /** @enum {string} */
                         type: "link";
                         attrs: {
-                            /** Format: uri */
                             href: string;
                         };
                     })[];
@@ -18145,7 +18986,6 @@ export interface components {
                         /** @enum {string} */
                         type: "link";
                         attrs: {
-                            /** Format: uri */
                             href: string;
                         };
                     })[];
@@ -18157,7 +18997,7 @@ export interface components {
                         userId: string;
                     };
                 })[];
-            } | components["schemas"]["__schema0"])[];
+            } | components["schemas"]["__schema1"])[];
         };
         __schema1: {
             /** @enum {string} */
@@ -19458,6 +20298,8 @@ export interface components {
             counts: {
                 [key: string]: number;
             };
+            occasions: components["schemas"]["CalendarOccasion"][];
+            issues: components["schemas"]["CalendarIssue"][];
         };
         Post: {
             /** Format: uuid */
@@ -19483,15 +20325,66 @@ export interface components {
             thumbnailVersionId: string | null;
             linkedTaskCount: number;
             overdue: boolean;
+            pillar: components["schemas"]["ContentPillar"] | null;
+            /** Format: uuid */
+            occasionId: string | null;
         };
+        ContentPillar: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            color: components["schemas"]["PillarColor"];
+            position: number;
+            archived: boolean;
+        };
+        /** @enum {string} */
+        PillarColor: "chart_1" | "chart_2" | "chart_3" | "chart_4" | "chart_5" | "chart_6" | "chart_7" | "chart_8";
+        CalendarOccasion: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            category: components["schemas"]["OccasionCategory"];
+            /** Format: uuid */
+            clientId: string | null;
+            /** Format: date */
+            startDate: string;
+            /** Format: date */
+            endDate: string;
+            leadDays: number;
+            confirmed: boolean;
+            covered: boolean | null;
+            skipped: boolean | null;
+        };
+        /** @enum {string} */
+        OccasionCategory: "general" | "healthcare" | "education" | "food" | "retail" | "tourism" | "beauty" | "real_estate";
+        CalendarIssue: {
+            kind: components["schemas"]["PlanningIssueKind"];
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            endDate: string | null;
+            postIds: string[];
+            platform: components["schemas"]["PostPlatform"] | null;
+            /** Format: uuid */
+            occasionId: string | null;
+            /** @enum {string|null} */
+            commitment: "post" | "reel" | "story" | null;
+            planned: number | null;
+            committed: number | null;
+            /** Format: uuid */
+            clientId: string;
+        };
+        /** @enum {string} */
+        PlanningIssueKind: "gap" | "too_close" | "under_committed" | "occasion_uncovered" | "pillar_mix";
         MyContentSummary: {
             publishToday: number;
             overdue: number;
             returned: number;
+            atRisk: number;
             toReview: number | null;
         };
         /** @enum {string} */
-        PostView: "publish_today" | "overdue" | "to_review" | "returned";
+        PostView: "publish_today" | "overdue" | "to_review" | "returned" | "at_risk";
         /** @description Posts by publish date and time */
         PostPage: {
             items: components["schemas"]["Post"][];
@@ -19517,8 +20410,25 @@ export interface components {
              * @default null
              */
             cycleLineId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            pillarId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            occasionId: string | null;
             /** Format: uuid */
             clientId: string;
+            /** Format: uuid */
+            ideaId?: string;
+            files?: components["schemas"]["PostWizardFile"][];
+            /** @default [] */
+            linkTaskIds: string[];
+            tasks?: components["schemas"]["CreateTask"][];
+            acceptLeave?: boolean;
         };
         PostCaptionInput: {
             group: components["schemas"]["CaptionGroup"];
@@ -19528,6 +20438,12 @@ export interface components {
         };
         /** @enum {string} */
         CaptionGroup: "facebook_instagram" | "tiktok" | "x" | "linkedin" | "youtube" | "snapchat" | "google_business";
+        PostWizardFile: {
+            /** Format: uuid */
+            uploadId: string;
+            name?: string;
+            slideCaption?: string | null;
+        };
         PostDetail: {
             /** Format: uuid */
             id: string;
@@ -19560,6 +20476,9 @@ export interface components {
             thumbnailVersionId: string | null;
             linkedTaskCount: number;
             overdue: boolean;
+            pillar: components["schemas"]["ContentPillar"] | null;
+            /** Format: uuid */
+            occasionId: string | null;
             caption: string | null;
             hashtags: string | null;
             captions: components["schemas"]["PostCaption"][];
@@ -19567,6 +20486,12 @@ export interface components {
             needsClientApproval: boolean;
             media: components["schemas"]["PostMedia"][];
             checks: components["schemas"]["PostCheck"][];
+            occasion: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
             linkedTasks: components["schemas"]["PostTask"][];
             cycleLine: {
                 /** Format: uuid */
@@ -19737,9 +20662,129 @@ export interface components {
             responsibleId?: string;
             /** Format: uuid */
             cycleLineId?: string | null;
+            /** Format: uuid */
+            pillarId?: string | null;
+            /** Format: uuid */
+            occasionId?: string | null;
             /** Format: date-time */
             publishedAt?: string;
             publishedLinks?: components["schemas"]["PublishedLink"][];
+        };
+        PostMovePreview: {
+            workDays: number;
+            tasks: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+                /** Format: uuid */
+                parentId: string | null;
+                /** Format: date */
+                dueDate: string;
+                /** Format: date */
+                newDueDate: string;
+                clamped: boolean;
+            }[];
+            suggestShift: boolean;
+        };
+        MovePost: {
+            /** Format: date */
+            publishDate: string;
+            /** @default false */
+            shiftTasks: boolean;
+        };
+        MovedPost: {
+            /** Format: uuid */
+            id: string;
+            client: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** Format: uuid */
+                imageId: string | null;
+                healthcare: boolean;
+            };
+            title: string;
+            type: components["schemas"]["PostType"];
+            platforms: components["schemas"]["PostPlatform"][];
+            /** Format: date */
+            publishDate: string;
+            publishTime: string | null;
+            status: components["schemas"]["PostStatus"];
+            reviewStage: components["schemas"]["ReviewStage"] | null;
+            responsible: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** Format: uuid */
+                imageId: string | null;
+                archived: boolean;
+                inScope: boolean;
+            };
+            /** Format: uuid */
+            thumbnailVersionId: string | null;
+            linkedTaskCount: number;
+            overdue: boolean;
+            pillar: components["schemas"]["ContentPillar"] | null;
+            /** Format: uuid */
+            occasionId: string | null;
+            caption: string | null;
+            hashtags: string | null;
+            captions: components["schemas"]["PostCaption"][];
+            notes: string | null;
+            needsClientApproval: boolean;
+            media: components["schemas"]["PostMedia"][];
+            checks: components["schemas"]["PostCheck"][];
+            occasion: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            linkedTasks: components["schemas"]["PostTask"][];
+            cycleLine: {
+                /** Format: uuid */
+                id: string;
+                kind: components["schemas"]["DeliverableKind"];
+                label: string | null;
+                retainer: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                };
+            } | null;
+            contentToken: string;
+            clearedReview: components["schemas"]["PostReview"] | null;
+            reviewHistory: components["schemas"]["PostReview"][];
+            clientResponses: components["schemas"]["PostClientResponse"][];
+            pendingApproval: {
+                /** Format: uuid */
+                requestId: string;
+                state: components["schemas"]["ApprovalRequestState"];
+                /** Format: date-time */
+                issuedAt: string;
+                /** Format: date-time */
+                expiresAt: string;
+            } | null;
+            /** Format: date-time */
+            scheduledAt: string | null;
+            /** Format: date-time */
+            publishedAt: string | null;
+            publishedBy: components["schemas"]["PersonRef"] | null;
+            publishedLinks: components["schemas"]["PublishedLink"][];
+            /** Format: date-time */
+            cancelledAt: string | null;
+            cancelReason: string | null;
+            createdBy: components["schemas"]["PersonRef"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            readOnly: boolean;
+            permissions: components["schemas"]["PostPermissions"];
+            allowedTransitions: components["schemas"]["PostStatus"][];
+            shiftedTaskIds: string[];
         };
         UpdatePostLayout: {
             items: {
@@ -19853,6 +20898,304 @@ export interface components {
         };
         ReturnPostTask: {
             note: string;
+        };
+        ContentAgencySettings: {
+            postingTimes: components["schemas"]["PostingWindow"][];
+        };
+        PostingWindow: {
+            platform: components["schemas"]["PostPlatform"];
+            weekdays: number[];
+            from: string;
+            to: string;
+        };
+        UpdateContentAgencySettings: {
+            postingTimes: components["schemas"]["PostingWindow"][];
+        };
+        ClientContentSettings: {
+            /** Format: uuid */
+            clientId: string;
+            saved: boolean;
+            postingTimes: components["schemas"]["PostingWindow"][];
+            pillarTargets: components["schemas"]["PillarTarget"][];
+            maxGapDays: number;
+            occasionCategories: components["schemas"]["OccasionCategory"][];
+            excludedOccasionIds: string[];
+            xLongPosts: boolean;
+            skippedOccasions: components["schemas"]["OccasionSkip"][];
+            effectivePostingTimes: components["schemas"]["PostingWindow"][];
+        };
+        PillarTarget: {
+            /** Format: uuid */
+            pillarId: string;
+            percent: number;
+        };
+        OccasionSkip: {
+            /** Format: uuid */
+            occasionId: string;
+            year: number;
+        };
+        UpdateClientContentSettings: {
+            postingTimes: components["schemas"]["PostingWindow"][];
+            pillarTargets: components["schemas"]["PillarTarget"][];
+            maxGapDays: number;
+            occasionCategories: components["schemas"]["OccasionCategory"][];
+            excludedOccasionIds: string[];
+            xLongPosts: boolean;
+        };
+        /** @description By position, archived ones last */
+        ContentPillarList: {
+            items: components["schemas"]["ContentPillar"][];
+        };
+        CreateContentPillar: {
+            name: string;
+            color: components["schemas"]["PillarColor"];
+        };
+        ContentPillarOrder: {
+            ids: string[];
+        };
+        UpdateContentPillar: {
+            name?: string;
+            color?: components["schemas"]["PillarColor"];
+        };
+        /** @description By next start in the range, then name */
+        ContentOccasionList: {
+            items: components["schemas"]["ContentOccasion"][];
+        };
+        ContentOccasion: {
+            name: string;
+            category: components["schemas"]["OccasionCategory"];
+            calendar: components["schemas"]["OccasionCalendar"];
+            month: number | null;
+            day: number | null;
+            /** Format: date */
+            date: string | null;
+            durationDays: number;
+            leadDays: number;
+            /** Format: uuid */
+            id: string;
+            client: components["schemas"]["ClientRef"] | null;
+            archived: boolean;
+            occurrences: components["schemas"]["OccasionOccurrence"][];
+        };
+        /** @enum {string} */
+        OccasionCalendar: "gregorian" | "hijri" | "once";
+        OccasionOccurrence: {
+            year: number;
+            /** Format: date */
+            startDate: string;
+            /** Format: date */
+            endDate: string;
+            confirmed: boolean;
+        };
+        CreateContentOccasion: {
+            name: string;
+            category: components["schemas"]["OccasionCategory"];
+            /**
+             * Format: uuid
+             * @default null
+             */
+            clientId: string | null;
+            calendar: components["schemas"]["OccasionCalendar"];
+            /** @default null */
+            month: number | null;
+            /** @default null */
+            day: number | null;
+            /**
+             * Format: date
+             * @default null
+             */
+            date: string | null;
+            /** @default 1 */
+            durationDays: number;
+            /** @default 7 */
+            leadDays: number;
+        };
+        UpdateContentOccasion: {
+            name?: string;
+            category?: components["schemas"]["OccasionCategory"];
+            calendar?: components["schemas"]["OccasionCalendar"];
+            month?: number | null;
+            day?: number | null;
+            /** Format: date */
+            date?: string | null;
+            durationDays?: number;
+            leadDays?: number;
+        };
+        ConfirmOccasionDate: {
+            /** Format: date */
+            startDate: string;
+        };
+        /** @enum {string} */
+        SnippetKind: "hashtags" | "caption";
+        /** @description The client's first, then the agency's, by name */
+        ContentSnippetList: {
+            items: components["schemas"]["ContentSnippet"][];
+        };
+        ContentSnippet: {
+            /** Format: uuid */
+            id: string;
+            client: components["schemas"]["ClientRef"] | null;
+            kind: components["schemas"]["SnippetKind"];
+            name: string;
+            body: string;
+            canEdit: boolean;
+        };
+        CreateContentSnippet: {
+            /**
+             * Format: uuid
+             * @default null
+             */
+            clientId: string | null;
+            kind: components["schemas"]["SnippetKind"];
+            name: string;
+            body: string;
+        };
+        UpdateContentSnippet: {
+            name?: string;
+            body?: string;
+        };
+        /** @enum {string} */
+        IdeaStatus: "open" | "used" | "dropped";
+        /** @description Ideas, newest first */
+        ContentIdeaPage: {
+            items: components["schemas"]["ContentIdea"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        ContentIdea: {
+            /** Format: uuid */
+            id: string;
+            text: string;
+            client: components["schemas"]["ClientRef"] | null;
+            pillar: components["schemas"]["ContentPillar"] | null;
+            occasion: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                archived: boolean;
+            } | null;
+            status: components["schemas"]["IdeaStatus"];
+            post: {
+                /** Format: uuid */
+                id: string;
+                title: string;
+            } | null;
+            dropReason: string | null;
+            createdBy: components["schemas"]["PersonRef"];
+            /** Format: date-time */
+            createdAt: string;
+            permissions: {
+                canEdit: boolean;
+                canDrop: boolean;
+                canRestore: boolean;
+                canUse: boolean;
+            };
+        };
+        CreateContentIdea: {
+            text: string;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            clientId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            pillarId: string | null;
+            /**
+             * Format: uuid
+             * @default null
+             */
+            occasionId: string | null;
+        };
+        UpdateContentIdea: {
+            text?: string;
+            /** Format: uuid */
+            clientId?: string | null;
+            /** Format: uuid */
+            pillarId?: string | null;
+            /** Format: uuid */
+            occasionId?: string | null;
+        };
+        /** @default {} */
+        DropContentIdea: {
+            reason?: string | null;
+        };
+        ContentPlanning: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            clients: components["schemas"]["ClientPlanning"][];
+        };
+        ClientPlanning: {
+            client: components["schemas"]["ClientRef"];
+            issues: components["schemas"]["PlanningIssue"][];
+            pillarBalance: {
+                month: string;
+                posts: number;
+                items: components["schemas"]["PillarBalanceItem"][];
+            };
+            commitments: components["schemas"]["Commitment"][];
+        };
+        PlanningIssue: {
+            kind: components["schemas"]["PlanningIssueKind"];
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            endDate: string | null;
+            postIds: string[];
+            platform: components["schemas"]["PostPlatform"] | null;
+            /** Format: uuid */
+            occasionId: string | null;
+            /** @enum {string|null} */
+            commitment: "post" | "reel" | "story" | null;
+            planned: number | null;
+            committed: number | null;
+        };
+        PillarBalanceItem: {
+            /** Format: uuid */
+            pillarId: string | null;
+            count: number;
+            share: number;
+            target: number | null;
+            off: boolean;
+        };
+        Commitment: {
+            /** Format: uuid */
+            cycleId: string;
+            retainer: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @enum {string} */
+            kind: "post" | "reel" | "story";
+            planned: number;
+            committed: number;
+        };
+        ContentGrid: {
+            client: components["schemas"]["ClientRef"];
+            month: string;
+            tiles: components["schemas"]["GridTile"][];
+        };
+        GridTile: {
+            /** Format: uuid */
+            postId: string;
+            title: string;
+            type: components["schemas"]["PostType"];
+            status: components["schemas"]["PostStatus"];
+            /** Format: date */
+            publishDate: string;
+            publishTime: string | null;
+            /** Format: uuid */
+            thumbnailVersionId: string | null;
         };
         /** @enum {string} */
         CalendarKind: "shoot" | "meeting" | "leave" | "project_due" | "milestone_due" | "renewal" | "invoice_due" | "holiday";
@@ -22410,6 +23753,9 @@ export interface components {
             thumbnailVersionId: string | null;
             linkedTaskCount: number;
             overdue: boolean;
+            pillar: components["schemas"]["ContentPillar"] | null;
+            /** Format: uuid */
+            occasionId: string | null;
             snapshot: {
                 files: number;
                 caption: string | null;
@@ -30886,6 +32232,7 @@ export interface operations {
         parameters: {
             query: {
                 clientId?: string;
+                pillarId?: string;
                 status?: components["schemas"]["PostStatus"] | components["schemas"]["PostStatus"][];
                 platform?: components["schemas"]["PostPlatform"];
                 type?: components["schemas"]["PostType"];
@@ -30937,6 +32284,7 @@ export interface operations {
                 page?: number;
                 pageSize?: number;
                 clientId?: string;
+                pillarId?: string;
                 status?: components["schemas"]["PostStatus"] | components["schemas"]["PostStatus"][];
                 platform?: components["schemas"]["PostPlatform"];
                 type?: components["schemas"]["PostType"];
@@ -30978,7 +32326,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The new post, an idea (edit scope on the client) */
+            /** @description The new post with its captions, files, linked and new tasks, in one save (F08B rule B2): an idea, or in production with tasks (edit scope on the client) */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -30987,7 +32335,14 @@ export interface operations {
                     "application/json": components["schemas"]["PostDetail"];
                 };
             };
-            /** @description `CLIENT_ARCHIVED`, `CLIENT_ENDED`, `CYCLE_CLOSED` */
+            /** @description `INVALID_CAPTION_GROUP`, `UPLOAD_NOT_FOUND`, `FILE_TYPE_BLOCKED`, `INVALID_LINK`, `INVALID_DATES`; `details.part` and `details.index` name the part of the wizard */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `CLIENT_ARCHIVED`, `CLIENT_ENDED`, `CYCLE_CLOSED`, `LIMIT_REACHED`, `TASK_ALREADY_LINKED`, `TASK_NOT_LINKABLE`, `POST_COUNTED_BY_TASK`, `ASSIGNEE_ON_LEAVE`, `IDEA_USED` */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -31112,6 +32467,84 @@ export interface operations {
                 content?: never;
             };
             /** @description `POST_LOCKED`, `POST_ARCHIVED`, `INVALID_TRANSITION`, `CYCLE_CLOSED`, `POST_COUNTED_BY_TASK` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentController_movePreview: {
+        parameters: {
+            query: {
+                publishDate: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What moving the post to the date would shift: the open linked tasks and their open subtasks with their new due dates (F08B rule B7) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostMovePreview"];
+                };
+            };
+            /** @description `INVALID_DATES`: a date in the past */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `POST_LOCKED`, `POST_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentController_move: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MovePost"];
+            };
+        };
+        responses: {
+            /** @description The post on its new date, keeping its time, status and line; `shiftTasks` moves the open linked tasks by the same work days (F08B rules B8–B9) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovedPost"];
+                };
+            };
+            /** @description `INVALID_DATES`: a date in the past */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `POST_LOCKED` (published, cancelled), `POST_ARCHIVED` */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -31476,6 +32909,811 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PostDetail"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_agencySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The agency's default best publishing times */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentAgencySettings"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_updateAgencySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContentAgencySettings"];
+            };
+        };
+        responses: {
+            /** @description Saved (`content.review` over all posts) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentAgencySettings"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_clientSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clientId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The client's content settings, the defaults while none are saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientContentSettings"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_updateClientSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clientId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateClientContentSettings"];
+            };
+        };
+        responses: {
+            /** @description Saved (`content.manage` covering the client) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientContentSettings"];
+                };
+            };
+            /** @description `INVALID_TARGETS`, `INVALID_LINK` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_skipOccasion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clientId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OccasionSkip"];
+            };
+        };
+        responses: {
+            /** @description "No post this year" for the occasion (rule C6) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientContentSettings"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_unskipOccasion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clientId: string;
+                occasionId: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The skip removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientContentSettings"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_pillars: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every pillar */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentPillarList"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_createPillar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContentPillar"];
+            };
+        };
+        responses: {
+            /** @description Added at the end */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentPillar"];
+                };
+            };
+            /** @description `LIMIT_REACHED` (10), `NAME_TAKEN` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_orderPillars: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContentPillarOrder"];
+            };
+        };
+        responses: {
+            /** @description The pillars in the new order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentPillarList"];
+                };
+            };
+            /** @description `INVALID_ORDER` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_updatePillar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContentPillar"];
+            };
+        };
+        responses: {
+            /** @description Renamed or recoloured */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentPillar"];
+                };
+            };
+            /** @description `NAME_TAKEN` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_archivePillar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No longer offered; posts keep it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentPillar"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_restorePillar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Offered again, at the end */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentPillar"];
+                };
+            };
+            /** @description `LIMIT_REACHED`, `NAME_TAKEN` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_listOccasions: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                clientId?: string;
+                includeArchived?: "true" | "false";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Occasions with their dates in the range (with `clientId`, those applying to it) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentOccasionList"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_createOccasion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContentOccasion"];
+            };
+        };
+        responses: {
+            /** @description An agency occasion (`content.review` over all posts), or a client’s own (`content.manage` covering it) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentOccasion"];
+                };
+            };
+            /** @description `INVALID_DATES`, `INVALID_LINK` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_updateOccasion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContentOccasion"];
+            };
+        };
+        responses: {
+            /** @description The occasion */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentOccasion"];
+                };
+            };
+            /** @description `INVALID_DATES` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_archiveOccasion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No longer shown or checked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentOccasion"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_restoreOccasion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Shown again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentOccasion"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_confirmOccasionDate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmOccasionDate"];
+            };
+        };
+        responses: {
+            /** @description The year's start confirmed, replacing the computed one (rule C5) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentOccasion"];
+                };
+            };
+            /** @description `INVALID_DATES` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_clearOccasionDate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back to the computed start */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentOccasion"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_snippets: {
+        parameters: {
+            query?: {
+                clientId?: string;
+                kind?: components["schemas"]["SnippetKind"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The client's snippets and the agency's */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentSnippetList"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_createSnippet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContentSnippet"];
+            };
+        };
+        responses: {
+            /** @description A client's snippet (`content.manage` covering it) or the agency's (`content.review` over all posts) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentSnippet"];
+                };
+            };
+            /** @description `LIMIT_REACHED` (50 per kind) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_updateSnippet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContentSnippet"];
+            };
+        };
+        responses: {
+            /** @description The snippet */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentSnippet"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_archiveSnippet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed from the pickers */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_listIdeas: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: components["schemas"]["IdeaStatus"];
+                clientId?: string;
+                mine?: "true" | "false";
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ideas, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentIdeaPage"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_createIdea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContentIdea"];
+            };
+        };
+        responses: {
+            /** @description The idea, open */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentIdea"];
+                };
+            };
+            /** @description `INVALID_LINK` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `CLIENT_ARCHIVED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_updateIdea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContentIdea"];
+            };
+        };
+        responses: {
+            /** @description Edited by its author while open, or by edit scope on its client */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentIdea"];
+                };
+            };
+            /** @description `IDEA_USED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_dropIdea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DropContentIdea"];
+            };
+        };
+        responses: {
+            /** @description Dropped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentIdea"];
+                };
+            };
+            /** @description `IDEA_USED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContentPlanningController_restoreIdea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentIdea"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_planning: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                clientId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per client with an open content cycle or settings: the issues of the range (at most 45 days), the pillar balance of its first month and the commitments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentPlanning"];
+                };
+            };
+        };
+    };
+    ContentPlanningController_grid: {
+        parameters: {
+            query: {
+                clientId: string;
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The client's Instagram feed posts of the month and the two before, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentGrid"];
                 };
             };
         };

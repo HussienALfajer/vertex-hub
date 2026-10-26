@@ -13,6 +13,7 @@ export * from './campaigns.js';
 export * from './catalog.js';
 export * from './clients.js';
 export * from './content.js';
+export * from './content-planning.js';
 export * from './dates.js';
 export * from './departments.js';
 export * from './devices.js';

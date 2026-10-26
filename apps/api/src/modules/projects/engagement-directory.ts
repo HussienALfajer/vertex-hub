@@ -319,6 +319,61 @@ export class EngagementDirectory {
     );
   }
 
+  /**
+   * F08B rule C9: the open cycles of live retainers that commit content (a `post`, `reel`, `story`
+   * or `design` line), of the given clients or of all, with their committed lines by kind.
+   */
+  async openContentCycles(
+    clientIds: readonly string[] | null,
+    executor: Executor = this.db,
+  ): Promise<
+    {
+      cycleId: string;
+      retainerId: string;
+      retainerName: string;
+      clientId: string;
+      periodStart: string;
+      periodEnd: string;
+      lines: { kind: DeliverableKind; count: number }[];
+    }[]
+  > {
+    if (clientIds?.length === 0) return [];
+    const rows = await executor
+      .select({
+        cycleId: retainerCycles.id,
+        retainerId: retainers.id,
+        retainerName: retainers.name,
+        clientId: retainers.clientId,
+        periodStart: retainerCycles.periodStart,
+        periodEnd: retainerCycles.periodEnd,
+        kind: retainerCycleLines.kind,
+        count: retainerCycleLines.committedQuantity,
+      })
+      .from(retainerCycles)
+      .innerJoin(retainers, eq(retainers.id, retainerCycles.retainerId))
+      .innerJoin(retainerCycleLines, eq(retainerCycleLines.cycleId, retainerCycles.id))
+      .where(
+        and(
+          eq(retainerCycles.status, 'open'),
+          isNull(retainers.archivedAt),
+          clientIds ? inArray(retainers.clientId, [...clientIds]) : undefined,
+        ),
+      )
+      .orderBy(asc(retainerCycles.periodStart), asc(retainerCycles.id));
+    const cycles = new Map<
+      string,
+      Awaited<ReturnType<EngagementDirectory['openContentCycles']>>[number]
+    >();
+    for (const { kind, count, ...cycle } of rows) {
+      const entry = cycles.get(cycle.cycleId) ?? { ...cycle, lines: [] };
+      entry.lines.push({ kind, count });
+      cycles.set(cycle.cycleId, entry);
+    }
+    return [...cycles.values()].filter((cycle) =>
+      cycle.lines.some((line) => ['post', 'reel', 'story', 'design'].includes(line.kind)),
+    );
+  }
+
   async cycleLines(
     ids: string[],
     executor: Executor = this.db,

@@ -1158,6 +1158,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
           .filter({ visible: true })
           .first()
           .click();
+        // Wait for the list to close, so the next pick cannot catch an option of this one.
+        await expect(page.getByRole('option').filter({ visible: true })).toHaveCount(0);
       };
       await choose(form, ar.tasks.form.department, 'التسويق');
       await choose(form, ar.tasks.form.assignee, 'ليان الأحمد');

@@ -108,6 +108,43 @@ export class FileAttachments {
   }
 
   /**
+   * F08B rule B2: the actor's held uploads attached to a new post as its files, in order
+   * (`FILE_NAME_TAKEN` for two of one name; a caller attaching one file at a time passes the same
+   * `names` set). Returns the new items' ids, and whether a preview
+   * waits: call `queuePreviews` once the transaction committed.
+   */
+  async attachToPost(
+    tx: Transaction,
+    actor: CurrentUserInfo,
+    target: { postId: string; clientId: string },
+    files: readonly { uploadId: string; name?: string }[],
+    names = new Set<string>(),
+  ): Promise<{ itemIds: string[]; preview: boolean }> {
+    let preview = false;
+    const itemIds: string[] = [];
+    for (const file of files) {
+      const upload = await this.takeUpload(tx, actor, file.uploadId);
+      const name = file.name ?? documentName(upload.originalName);
+      const key = name.toLocaleLowerCase('ar');
+      if (names.has(key)) {
+        throw new CodedException(409, 'FILE_NAME_TAKEN', 'Two files of the post share a name');
+      }
+      names.add(key);
+      const itemId = await this.insertItem(tx, actor, {
+        ownerType: 'post',
+        postId: target.postId,
+        clientId: target.clientId,
+        role: 'deliverable',
+        taskCommentId: null,
+        name,
+      });
+      itemIds.push(itemId);
+      preview = (await this.insertUploadVersion(tx, actor, itemId, upload)) || preview;
+    }
+    return { itemIds, preview };
+  }
+
+  /**
    * F06B rule C3: the actor's held uploads attached to a new task as references or as the first
    * version of a deliverable (`FILE_NAME_TAKEN` for two deliverables of one name; a caller
    * attaching one file at a time passes the same `deliverables` set). Returns whether a preview
@@ -253,7 +290,7 @@ export class FileAttachments {
     actor: CurrentUserInfo,
     values: Pick<
       typeof fileItems.$inferInsert,
-      'ownerType' | 'taskId' | 'clientId' | 'role' | 'taskCommentId' | 'name'
+      'ownerType' | 'taskId' | 'postId' | 'clientId' | 'role' | 'taskCommentId' | 'name'
     >,
   ): Promise<string> {
     const [item] = await tx
