@@ -18,7 +18,7 @@ import { type AuditActor, recordAudit } from '../audit/index.js';
 import { personRef, UserDirectory } from '../auth/index.js';
 import { FileVersions } from '../files/index.js';
 import type { Notice } from '../notifications/index.js';
-import { blockedIds, closesCycle } from './task-dependencies.js';
+import { blockedIds, closesCycle, dependentsOf } from './task-dependencies.js';
 import { TaskNotices } from './task-notices.js';
 
 type Executor = Database | Transaction;
@@ -52,6 +52,10 @@ const subtaskColumns = {
 
 /** Neither cancelled nor archived: the subtasks the run, the progress and the stages count. */
 const isLive = (subtask: SubtaskRow) => !subtask.archivedAt && subtask.status !== 'cancelled';
+
+/** Live and not started or started: the subtasks that open or wait again. */
+const isWatched = (subtask: SubtaskRow) =>
+  isLive(subtask) && (subtask.status === 'new' || subtask.status === 'in_progress');
 
 /**
  * The run of a parent's subtasks (F06B rules A3, A4, A6, A9 and A12): keeps its `run` dependencies
@@ -89,9 +93,16 @@ export class SubtaskRuns {
    * live subtasks changed. A started subtask stays started (F06 edge case 3); a `new` or started
    * one that waits again is told (`task_blocked`), and a `new` one no longer waiting opens. The
    * caller took `lockDependencyGraph` and the parent's lock. `DEPENDENCY_CYCLE` when the new
-   * order contradicts a manual dependency between the subtasks.
+   * order contradicts a manual dependency between the subtasks. `blockedBefore` (from
+   * `blockedNow`, read before the caller changed a subtask's status) compares with the state
+   * before that change, so a subtask freed by a cancel or an archive opens (edge case 3).
    */
-  async sync(tx: Transaction, parentId: string, actorId: string | null): Promise<void> {
+  async sync(
+    tx: Transaction,
+    parentId: string,
+    actorId: string | null,
+    blockedBefore?: ReadonlySet<string>,
+  ): Promise<void> {
     const [parent] = await tx
       .select({ runMode: tasks.runMode })
       .from(tasks)
@@ -131,14 +142,11 @@ export class SubtaskRuns {
     const wantKeys = new Set(want.map(key));
     const added = want.filter((edge) => !run.has(key(edge)));
     const removed = existing.filter((e) => e.source === 'run' && !wantKeys.has(key(e)));
-    if (added.length === 0 && removed.length === 0) return;
+    if (added.length === 0 && removed.length === 0 && !blockedBefore) return;
 
-    const watched = subtasks.filter(
-      (subtask) =>
-        isLive(subtask) && (subtask.status === 'new' || subtask.status === 'in_progress'),
-    );
+    const watched = subtasks.filter(isWatched);
     const watchedIds = watched.map((subtask) => subtask.id);
-    const blockedBefore = await blockedIds(watchedIds, tx);
+    const before = blockedBefore ?? (await blockedIds(watchedIds, tx));
     if (removed.length > 0) {
       await tx
         .delete(taskDependencies)
@@ -171,7 +179,7 @@ export class SubtaskRuns {
 
     const notices: Notice[] = [];
     for (const subtask of watched) {
-      const was = blockedBefore.has(subtask.id);
+      const was = before.has(subtask.id);
       const is = blockedAfter.has(subtask.id);
       if (was === is) continue;
       const task = await this.notices.load(tx, subtask.id);
@@ -197,6 +205,69 @@ export class SubtaskRuns {
       }
     }
     await this.notices.send(tx, notices);
+  }
+
+  /** Rule A4: the parent's non-archived subtasks numbered 1, 2, 3… in their order. */
+  async compact(tx: Transaction, parentId: string): Promise<void> {
+    const kept = (await this.subtasksOf(tx, parentId)).filter((subtask) => !subtask.archivedAt);
+    for (const [index, subtask] of kept.entries()) {
+      if (subtask.position !== index + 1) {
+        await tx
+          .update(tasks)
+          .set({ position: index + 1 })
+          .where(eq(tasks.id, subtask.id));
+      }
+    }
+  }
+
+  /** The parent's live `new` or started subtasks that wait now, for `sync`'s `blockedBefore`. */
+  async blockedNow(tx: Transaction, parentId: string): Promise<Set<string>> {
+    const watched = (await this.subtasksOf(tx, parentId)).filter(isWatched);
+    return blockedIds(
+      watched.map((subtask) => subtask.id),
+      tx,
+    );
+  }
+
+  /** The live `new` or started tasks waiting on `taskIds` that are free to work now. */
+  async freeDependents(tx: Transaction, taskIds: readonly string[]): Promise<string[]> {
+    const waiting = new Set<string>();
+    for (const taskId of taskIds) {
+      for (const dependent of await dependentsOf(taskId, tx)) {
+        if (
+          !dependent.archived &&
+          (dependent.status === 'new' || dependent.status === 'in_progress')
+        ) {
+          waiting.add(dependent.id);
+        }
+      }
+    }
+    const blocked = await blockedIds([...waiting], tx);
+    return [...waiting].filter((dependentId) => !blocked.has(dependentId));
+  }
+
+  /**
+   * F06 edge case 3 (F06B event audit): the tasks of `freeBefore` that wait again after a
+   * dependency went back to work hear it (`task_blocked`), and a turn they had is void.
+   */
+  async blockedAgain(
+    tx: Transaction,
+    actorId: string,
+    freeBefore: readonly string[],
+  ): Promise<Notice[]> {
+    if (freeBefore.length === 0) return [];
+    const blocked = await blockedIds([...freeBefore], tx);
+    for (const dependentId of blocked) {
+      await this.notices.resolve(tx, {
+        subject: { type: 'task', id: dependentId },
+        types: ['subtask_turn', 'subtask_handover'],
+        outcome: 'void',
+        actorId,
+      });
+    }
+    return (await this.notices.loadMany(tx, [...blocked])).map((dependent) =>
+      this.notices.notice(dependent, 'task_blocked', [dependent.assigneeId], actorId),
+    );
   }
 
   /**

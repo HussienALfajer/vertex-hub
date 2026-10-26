@@ -219,6 +219,7 @@ describe('allowedTaskTransitions', () => {
     client: false,
     creator: false,
     parentReviewer: false,
+    parentManager: false,
   };
   const assignee: TaskRights = { ...none, work: true };
   const departmentManager: TaskRights = { ...none, work: true, manage: true, assign: true };
@@ -377,6 +378,10 @@ describe('allowedTaskTransitions', () => {
     expect(allowedTaskTransitions(state({ status: 'internal_review' }), parentAssignee)).toEqual(
       [],
     );
+    // The parent's assignee cancels a subtask, even their own (F06B, Roles).
+    const parentManager: TaskRights = { ...none, parentManager: true };
+    expect(allowedTaskTransitions(state({ subtask: true }), parentManager)).toEqual(['cancelled']);
+    expect(allowedTaskTransitions(state({}), parentManager)).toEqual([]);
     const delivered = state({ status: 'delivered', subtask: true });
     expect(allowedTaskTransitions(delivered, accountManager)).toEqual(['in_progress']);
   });

@@ -242,9 +242,13 @@ describe('subtasks (F06B part A)', () => {
     await cast.moveOk(copy.id, cast.writer.cookie, { status: 'internal_review' });
     // Rule A7: its reviewers are its department managers and the parent's assignee, not the AM.
     expect(await typesOf(cast.contentManager.id, copy.id)).toContain('task_review_requested');
-    // The parent's assignee is the subtask's own assignee here: not their review.
+    // The parent's assignee is the subtask's own assignee here: not their review, though they
+    // may cancel it as the parent's.
     const own = await cast.detail(copy.id, cast.writer.cookie);
-    expect(own).toMatchObject({ allowedTransitions: [], permissions: { canReview: false } });
+    expect(own).toMatchObject({
+      allowedTransitions: ['cancelled'],
+      permissions: { canReview: false },
+    });
     expect((await cast.move(copy.id, cast.writer.cookie, { status: 'delivered' })).status).toBe(
       403,
     );
@@ -289,7 +293,7 @@ describe('subtasks (F06B part A)', () => {
     expect(await typesOf(cast.am.id, design.id)).not.toContain('task_review_requested');
     // The writer, the parent's assignee, may review it (as in the next test); its manager does.
     const review = await cast.detail(design.id, cast.writer.cookie);
-    expect(review.allowedTransitions).toEqual(['revisions', 'delivered']);
+    expect(review.allowedTransitions).toEqual(['revisions', 'delivered', 'cancelled']);
     await cast.moveOk(design.id, cast.designManager.cookie, { status: 'delivered' });
 
     // Rule A9: the last one delivered tells the parent's assignee; the parent may go to review.
@@ -490,6 +494,69 @@ describe('subtasks (F06B part A)', () => {
     expect(await typesOf(cast.writer.id, first.id)).not.toContain('task_reopened');
   });
 
+  it('opens the next subtask when the one holding it is cancelled or archived (edge case 3)', async () => {
+    for (const leave of ['cancel', 'archive'] as const) {
+      const parent = await parentTask();
+      const add = () => addSubtask(parent.id, cast.gm.cookie, { assigneeId: cast.designer.id });
+      const first = await add();
+      const middle = await add();
+      const last = await add();
+      await deliver(first.id, cast.designer.cookie, cast.designManager.cookie);
+      expect((await cast.detail(last.id, cast.gm.cookie)).blocked).toBe(true);
+      if (leave === 'cancel') {
+        // The parent's assignee cancels a subtask of another department (Roles).
+        await cast.moveOk(middle.id, cast.writer.cookie, { status: 'cancelled', note: 'لا حاجة' });
+      } else {
+        expect(
+          (await client.post(`/api/tasks/${middle.id}/archive`, cast.gm.cookie, {})).status,
+        ).toBe(200);
+      }
+      expect((await cast.detail(last.id, cast.gm.cookie)).blocked).toBe(false);
+      expect(
+        (await noticeOf(cast.designer.id, last.id, 'subtask_turn'))?.data,
+        leave,
+      ).toMatchObject({
+        previous: { title: first.title },
+      });
+      if (leave === 'archive') {
+        // Positions stay dense; restored, the subtask joins last.
+        expect(
+          (await cast.detail(parent.id, cast.gm.cookie)).subtasks.map((s) => [s.id, s.position]),
+        ).toEqual([
+          [first.id, 1],
+          [last.id, 2],
+        ]);
+        await client.post(`/api/tasks/${middle.id}/restore`, cast.gm.cookie, {});
+        expect(
+          (await cast.detail(parent.id, cast.gm.cookie)).subtasks.map((s) => [s.id, s.position]),
+        ).toEqual([
+          [first.id, 1],
+          [last.id, 2],
+          [middle.id, 3],
+        ]);
+        expect((await cast.detail(middle.id, cast.gm.cookie)).dependencies).toMatchObject([
+          { id: last.id, source: 'run' },
+        ]);
+      }
+    }
+  });
+
+  it('holds a parent at every later step while a subtask added since is open (rule A8)', async () => {
+    const parent = await parentTask();
+    await cast.moveOk(parent.id, cast.writer.cookie, { status: 'in_progress' });
+    await cast.moveOk(parent.id, cast.writer.cookie, { status: 'internal_review' });
+    await addSubtask(parent.id, cast.writer.cookie);
+    await expectError(
+      await cast.move(
+        parent.id,
+        cast.contentManager.cookie,
+        await cast.asThePageSends(parent.id, cast.contentManager.cookie, { status: 'approved' }),
+      ),
+      409,
+      'SUBTASKS_OPEN',
+    );
+  });
+
   it('reopens chosen subtasks while the parent is in revisions (rule A10)', async () => {
     const { id: clientId } = await cast.createClient();
     const parent = await cast.createTask(cast.am.cookie, {
@@ -526,6 +593,12 @@ describe('subtasks (F06B part A)', () => {
       note: 'أقصر',
     });
     expect(revisions.permissions.canReopenSubtasks).toBe(true);
+    // A subtask added during revisions follows the delivered ones, free until one reopens.
+    const added = await addSubtask(parent.id, cast.contentManager.cookie, {
+      department: 'content_management',
+      assigneeId: cast.writer.id,
+    });
+    expect(added.blocked).toBe(false);
     expect((await client.post(reopenPath, cast.employee.cookie, body)).status).toBe(403);
     expect((await client.post(reopenPath, undefined, body)).status).toBe(401);
 
@@ -534,6 +607,7 @@ describe('subtasks (F06B part A)', () => {
     expect(taskDetailSchema.parse(await reopened.json()).subtasks).toMatchObject([
       { id: copy.id, status: 'in_progress' },
       { id: other.id, status: 'delivered' },
+      { id: added.id, status: 'new' },
     ]);
     const [revision] = await db
       .select()
@@ -541,6 +615,14 @@ describe('subtasks (F06B part A)', () => {
       .where(eq(taskRevisions.taskId, copy.id));
     expect(revision).toMatchObject({ source: 'internal', note: 'العميل يريد نصًا أقصر' });
     expect(await typesOf(cast.writer.id, copy.id)).toContain('task_reopened');
+    // The added one waits on the subtask before it: reopened, it holds it again.
+    expect((await cast.detail(added.id, cast.gm.cookie)).blocked).toBe(false);
+    const again = await client.post(reopenPath, cast.contentManager.cookie, {
+      items: [{ id: other.id, note: 'وهذا أيضًا' }],
+    });
+    expect(again.status).toBe(200);
+    expect((await cast.detail(added.id, cast.gm.cookie)).blocked).toBe(true);
+    expect(await typesOf(cast.writer.id, added.id)).toContain('task_blocked');
     expect((await auditOf(parent.id, 'task.subtasks_reopened'))[0]?.after).toMatchObject({
       subtasks: [{ id: copy.id, note: 'العميل يريد نصًا أقصر' }],
     });

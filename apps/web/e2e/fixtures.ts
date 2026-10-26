@@ -5371,6 +5371,7 @@ function taskRoutes({
       creator: holds('tasks.request', 'all') && task.createdById === me().user.id,
       // The mocks hold no subtasks yet (F06B).
       parentReviewer: false,
+      parentManager: false,
     };
   };
   const reviewStage = (task: TaskRecord) => task.reviewStage;

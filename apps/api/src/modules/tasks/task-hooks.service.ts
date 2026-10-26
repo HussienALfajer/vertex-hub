@@ -10,6 +10,7 @@ import { AttendanceFieldWork, LeaveWorkSources } from '../hr/index.js';
 import { EngagementDirectory, WorkProgress } from '../projects/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
+import { taskLockOrder } from './task-access.js';
 import { TaskGuards } from './task-guards.js';
 import { blocksDependents, TaskNotices } from './task-notices.js';
 
@@ -168,8 +169,8 @@ export class TaskHooksService implements OnModuleInit {
       .select(cancelledColumns)
       .from(tasks)
       .where(this.openTaskFilter(projectId))
-      // By id, the order every task lock set follows, so a concurrent move cannot deadlock.
-      .orderBy(asc(tasks.id))
+      // A project's tasks hold parents and their subtasks: the shared lock order.
+      .orderBy(...taskLockOrder)
       .for('update');
     // F11 edge case 7: a task a scheduled shoot holds keeps the project open.
     await this.guards.assertFree(

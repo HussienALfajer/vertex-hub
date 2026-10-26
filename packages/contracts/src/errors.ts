@@ -268,7 +268,6 @@ export const ERROR_CODES = [
   'SUBTASK_DEPTH',
   'SUBTASKS_OPEN',
   'SUBTASK_DUE_AFTER_PARENT',
-  'TASK_CLOSED',
   'STAGE_NOT_EMPTY',
 ] as const;
 

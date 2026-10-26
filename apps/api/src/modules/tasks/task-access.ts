@@ -15,7 +15,7 @@ import {
   type TaskType,
 } from '@vertex-hub/contracts';
 import { type Database, type Transaction, tasks } from '@vertex-hub/db';
-import { eq, inArray } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { CodedException } from '../../core/errors/index.js';
 import type { AuditActor } from '../audit/index.js';
 import type { CurrentUserInfo } from '../auth/index.js';
@@ -109,6 +109,30 @@ export interface TaskRow {
   runMode: SubtaskRunMode | null;
   handoverNote: string | null;
   archivedAt: Date | null;
+}
+
+/**
+ * The order every set of task row locks follows, so concurrent changes cannot deadlock: by id,
+ * with a parent right before its subtasks (F06B: a subtask's move locks its parent first).
+ */
+export const taskLockOrder = [
+  sql`coalesce(${tasks.parentId}, ${tasks.id})`,
+  sql`${tasks.parentId} is not null`,
+  asc(tasks.id),
+];
+
+/**
+ * F06B: a change of a subtask locks its parent first (the parent before its subtasks, as
+ * `taskLockOrder`), so it serializes with the parent's own changes (edge case 2).
+ */
+export async function lockParentOf(tx: Transaction, taskId: string): Promise<void> {
+  const [row] = await tx
+    .select({ parentId: tasks.parentId })
+    .from(tasks)
+    .where(eq(tasks.id, taskId));
+  if (row?.parentId) {
+    await tx.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, row.parentId)).for('update');
+  }
 }
 
 /** The parent of a subtask, as access, the workflow and notices read it (F06B). */
@@ -269,6 +293,18 @@ export function taskRights(actor: CurrentUserInfo, task: TaskAccess): TaskRights
       !!task.parent?.assigneeId &&
       task.parent.assigneeId === actor.id &&
       task.assigneeId !== actor.id,
+    // F06B, Roles: who manages the parent's subtasks cancels them. A subtask shares its parent's
+    // client and engagement (rule A1), so the parent's rights are read from its own row's links.
+    parentManager:
+      !!task.parent &&
+      managesSubtasks(actor, {
+        ...task,
+        id: task.parent.id,
+        department: task.parent.department,
+        assigneeId: task.parent.assigneeId,
+        parentId: null,
+        parent: null,
+      }),
   };
 }
 

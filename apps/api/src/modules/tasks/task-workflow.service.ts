@@ -55,9 +55,7 @@ import {
 import { TaskApprovals } from './task-approvals.js';
 import {
   assertValidDependencies,
-  blockedIds,
   dependenciesOf,
-  dependentsOf,
   isBlocked,
   lockDependencyGraph,
 } from './task-dependencies.js';
@@ -75,6 +73,15 @@ const RESPONSE_MOVES: readonly TaskMove[] = ['client_approved', 'client_changes'
 
 /** Internal passes (F09 rules 1 and 2): they write a snapshot of the content they were shown. */
 const PASS_MOVES: readonly TaskMove[] = ['send_to_client', 'approve'];
+
+/** F06B rule A8: moves toward review, the client or delivery wait for the subtasks. */
+const SUBTASK_HELD_MOVES: readonly TaskMove[] = [
+  'submit',
+  'resubmit',
+  'send_to_client',
+  'approve',
+  'deliver',
+];
 
 /** Moves that turn a delivered or cancelled task back into open work. */
 const REOPEN_MOVES: readonly TaskMove[] = ['reopen', 'reopen_client', 'reopen_internal'];
@@ -168,7 +175,10 @@ export class TaskWorkflowService {
       }
       if (!canMakeTaskMove(taskState(task, blocked), move, rights)) throw new ForbiddenException();
       // F06B rule A8: a parent goes to review only once its subtasks are delivered.
-      if (move === 'submit' || move === 'resubmit') await this.assertSubtasksDelivered(tx, id);
+      // A subtask added later holds the parent at every later step too.
+      if (!task.parentId && SUBTASK_HELD_MOVES.includes(move)) {
+        await this.assertSubtasksDelivered(tx, id);
+      }
       // F08 rule 7: the client approves the post, and publishing it delivers the task.
       if (isRefusedOnLinkedTask(task, change.status)) {
         throw new CodedException(
@@ -242,7 +252,14 @@ export class TaskWorkflowService {
 
       // F06 edge case 3: the tasks free to work now, to tell those this move holds again.
       const freeDependents =
-        isTaskFinished(task.status) && !isTaskFinished(to) ? await this.freeDependents(tx, id) : [];
+        isTaskFinished(task.status) && !isTaskFinished(to)
+          ? await this.runs.freeDependents(tx, [id])
+          : [];
+      // Edge case 3: a cancelled subtask frees the next one; compare with the run before it.
+      const blockedBefore =
+        task.parentId && move === 'cancel'
+          ? await this.runs.blockedNow(tx, task.parentId)
+          : undefined;
       const now = new Date();
       await tx
         .update(tasks)
@@ -342,7 +359,7 @@ export class TaskWorkflowService {
       // Rules A3 and A10: a subtask cancelled or back to work rewrites its parent's run, and a
       // reopened one holds the parent again.
       if (task.parentId && (move === 'cancel' || REOPEN_MOVES.includes(move))) {
-        await this.runs.sync(tx, task.parentId, actor.id);
+        await this.runs.sync(tx, task.parentId, actor.id, blockedBefore);
         if (REOPEN_MOVES.includes(move)) await this.runs.rearm(tx, task.parentId, actor.id);
       }
       const overLimit = !!revision?.overLimit;
@@ -356,7 +373,7 @@ export class TaskWorkflowService {
               ...(await this.moveNotices(tx, actor, task, move, overLimit)),
               // F06 edge case 3: a finished task back to work holds its dependents again.
               ...(isTaskFinished(task.status) && !isTaskFinished(to)
-                ? await this.blockedAgain(tx, actor.id, freeDependents)
+                ? await this.runs.blockedAgain(tx, actor.id, freeDependents)
                 : []),
             ],
       );
@@ -404,39 +421,6 @@ export class TaskWorkflowService {
       open.map((subtask) => subtask.id),
     );
     await this.hooks.cancelLocked(tx, open, reason, actorOf(actor), { parentId });
-  }
-
-  /** The live `new` or started tasks waiting on `taskId` that are free to work now. */
-  private async freeDependents(tx: Transaction, taskId: string): Promise<string[]> {
-    const waiting = (await dependentsOf(taskId, tx))
-      .filter((d) => !d.archived && (d.status === 'new' || d.status === 'in_progress'))
-      .map((d) => d.id);
-    const blocked = await blockedIds(waiting, tx);
-    return waiting.filter((dependentId) => !blocked.has(dependentId));
-  }
-
-  /**
-   * F06 edge case 3 (F06B event audit): the tasks of `freeBefore` that wait again after a
-   * dependency went back to work hear it (`task_blocked`), and a turn they had is void.
-   */
-  private async blockedAgain(
-    tx: Transaction,
-    actorId: string,
-    freeBefore: readonly string[],
-  ): Promise<Notice[]> {
-    if (freeBefore.length === 0) return [];
-    const blocked = await blockedIds([...freeBefore], tx);
-    for (const dependentId of blocked) {
-      await this.notices.resolve(tx, {
-        subject: { type: 'task', id: dependentId },
-        types: ['subtask_turn', 'subtask_handover'],
-        outcome: 'void',
-        actorId,
-      });
-    }
-    return (await this.notices.loadMany(tx, [...blocked])).map((dependent) =>
-      this.notices.notice(dependent, 'task_blocked', [dependent.assigneeId], actorId),
-    );
   }
 
   /** Rule 10: the account manager decides on an over-limit client revision, once. */

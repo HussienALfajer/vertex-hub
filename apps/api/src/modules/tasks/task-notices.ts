@@ -20,7 +20,13 @@ import {
   type Resolution,
 } from '../notifications/index.js';
 import { EngagementDirectory, type ProjectLink } from '../projects/index.js';
-import { accessColumns, type ParentRef, parentsOf, type TaskRow } from './task-access.js';
+import {
+  accessColumns,
+  type ParentRef,
+  parentsOf,
+  type TaskRow,
+  taskLockOrder,
+} from './task-access.js';
 import { dependentsOf, isBlocked } from './task-dependencies.js';
 import { TaskQueueHooks } from './task-queue-hooks.js';
 
@@ -177,7 +183,7 @@ export class TaskNotices {
         .select({ id: tasks.id })
         .from(tasks)
         .where(inArray(tasks.id, [...waiting.keys()]))
-        .orderBy(tasks.id)
+        .orderBy(...taskLockOrder)
         .for('update');
     }
     const notices: Notice[] = [];

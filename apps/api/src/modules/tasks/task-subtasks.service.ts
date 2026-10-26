@@ -372,6 +372,11 @@ export class TaskSubtasksService {
           );
         }
       }
+      // F06 edge case 3: the work they held that is free now waits again.
+      const freeDependents = await this.runs.freeDependents(
+        tx,
+        rows.map((row) => row.id),
+      );
       const reopened: { id: string; title: string; note: string }[] = [];
       for (const row of rows) {
         const note = input.items.find((item) => item.id === row.id)?.note ?? '';
@@ -403,6 +408,7 @@ export class TaskSubtasksService {
       });
       await this.runs.sync(tx, parentId, actor.id);
       await this.runs.rearm(tx, parentId, actor.id);
+      await this.notices.send(tx, await this.runs.blockedAgain(tx, actor.id, freeDependents));
     });
     return this.tasks.detail(actor, parentId);
   }

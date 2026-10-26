@@ -15,6 +15,7 @@ import {
   isTaskFinished,
   isTaskOverdue,
   permissionScopes,
+  SUBTASK_LIMITS,
   type Subtask,
   TASK_LIMITS,
   type Task,
@@ -76,7 +77,9 @@ import {
   hasClientScope,
   holdsAll,
   inClosedProject,
+  lockParentOf,
   ownsOpenRequest,
+  type ParentRef,
   parentsOf,
   readableTask,
   type TaskAccess,
@@ -608,6 +611,8 @@ export class TasksService {
       if (movesPeople) await lockAccessChanges(tx);
       // A new client for a linked task changes the dependency graph's rule (same client only).
       if (input.clientId !== undefined) await lockDependencyGraph(tx);
+      // F06B rule A5: a subtask's dates are checked against its parent's, under its lock.
+      await lockParentOf(tx, id);
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       const rights = taskRights(actor, task);
       if (!rights.manage && !ownsOpenRequest(rights, task)) throw new ForbiddenException();
@@ -989,10 +994,15 @@ export class TasksService {
     await this.db.transaction(async (tx) => {
       // Archiving a subtask rewrites its parent's run (F06B rule A3).
       await lockDependencyGraph(tx);
+      await lockParentOf(tx, id);
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       if (task.archivedAt) {
         throw new CodedException(409, 'TASK_ARCHIVED', 'The task is already archived');
       }
+      // Edge case 3: the subtask it held opens; compare with the run before it left.
+      const blockedBefore = task.parentId
+        ? await this.runs.blockedNow(tx, task.parentId)
+        : undefined;
       // F06B rule A11: a parent's subtasks are archived with it, at the same instant, so restore
       // knows which to bring back.
       const subtasks = task.parentId
@@ -1016,7 +1026,10 @@ export class TasksService {
       }
       // F08 rule 8: an archived task leaves its post.
       await unlinkRemovedTask(tx, this.postHooks, task, 'archived', actorOf(actor));
-      if (task.parentId) await this.runs.sync(tx, task.parentId, actor.id);
+      if (task.parentId) {
+        await this.runs.compact(tx, task.parentId);
+        await this.runs.sync(tx, task.parentId, actor.id, blockedBefore);
+      }
       const archivedNotice = (archived: NoticeTask) =>
         this.notices.notice(archived, 'task_changed', [archived.assigneeId], actor.id, {
           change: 'archived',
@@ -1043,6 +1056,7 @@ export class TasksService {
       // Taken before the row lock: restoring open work waits for user archiving (rule 6).
       await lockAccessChanges(tx);
       await lockDependencyGraph(tx);
+      await lockParentOf(tx, id);
       const task = await readableTask(tx, this.directories, actor, id, { forUpdate: true });
       if (!task.archivedAt) {
         throw new CodedException(409, 'TASK_NOT_ARCHIVED', 'The task is not archived');
@@ -1063,12 +1077,46 @@ export class TasksService {
             .where(and(eq(tasks.parentId, id), eq(tasks.archivedAt, task.archivedAt)))
             .orderBy(asc(tasks.id))
             .for('update');
+      if (task.parent) await this.placeRestoredSubtask(tx, task, task.parent);
       for (const restored of [task, ...subtasks]) {
         await this.restoreOne(tx, actor, restored);
       }
-      if (task.parentId) await this.runs.sync(tx, task.parentId, actor.id);
+      if (task.parentId) {
+        await this.runs.sync(tx, task.parentId, actor.id);
+        await this.runs.rearm(tx, task.parentId, actor.id);
+      }
     });
     return this.detail(actor, id);
+  }
+
+  /**
+   * F06B: a subtask restored on its own joins an open parent last, in the stage its run mode
+   * asks for (its own while live, else the first), within the limit of 30.
+   */
+  private async placeRestoredSubtask(
+    tx: Transaction,
+    task: TaskAccess,
+    parent: ParentRef,
+  ): Promise<void> {
+    if (parent.status === 'delivered' || parent.status === 'cancelled') {
+      throw new CodedException(409, 'TASK_CLOSED', 'Reopen the parent task first');
+    }
+    const kept = (await this.runs.subtasksOf(tx, parent.id)).filter((s) => !s.archivedAt);
+    if (
+      task.status !== 'cancelled' &&
+      kept.filter((s) => s.status !== 'cancelled').length >= SUBTASK_LIMITS.subtasks
+    ) {
+      throw new CodedException(409, 'LIMIT_REACHED', 'A task holds at most 30 subtasks');
+    }
+    const stages = await this.runs.stagesOf(tx, parent.id);
+    const stageId =
+      parent.runMode === 'stages'
+        ? ((stages.find((stage) => stage.id === task.stageId) ?? stages[0])?.id ?? null)
+        : null;
+    await tx
+      .update(tasks)
+      .set({ position: kept.length + 1, stageId })
+      .where(eq(tasks.id, task.id));
   }
 
   /** Restores one locked task; an archived assignee cannot take open work back (rule 6). */

@@ -243,7 +243,9 @@ export function revisionSourceOf(move: TaskMove): RevisionSource | null {
  * What the caller may do on one task, worked out by the API from their scopes (spec F06,
  * "Scopes on tasks"): `work` is `tasks.work`, `manage` is manage scope, `assign` is assign scope,
  * `client` is client scope, `creator` is being the task's creator. `parentReviewer`: the task is a
- * subtask and the caller is its parent's assignee but not its own (F06B rule A7).
+ * subtask and the caller is its parent's assignee but not its own (F06B rule A7);
+ * `parentManager`: the task is a subtask and the caller manages its parent's subtasks (manage
+ * scope on the parent, or its assignee), so they may cancel it (F06B, Roles).
  */
 export type TaskRights = {
   work: boolean;
@@ -252,6 +254,7 @@ export type TaskRights = {
   client: boolean;
   creator: boolean;
   parentReviewer: boolean;
+  parentManager: boolean;
 };
 
 /** The parts of a task the workflow looks at. */
@@ -310,7 +313,11 @@ export function canMakeTaskMove(task: TaskState, move: TaskMove, rights: TaskRig
     case 'reopen':
       return rights.manage;
     case 'cancel':
-      return rights.manage || (rights.creator && task.status === 'new' && task.assigneeId === null);
+      return (
+        rights.manage ||
+        (task.subtask && rights.parentManager) ||
+        (rights.creator && task.status === 'new' && task.assigneeId === null)
+      );
   }
 }
 
