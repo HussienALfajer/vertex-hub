@@ -19,6 +19,7 @@ build/
 brand/fonts/private/
 
 # Tests
+.verify/
 coverage/
 playwright-report/
 test-results/
