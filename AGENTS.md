@@ -83,7 +83,7 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 ## How to work
 
 - Continue without asking when the next step needs no input from the owner. Put brief status notes in the same message as the next action.
-- Stop and ask only when a decision belongs to the owner (scope, business rules, anything in `open-questions.md`), when a spec is ambiguous in a way that changes the result, or before a destructive or outward-facing action (deleting data, dropping tables, restoring a database snapshot, force-push, publishing). Deploying `main` to production and changing production through the server or an admin panel need no approval (owner, 2026-10-18): do them when the task calls for them and report what changed.
+- Stop and ask only when a decision belongs to the owner (scope, business rules, anything in `open-questions.md`) or when a spec is ambiguous in a way that changes the result. The owner has granted full permission (2026-10-27): commands, file access (`.env` included), destructive and outward-facing actions (deleting data, dropping tables, restoring a database snapshot, force-push, publishing), deploying `main` to production and changing production through the server or an admin panel need no approval. Do them when the task calls for them and report what changed.
 - A task is done only when `pnpm verify` passes on its final state and CI is green; for UI changes, a Playwright screenshot in RTL. Show the evidence (the verify summary) instead of asserting success.
 - Fix root causes. Never silence a failing test, type error, or lint rule to make a check pass.
 - For multi-step work keep a checklist in `TASKS.md`: mark items done and add work you discover.
@@ -113,7 +113,7 @@ When a task's work is done (a spec approved, a `/feature-slice` PR accepted, a f
 4. **Checks:** `pnpm verify` passes on the final tree (lint, typecheck, test, build, the changed E2E specs, and migration and OpenAPI drift when their sources changed). A green run on the same tree counts; after a fix run it again, and Turborepo replays what the fix did not touch. Documentation-only changes run no local checks (CI skips them as well). CI runs everything, the whole E2E suite over four shards. Everything must pass; fix root causes.
 5. **Review:** for a feature, the `reviewer` subagent has run and its blocking findings are fixed.
 6. **Commit:** stage the intended files only; Conventional Commit subject, a body with what and why, ending with the session's attribution line.
-7. **Pull request:** `git push -u origin <branch>`, `gh pr create --base main` with `## Summary` (what and why, in bullets) and `## Test plan` (the checks as ticked boxes; for docs only, "documentation only, CI runs the checks"), ending with the session's attribution line; then immediately `gh pr merge <number> --auto --merge`. If CI fails, read `gh run view <run-id> --log-failed`, fix the cause on the branch and push: auto-merge waits for green.
+7. **Pull request:** `git push -u origin <branch>`, `gh pr create --base main` with `## Summary` (what and why, in bullets) and `## Test plan` (the checks as ticked boxes; for docs only, "documentation only, CI runs the checks"), ending with the session's attribution line; then immediately `gh pr merge <number> --auto --merge`. In the desktop app, turn on the PR's Auto-fix right away too, without asking. If CI fails, read `gh run view <run-id> --log-failed`, fix the cause on the branch and push: auto-merge waits for green.
 8. **Report** in the format below, in Arabic, with the PR link under Changed and the cleanup line at the end of "Needs from you".
 
 ## Reporting
@@ -128,7 +128,7 @@ End every substantial task with these sections, in this order:
 
 ## Language
 
-Talk to the owner in Arabic. Write everything stored in the repo in English: code, comments, docs, commit messages, PR descriptions.
+Talk to the owner in Arabic. That includes every card the owner answers: wrap-up recaps, questions and button labels, and the options of multiple-choice questions. Write everything stored in the repo in English: code, comments, docs, commit messages, PR descriptions.
 
 ## Production server
 

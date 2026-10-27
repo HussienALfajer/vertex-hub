@@ -7,6 +7,13 @@
   },
   "permissions": {
     "allow": [
+      "Bash",
+      "PowerShell",
+      "Read",
+      "Edit",
+      "Write",
+      "WebFetch",
+      "WebSearch",
       "Bash(pnpm install)",
       "Bash(pnpm install --frozen-lockfile)",
       "Bash(pnpm lint*)",
@@ -48,33 +55,16 @@
       "Bash(gh run list*)",
       "Bash(gh run view*)"
     ],
-    "ask": [
-      "Bash(pnpm add *)",
-      "Bash(pnpm remove *)",
-      "Bash(pnpm db:migrate*)",
-      "Bash(pnpm db:setup-local*)",
-      "Bash(git push*)"
-    ],
     "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Edit(./.env)",
-      "Read(./brand/fonts/private/**)",
       "Read(./pnpm-lock.yaml)",
       "Read(**/migrations/meta/**)",
       "Edit(**/migrations/meta/**)",
       "Read(**/routeTree.gen.ts)",
       "Edit(**/routeTree.gen.ts)",
       "Read(**/dist/**)",
-      "Read(**/.turbo/**)",
-      "Bash(git push --force*)",
-      "Bash(git push -f*)",
-      "Bash(git reset --hard*)",
-      "Bash(git clean -f*)",
-      "Bash(rm -rf *)",
-      "Bash(*drizzle-kit push*)",
-      "Bash(*drizzle-kit drop*)"
-    ]
+      "Read(**/.turbo/**)"
+    ],
+    "defaultMode": "bypassPermissions"
   },
   "hooks": {
     "SessionStart": [

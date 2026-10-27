@@ -19,7 +19,7 @@
 - `/spec <feature>`: interview the owner, then write `docs/specs/<feature>.md`.
 - `/feature-slice <feature>`: implement an approved spec layer by layer (contracts → db → api → web → E2E) with a check gate per layer, the reviewer and the owner's acceptance steps, then opens the PR with auto-merge ("Finishing a task" in `AGENTS.md`).
 - `/db-migration`: change the schema, generate and review the migration, test it.
-- There is no shipping skill: every task ends by opening its PR with auto-merge right away, following "Finishing a task" in `AGENTS.md`. In the desktop app, turn on the PR's Auto-fix afterwards, so a failing CI run comes back to the session to fix.
+- There is no shipping skill: every task ends by opening its PR with auto-merge right away, following "Finishing a task" in `AGENTS.md`. In the desktop app, turn on the PR's Auto-fix right after (`mcp__ccd_pr__set_monitor`), without asking, so a failing CI run comes back to the session to fix.
 
 ## Context hygiene
 
