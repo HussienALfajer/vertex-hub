@@ -98,21 +98,21 @@ Avoid `max` unless a gain is measured. Agent teams (~7× tokens), fast mode (2×
 
 ## Cloud sessions
 
-Sessions can run on the owner's machine (**Local**) or in a Claude Code cloud environment (**Cloud**, Ubuntu 24.04). Skills, subagents, hooks, `CLAUDE.md` files and settings come with the repository, and the two scripts below give a cloud session the same toolchain and databases as the owner's machine, so the spec, backend and web sessions can all run in the cloud.
+Sessions can run on the owner's machine (**Local**) or in a Claude Code cloud environment (**Cloud**, Ubuntu 24.04). Skills, subagents, hooks, `CLAUDE.md` files and settings come with the repository, and the cloud environment plus the session hook give a cloud session the same toolchain and databases as the owner's machine, so the spec, backend and web sessions can all run in the cloud.
+
+The owner runs one shared cloud environment, **`vertex`**, for all five Vertex repositories. Its setup script is a superset of `scripts/cloud-setup.sh`: Node 24 at `/opt/node24` (default on PATH) with Corepack, Docker with `postgres:17` and `axllent/mailpit:v1.27`, Playwright Chromium with its system libraries in `/opt/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`), `NODE_OPTIONS=--max-old-space-size=6144` (the typecheck heap), and the command `vertex-session`. Its network access is **Full**, which is acceptable for these repositories.
 
 | Script | Runs | Does |
 |---|---|---|
-| `scripts/cloud-setup.sh` | Once per environment, as its setup script; the result is cached (rebuilt when the script or network list changes, or after about seven days) | Installs Node 24, pulls the `postgres:17` image, installs Chromium for Playwright |
-| `scripts/cloud-session.sh` | On every cloud session start and resume (SessionStart hook in `.claude/settings.json`); exits at once outside the cloud | Starts PostgreSQL 17, `pnpm install`, creates `.env` and the dev and test databases (`db:setup-local`), `db:migrate`, checks Chromium |
+| `scripts/cloud-setup.sh` | Not used by the `vertex` environment; kept as this repository's own reference of what its environment needs (and for an environment made for this repository alone) | Installs Node 24, pulls the `postgres:17` image, installs Chromium for Playwright |
+| `scripts/cloud-session.sh` | On every cloud session start and resume (SessionStart hook in `.claude/settings.json`); exits at once outside the cloud | Reuses a PostgreSQL that already answers on `127.0.0.1:5432` (postgres/postgres), otherwise starts PostgreSQL 17 in Docker; sets `PLAYWRIGHT_BROWSERS_PATH` (default `/opt/ms-playwright`) for the session; `pnpm install`, creates `.env` and the dev and test databases (`db:setup-local`), `db:migrate`, checks Chromium |
 
 The dev database in a cloud session is disposable, so the hook migrates it without asking. No secret is needed: `.env` gets a random password on each VM.
 
-### One-time setup (the owner, at claude.ai/code)
-1. Create a cloud environment named `vertex-hub`.
-2. **Network access:** Custom, with the default (Trusted) domains included, plus `cdn.playwright.dev` and `playwright.download.prss.microsoft.com`.
-3. **Setup script:** paste the whole of `scripts/cloud-setup.sh`. Paste it again whenever that file changes.
-4. **Environment variables:** none.
-5. The Claude GitHub App is installed on the repository (needed to clone and push).
+### Sessions with several repositories
+Repository hooks do not run when a session holds several repositories, so `scripts/cloud-session.sh` does not run either. Run `vertex-session` (or `vertex-session <repo-dir>` for one repository) at the start: it starts one PostgreSQL 17 container, `vertex-postgres`, on `127.0.0.1:5432` and prepares every Vertex repository it finds. A single-repository session started afterwards in the same VM reuses that server.
+
+F18 (accounting through Vertex Mizan, ADR 0035) is worked on this way: one session with `vertex-mizan` next to this repository.
 
 ### What stays local
 - **Production deploys** (`ssh vertex`): the server's SSH key never goes into a cloud environment, where every process in the session could read it.
@@ -122,6 +122,7 @@ The dev database in a cloud session is disposable, so the hook migrates it witho
 - `/clear` does not exist: start a new session from the sidebar instead.
 - Set the model and effort with arguments before the first message: `/model opus`, `/effort high`.
 - The owner's personal `~/.claude/` files are not loaded; everything the project needs is in the repository.
+- `gh pr create` is refused in the cloud: push the branch and open the PR with the **Create PR** button, then enable auto-merge as in "Finishing a task" (`AGENTS.md`).
 - The cleanup line after a merge is for the local checkout; run it there before the next local session.
 - If the hook reports a problem ("Cloud session problems"), fix the environment before running checks: a check that fails for environment reasons says nothing about the code.
 
