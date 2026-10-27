@@ -21,6 +21,7 @@ import {
   businessInstant,
   type CalendarDate,
   type DepartmentCode,
+  richTextFromPlain,
   type TimeOfDay,
 } from '@vertex-hub/contracts';
 import { createDatabase, loadRootEnv } from '@vertex-hub/db';
@@ -671,7 +672,7 @@ async function seedData(http: Http, people: Record<string, string>) {
   });
   const commented = tasks[0] as Row;
   await http.post(`/tasks/${commented.id}/comments`, {
-    body: 'يرجى الالتزام بألوان الهوية المعتمدة.',
+    bodyDoc: richTextFromPlain('يرجى الالتزام بألوان الهوية المعتمدة.'),
   });
   for (const text of ['مسودة أولى', 'مراجعة الألوان', 'نسخة الجوال']) {
     await http.post(`/tasks/${commented.id}/checklist`, { text });
