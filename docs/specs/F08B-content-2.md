@@ -322,6 +322,8 @@ All Arabic RTL with logical CSS, `packages/ui` components and tokens, strings th
 
 Settled in PR 3: the previews cut a caption where the platforms fold it on a phone (approximate values in `apps/web/src/features/content/post-preview.ts`, never checked against the platforms); pillar colours are the design system's `chart-1..8` tokens; on the post page "Move" sits in the header menu (the calendar drag arrives with PR 4); the wizard keeps new tasks' held files with each task and sends them in the create request.
 
+Settled in PR 4: a day opens the wizard from its empty space or its "+" (shown on hover and focus); a period without posts keeps its days under the empty message; posts dragged on the calendar load their detail on drop and only the post's `permissions.canEdit` lets the move dialog open; "No post this year" is offered in the occasion strip's popover on a client's calendar; gap marks name their clients on the calendar of every client; the Grid is a third view of the client's calendar (Month, Week, Grid); a Hijri occasion's date is confirmed for the year of its next occurrence.
+
 What roles see differently: everyone reads every calendar, preview, idea and setting; edit-scope users get clicks, drags, the wizard, captions, slides, the pack and the client's settings; `content.review` scope-all holders edit the agency settings; every user adds ideas.
 
 ## Audit, notifications and jobs

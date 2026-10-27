@@ -21,35 +21,45 @@ import { type CalendarView, calendarRange, shiftCalendar } from './content-dates
  * through months and weeks, and the list of a day too full for its cell.
  */
 
-/** Back, forward and today, the month or the week shown, and the month or week switch. */
-export function CalendarToolbar({
+/** The views of the toolbar: the Instagram grid of a client's months beside the month and week. */
+export type ToolbarView = CalendarView | 'grid';
+
+/**
+ * Back, forward and today, the month or the week shown, and the view switch. The grid view (F08B
+ * rule C11) moves by months, as the month does.
+ */
+export function CalendarToolbar<View extends ToolbarView = CalendarView>({
   view,
   date,
+  views = ['month', 'week'] as View[],
   onChange,
 }: {
-  view: CalendarView;
+  view: View;
   date: CalendarDate;
+  /** The views offered, in order; the month and the week by default. */
+  views?: readonly View[];
   /** `date` unset means today; `view` unset means the month. */
-  onChange: (next: { date?: CalendarDate; view?: 'week' }) => void;
+  onChange: (next: { date?: CalendarDate; view?: Exclude<View, 'month'> }) => void;
 }) {
   const { t } = useTranslation();
-  const range = calendarRange(view, date);
+  const steps: CalendarView = view === 'week' ? 'week' : 'month';
+  const range = calendarRange(steps, date);
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex items-center gap-1">
         <IconButton
           variant="outline"
           size="icon"
-          label={t(`calendar.previous.${view}`)}
-          onClick={() => onChange({ date: shiftCalendar(view, date, -1) })}
+          label={t(`calendar.previous.${steps}`)}
+          onClick={() => onChange({ date: shiftCalendar(steps, date, -1) })}
         >
           <ChevronRightIcon className="ltr:-scale-x-100" />
         </IconButton>
         <IconButton
           variant="outline"
           size="icon"
-          label={t(`calendar.next.${view}`)}
-          onClick={() => onChange({ date: shiftCalendar(view, date, 1) })}
+          label={t(`calendar.next.${steps}`)}
+          onClick={() => onChange({ date: shiftCalendar(steps, date, 1) })}
         >
           <ChevronLeftIcon className="ltr:-scale-x-100" />
         </IconButton>
@@ -58,7 +68,7 @@ export function CalendarToolbar({
         </Button>
       </div>
       <h2 className="text-lg font-bold tabular-nums" aria-live="polite">
-        {view === 'month'
+        {steps === 'month'
           ? formatMonth(date)
           : t('calendar.weekRange', {
               from: formatCalendarDate(range.from),
@@ -69,12 +79,20 @@ export function CalendarToolbar({
         aria-label={t('calendar.view')}
         className="ms-auto"
         value={[view]}
-        onValueChange={(next: CalendarView[]) => {
-          if (next[0]) onChange({ view: next[0] === 'week' ? 'week' : undefined });
+        onValueChange={(next: View[]) => {
+          const picked = next[0];
+          if (picked) {
+            onChange({
+              view: picked === 'month' ? undefined : (picked as Exclude<View, 'month'>),
+            });
+          }
         }}
       >
-        <ToggleGroupItem value="month">{t('calendar.views.month')}</ToggleGroupItem>
-        <ToggleGroupItem value="week">{t('calendar.views.week')}</ToggleGroupItem>
+        {views.map((item) => (
+          <ToggleGroupItem key={item} value={item}>
+            {t(`calendar.views.${item}`)}
+          </ToggleGroupItem>
+        ))}
       </ToggleGroup>
     </div>
   );

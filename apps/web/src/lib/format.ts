@@ -75,6 +75,19 @@ export function formatMonth(day: string): string {
   }).format(new Date(`${day}T00:00:00Z`));
 }
 
+/** A Gregorian month's name from its number (1–12), e.g. "تشرين الأول". */
+export function formatMonthName(month: number): string {
+  return new Intl.DateTimeFormat(APP_LOCALE, { month: 'long', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(2026, month - 1, 15)),
+  );
+}
+
+/** A weekday's name from its number (0 = Sunday), e.g. "السبت". */
+export function formatWeekdayNumber(weekday: number, style: 'long' | 'short' = 'short'): string {
+  // 4 January 2026 is a Sunday.
+  return formatWeekday(`2026-01-${String(4 + weekday).padStart(2, '0')}`, style);
+}
+
 /** The weekday of a calendar day (`YYYY-MM-DD`), e.g. "السبت". */
 export function formatWeekday(day: string, style: 'long' | 'short' = 'long'): string {
   return new Intl.DateTimeFormat(APP_LOCALE, { weekday: style, timeZone: 'UTC' }).format(

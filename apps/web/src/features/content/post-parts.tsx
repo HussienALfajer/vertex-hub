@@ -8,7 +8,7 @@ import type {
   ReviewStage,
   WorkflowStatus,
 } from '@vertex-hub/contracts';
-import { Avatar, Badge, cn, PlatformMark, StatusBadge } from '@vertex-hub/ui';
+import { Avatar, Badge, ChartDot, cn, PlatformMark, StatusBadge } from '@vertex-hub/ui';
 import {
   BanIcon,
   CalendarClockIcon,
@@ -17,7 +17,9 @@ import {
   ImageIcon,
   type LucideIcon,
   SmartphoneIcon,
+  TimerIcon,
 } from 'lucide-react';
+import type { DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { scopesOf } from '../../lib/auth';
 import { formatCalendarDate, formatTimeOfDay } from '../../lib/format';
@@ -174,10 +176,27 @@ export function PostThumbnail({ versionId, className }: { versionId: string; cla
 }
 
 /**
- * A post on a calendar day: title and type, client and time, then status and platforms. Overdue
- * posts are marked; cancelled ones are dimmed.
+ * A post on a calendar day: title and type, client and time, then status, pillar and platforms.
+ * Overdue posts are marked, and posts too close to another (F08B rule C8); cancelled ones are
+ * dimmed. A post the user may move drags to another day (rule B6).
  */
-export function PostCard({ post, showClient }: { post: Post; showClient: boolean }) {
+export function PostCard({
+  post,
+  showClient,
+  tooClose = false,
+  onDragStart,
+  onDragEnd,
+  dragging = false,
+}: {
+  post: Post;
+  showClient: boolean;
+  tooClose?: boolean;
+  /** Set when the post moves by drag; anchors drag their link otherwise, so it is turned off. */
+  onDragStart?: (event: DragEvent) => void;
+  onDragEnd?: () => void;
+  dragging?: boolean;
+}) {
+  const { t } = useTranslation();
   const cancelled = post.status === 'cancelled';
   // The time first: a long client name is cut, never the time.
   const meta = [
@@ -189,11 +208,17 @@ export function PostCard({ post, showClient }: { post: Post; showClient: boolean
       to="/content/posts/$postId"
       params={{ postId: post.id }}
       data-post-status={post.status}
+      data-post={post.id}
+      draggable={!!onDragStart}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       className={cn(
         'flex min-w-0 flex-col gap-1 rounded-md border border-border bg-surface p-1.5 text-xs transition-colors duration-150 ease-out hover:bg-muted',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+        onDragStart && 'cursor-grab active:cursor-grabbing',
         post.overdue && 'border-destructive',
         cancelled && 'opacity-60',
+        dragging && 'opacity-50',
       )}
     >
       <span className="flex min-w-0 items-start gap-1.5">
@@ -214,6 +239,18 @@ export function PostCard({ post, showClient }: { post: Post; showClient: boolean
       <span className="flex flex-wrap items-center gap-1">
         <PostStatusBadge status={post.status} stage={post.reviewStage} />
         {post.overdue && <PostOverdueBadge />}
+        {tooClose && (
+          <Badge tone="warning">
+            <TimerIcon aria-hidden="true" />
+            {t('content.planning.tooCloseBadge')}
+          </Badge>
+        )}
+        {post.pillar && (
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <ChartDot color={post.pillar.color} muted={post.pillar.archived} />
+            <span className="sr-only">{post.pillar.name}</span>
+          </span>
+        )}
         <PostPlatforms platforms={post.platforms} />
       </span>
     </Link>

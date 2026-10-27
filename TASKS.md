@@ -35,6 +35,7 @@ Work branch: `feat/f08b-pr3-wizard`. Built on PR 2, merged as HussienALfajer/ver
 - [x] checks, reviewer, acceptance (delegated by the owner, 2026-10-26), PR with auto-merge
 
 ## PR 4 — Calendar, planning, grid, ideas and settings (web)
-- [ ] web: day click and drag with the move dialog, occasion strip, gap and too-close marks, pillar filter and dots, ideas panel (drag onto a day), Planning check tab, My posts "At risk", client tab month bar (pillar balance, planned / committed), Grid view, client settings and snippets dialogs, `/content/settings`, quick idea in the top bar; `ar.json`
-- [ ] e2e: the full F08B flow (`f08b.spec.ts`), screens (calendar with occasions, gaps and ideas, Planning check, Grid, settings, quick idea) in both themes
+Work branch: `feat/f08b-pr4-planning`. Built on PR 3, merged as HussienALfajer/vertex-hub#181.
+- [x] web: day click and drag with the move dialog, occasion strip, gap and too-close marks, pillar filter and dots, ideas panel (drag onto a day), Planning check tab, My posts "At risk", client tab month bar (pillar balance, planned / committed), Grid view, client settings and snippets dialogs, `/content/settings`, quick idea in the top bar; `ar.json` (files: `content-calendar.tsx`, `calendar-marks.ts` (+ test), `calendar-overlays.tsx`, `ideas-panel.tsx`, `quick-idea.tsx`, `planning-check.tsx`, `content-grid.tsx`, `client-settings-dialog.tsx`, `posting-times-editor.tsx`, `snippets-manager.tsx`, `content-settings-page.tsx`, route `/content/settings`; the toolbar takes a Grid view; an empty period keeps its days so a day still opens the wizard)
+- [x] e2e: the full F08B flow (`f08b.spec.ts`), screens (calendar with occasions, gaps and ideas, Planning check, Grid, settings, quick idea) in both themes; mocks compute the planning check with the contracts' `planningIssues`
 - [ ] checks, reviewer, acceptance, PR with auto-merge; `docs/ROADMAP.md` F08B done

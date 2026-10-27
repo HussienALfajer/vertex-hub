@@ -36,6 +36,7 @@ import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index
 import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
 import { Route as AppContentIndexRouteImport } from './routes/_app/content/index'
 import { Route as AppContentNewRouteImport } from './routes/_app/content/new'
+import { Route as AppContentSettingsRouteImport } from './routes/_app/content/settings'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
 import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/departments/$departmentId'
 import { Route as AppHrIndexRouteImport } from './routes/_app/hr/index'
@@ -228,6 +229,11 @@ const AppContentIndexRoute = AppContentIndexRouteImport.update({
 const AppContentNewRoute = AppContentNewRouteImport.update({
   id: '/content/new',
   path: '/content/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContentSettingsRoute = AppContentSettingsRouteImport.update({
+  id: '/content/settings',
+  path: '/content/settings',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDepartmentsIndexRoute = AppDepartmentsIndexRouteImport.update({
@@ -551,6 +557,7 @@ export interface FileRoutesByFullPath {
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
   '/content/new': typeof AppContentNewRoute
+  '/content/settings': typeof AppContentSettingsRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/hr/approvals': typeof AppHrApprovalsRoute
   '/hr/settings': typeof AppHrSettingsRoute
@@ -637,6 +644,7 @@ export interface FileRoutesByTo {
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
   '/content/new': typeof AppContentNewRoute
+  '/content/settings': typeof AppContentSettingsRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/hr/approvals': typeof AppHrApprovalsRoute
   '/hr/settings': typeof AppHrSettingsRoute
@@ -725,6 +733,7 @@ export interface FileRoutesById {
   '/_app/catalog/settings': typeof AppCatalogSettingsRoute
   '/_app/clients/new': typeof AppClientsNewRoute
   '/_app/content/new': typeof AppContentNewRoute
+  '/_app/content/settings': typeof AppContentSettingsRoute
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/_app/hr/approvals': typeof AppHrApprovalsRoute
   '/_app/hr/settings': typeof AppHrSettingsRoute
@@ -813,6 +822,7 @@ export interface FileRouteTypes {
     | '/catalog/settings'
     | '/clients/new'
     | '/content/new'
+    | '/content/settings'
     | '/departments/$departmentId'
     | '/hr/approvals'
     | '/hr/settings'
@@ -899,6 +909,7 @@ export interface FileRouteTypes {
     | '/catalog/settings'
     | '/clients/new'
     | '/content/new'
+    | '/content/settings'
     | '/departments/$departmentId'
     | '/hr/approvals'
     | '/hr/settings'
@@ -986,6 +997,7 @@ export interface FileRouteTypes {
     | '/_app/catalog/settings'
     | '/_app/clients/new'
     | '/_app/content/new'
+    | '/_app/content/settings'
     | '/_app/departments/$departmentId'
     | '/_app/hr/approvals'
     | '/_app/hr/settings'
@@ -1252,6 +1264,13 @@ declare module '@tanstack/react-router' {
       path: '/content/new'
       fullPath: '/content/new'
       preLoaderRoute: typeof AppContentNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/content/settings': {
+      id: '/_app/content/settings'
+      path: '/content/settings'
+      fullPath: '/content/settings'
+      preLoaderRoute: typeof AppContentSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/departments/': {
@@ -1677,6 +1696,7 @@ interface AppRouteChildren {
   AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
   AppContentNewRoute: typeof AppContentNewRoute
+  AppContentSettingsRoute: typeof AppContentSettingsRoute
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
   AppHrApprovalsRoute: typeof AppHrApprovalsRoute
   AppHrSettingsRoute: typeof AppHrSettingsRoute
@@ -1758,6 +1778,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCatalogSettingsRoute: AppCatalogSettingsRoute,
   AppClientsNewRoute: AppClientsNewRoute,
   AppContentNewRoute: AppContentNewRoute,
+  AppContentSettingsRoute: AppContentSettingsRoute,
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
   AppHrApprovalsRoute: AppHrApprovalsRoute,
   AppHrSettingsRoute: AppHrSettingsRoute,

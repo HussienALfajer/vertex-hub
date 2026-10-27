@@ -1,11 +1,13 @@
 import type { Page } from '@playwright/test';
 import type { CreatePost } from '@vertex-hub/contracts';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
-import { accountManagerMe, mockApi, PROJECTS_TODAY, seedIds } from './fixtures';
+import { accountManagerMe, employeeMe, mockApi, PROJECTS_TODAY, seedIds } from './fixtures';
 import { expect, test } from './test';
 
-// F08B PR 3 against the mocked API: the new post wizard, the post page's captions, slides, move
-// and publishing pack (the rules themselves are covered by apps/api/test).
+// F08B against the mocked API: the new post wizard, the post page's captions, slides, move and
+// publishing pack (PR 3); the calendar's day clicks, drags, occasions, gaps and ideas, the
+// Planning check, the Grid, the client's settings and snippets, the content settings and the
+// quick idea (PR 4). The rules themselves are covered by apps/api/test.
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
@@ -203,4 +205,161 @@ test('the post page: captions per group, slides arranged, and the publishing pac
   await arrange.getByRole('button', { name: ar.common.save }).click();
   await expect(page.getByText(ar.content.slides.saved)).toBeVisible();
   await expect(page.getByText('العرض كاملًا').first()).toBeVisible();
+});
+
+const day = (page: Page, date: string) =>
+  page.locator(`[data-slot="calendar-day"][data-day="${date}"]`);
+
+test('the calendar: occasions, gaps, a day click, a drag with the move dialog, an idea onto a day', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await mockApi(page, { signedIn: true, content: true });
+  await page.goto(`/content?clientId=${seedIds.jasmine}`);
+  await expect(page.getByRole('link', { name: /كاروسيل أطباق الخريف/ }).first()).toBeVisible();
+
+  // Rules C6–C8: the occasion on its day, not covered; gap days; posts too close.
+  const foodDay = day(page, '2026-10-16').locator('[data-occasion]');
+  await expect(foodDay).toHaveAttribute('data-uncovered', 'true');
+  await expect(foodDay).toContainText('يوم الغذاء العالمي');
+  await expect(page.locator('[data-gap]').first()).toBeVisible();
+  await expect(page.getByText(ar.content.planning.tooCloseBadge).first()).toBeVisible();
+  await foodDay.click();
+  await expect(page.getByRole('dialog').getByText(ar.content.occasions.uncovered)).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Rule B4: a past day is read-only; a day from today opens the wizard on it.
+  await day(page, '2026-10-05').click({ position: { x: 60, y: 90 } });
+  await expect(page).toHaveURL(/\/content\?/);
+  await day(page, '2026-10-20').hover();
+  await page
+    .getByRole('button', {
+      name: fill(ar.content.calendar.newOn, { date: 'الثلاثاء، 20 تشرين الأول' }),
+    })
+    .click();
+  await expect(page).toHaveURL(/\/content\/new\?.*date=2026-10-20/);
+  await expect(page).toHaveURL(new RegExp(`clientId=${seedIds.jasmine}`));
+  await page.goBack();
+
+  // Rules B6–B7: a post dragged to another day opens the move dialog on that day.
+  await page.getByRole('link', { name: /تهنئة بداية الأسبوع/ }).dragTo(day(page, '2026-10-21'));
+  const move = page.getByRole('dialog');
+  await expect(move.getByLabel(ar.content.moveDate.newDate)).toHaveValue('2026-10-21');
+  await move.getByRole('button', { name: ar.content.actions.move }).click();
+  await expect(page.getByText(ar.content.moveDate.done)).toBeVisible();
+  await expect(
+    day(page, '2026-10-21').getByRole('link', { name: /تهنئة بداية الأسبوع/ }),
+  ).toBeVisible();
+
+  // Rule B5: the ideas panel; an idea dragged onto a day opens the wizard from it.
+  await page.getByRole('button', { name: ar.content.ideas.toggle }).click();
+  const idea = page.locator('[data-ideas-panel] li').filter({ hasText: 'فطور الجمعة العائلي' });
+  await expect(idea).toBeVisible();
+  await idea.dragTo(day(page, '2026-10-23'));
+  await expect(page).toHaveURL(/\/content\/new\?.*date=2026-10-23/);
+  await expect(page).toHaveURL(/ideaId=/);
+  await expect(page.getByLabel(ar.content.form.title)).toHaveValue(
+    'فطور الجمعة العائلي بصور من المطبخ',
+  );
+});
+
+test('the Planning check, My posts at risk, and a client month bar, grid, settings and snippets', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
+
+  // Rule C10: Jasmine's next 14 days, its pillar balance and commitments.
+  await page.goto('/content?tab=planning');
+  const jasmine = page.locator(`[data-planning-client="${seedIds.jasmine}"]`);
+  await expect(jasmine.locator('[data-issue="gap"]').first()).toBeVisible();
+  await expect(jasmine.locator('[data-commitments]')).toContainText(
+    ar.content.planning.commitments.reel,
+  );
+
+  // My posts: the responsible's open posts close to their date and not approved.
+  await page.getByRole('tab', { name: ar.content.tabs.mine }).click();
+  await expect(
+    page.getByRole('region', { name: ar.content.my.sections.atRisk }).getByRole('link').first(),
+  ).toBeVisible();
+
+  // The client's Content tab: the balance and commitments, then the Grid.
+  await page.goto(`/clients/${seedIds.jasmine}?tab=content`);
+  await expect(page.locator('[data-pillar-balance]')).toBeVisible();
+  await expect(page.locator('[data-commitments]')).toContainText('/ 8');
+  await page.getByRole('button', { name: ar.calendar.views.grid }).click();
+  await expect(page.locator('[data-grid] li').first()).toBeVisible();
+  await page.getByRole('button', { name: ar.calendar.views.month, exact: true }).click();
+
+  // Settings: targets must sum to 100, then they show against the month's balance.
+  await page.getByRole('button', { name: ar.content.clientSettings.open }).click();
+  const settings = page.getByRole('dialog');
+  await settings.getByLabel('توعية').fill('40');
+  await settings.getByLabel('ترويج').fill('30');
+  await settings.getByRole('button', { name: ar.common.save }).click();
+  await expect(settings.getByText(ar.content.clientSettings.targetsError)).toBeVisible();
+  await settings.getByLabel('ترفيه').fill('20');
+  await settings.getByLabel('خلف الكواليس').fill('10');
+  await expect(settings.getByText(fill(ar.content.clientSettings.sum, { n: '100' }))).toBeVisible();
+  await settings.getByRole('button', { name: ar.common.save }).click();
+  await expect(page.getByText(ar.content.clientSettings.saved)).toBeVisible();
+  await expect(page.locator('[data-pillar-balance]')).toContainText('40%');
+
+  // Snippets: a new hashtag set for the client.
+  await page.getByRole('button', { name: ar.content.snippets.open }).click();
+  const snippets = page.getByRole('dialog');
+  await snippets.getByRole('button', { name: ar.content.snippets.add }).click();
+  const form = page.getByRole('dialog', { name: ar.content.snippets.addTitle });
+  await form.getByLabel(ar.content.snippets.name).fill('وسوم رمضان');
+  await form.getByLabel(ar.content.snippets.body).fill('#رمضان_كريم #الياسمين');
+  await form.getByRole('button', { name: ar.common.save }).click();
+  await expect(page.getByText(ar.content.snippets.saved)).toBeVisible();
+  await expect(snippets.getByText('وسوم رمضان')).toBeVisible();
+});
+
+test('content settings: a pillar, Ramadan confirmed, best times', async ({ page }) => {
+  test.setTimeout(90_000);
+  await mockApi(page, { signedIn: true, content: true });
+  await page.goto('/content/settings');
+  await expect(
+    page.getByRole('heading', { level: 1, name: ar.content.settings.title }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: ar.content.settings.addPillar }).click();
+  const pillar = page.getByRole('dialog');
+  await pillar.getByLabel(ar.content.settings.pillarName).fill('تعليمي');
+  await pillar.getByRole('button', { name: fill(ar.content.settings.colorN, { n: '5' }) }).click();
+  await pillar.getByRole('button', { name: ar.common.save }).click();
+  await expect(page.locator('[data-pillars]').getByText('تعليمي')).toBeVisible();
+
+  await page
+    .getByRole('button', { name: fill(ar.content.settings.confirmDate, { name: 'رمضان' }) })
+    .click();
+  const confirm = page.getByRole('dialog');
+  await confirm.getByLabel(ar.content.settings.startDate).fill('2027-02-09');
+  await confirm.getByRole('button', { name: ar.content.settings.confirmAction }).click();
+  await expect(page.getByText(ar.content.settings.dateConfirmed)).toBeVisible();
+  await expect(page.locator(`[data-occasion-row]`).filter({ hasText: 'رمضان' })).toContainText(
+    ar.content.occasions.confirmed,
+  );
+
+  await page
+    .getByRole('button', { name: fill(ar.content.times.addWindow, { platform: 'إكس' }) })
+    .click();
+  await page.getByRole('button', { name: ar.content.settings.saveTimes }).click();
+  await expect(page.getByText(ar.content.settings.timesSaved)).toBeVisible();
+});
+
+test('any employee adds an idea from the top bar; the content settings are read-only for them', async ({
+  page,
+}) => {
+  await mockApi(page, { signedIn: true, me: employeeMe, content: true });
+  await page.goto('/content/settings');
+  await expect(page.getByText(ar.content.settings.readOnly)).toBeVisible();
+  await expect(page.getByRole('button', { name: ar.content.settings.addPillar })).toHaveCount(0);
+  await page.getByRole('button', { name: ar.content.ideas.quick }).click();
+  const idea = page.getByRole('dialog');
+  await idea.getByLabel(ar.content.ideas.text).fill('مسابقة صور الزبائن في العيد');
+  await idea.getByRole('button', { name: ar.content.ideas.addAction }).click();
+  await expect(page.getByText(ar.content.ideas.added)).toBeVisible();
 });
