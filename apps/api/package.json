@@ -30,7 +30,7 @@
     "@vertex-hub/contracts": "workspace:*",
     "@vertex-hub/db": "workspace:*",
     "@vertex-hub/messages": "workspace:*",
-    "better-auth": "^1.7.6",
+    "better-auth": "^1.7.9",
     "busboy": "^1.6.0",
     "drizzle-orm": "^0.45.3",
     "exceljs": "^4.4.0",
