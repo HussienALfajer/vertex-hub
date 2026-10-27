@@ -30,6 +30,14 @@ export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 [ -n "${CLAUDE_ENV_FILE:-}" ] && echo "export COREPACK_ENABLE_DOWNLOAD_PROMPT=0" >>"$CLAUDE_ENV_FILE"
 status+=("node $(node --version 2>/dev/null)")
 
+# The api typecheck needs about 3 GB of heap, above Node's default limit in a 4-core VM (2.2 GB).
+# The session's NODE_OPTIONS can replace the environment's (it holds only the proxy's
+# --use-openssl-ca), so add the limit when it is missing, keeping the other options; Turbo passes
+# NODE_OPTIONS on to its tasks.
+heap='case " ${NODE_OPTIONS:-} " in *" --max-old-space-size="*) ;; *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=6144" ;; esac'
+eval "$heap"
+[ -n "${CLAUDE_ENV_FILE:-}" ] && echo "$heap" >>"$CLAUDE_ENV_FILE"
+
 # Chromium for the worker's PDF tests and E2E: keep a path the environment already set (the shared
 # `vertex` environment installs browsers in /opt/ms-playwright) and hand it to Claude's commands.
 export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/ms-playwright}"

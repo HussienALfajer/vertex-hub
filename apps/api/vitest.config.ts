@@ -17,6 +17,11 @@ export default defineConfig({
     // files in one worker run one after another on it, since some rows are global (one manager
     // per department).
     maxWorkers: TEST_WORKERS,
+    // Tests go over HTTP and the database, and some run a daily job several times (2–3 s on an
+    // idle machine); on 4 cores with the rest of `pnpm verify` running, Vitest's 5 s and 10 s
+    // defaults failed tests and app starts that pass alone (2026-10-27).
+    testTimeout: 15_000,
+    hookTimeout: 30_000,
     // A worker keeps its modules from one file to the next instead of loading the whole app again
     // for each file (that reload was 46% of the suite's time). Each file still starts its own app
     // and seeds its own data; a run with shuffled files passed whole (2026-10-26).
