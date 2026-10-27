@@ -2,7 +2,8 @@
 # Prepares a Claude Code cloud session: Node 24 on PATH, PostgreSQL 17 running, packages installed,
 # `.env` with the dev and test databases, migrations applied. Run by the SessionStart hook in
 # .claude/settings.json on every start and resume; it does nothing outside cloud sessions.
-# The VM itself is provisioned once by scripts/cloud-setup.sh (the environment's setup script).
+# The VM itself is provisioned once by the environment's setup script: the shared `vertex` one, a
+# superset of scripts/cloud-setup.sh. It reuses a PostgreSQL other repositories in the VM started.
 #
 # Standard output reaches Claude's context, so it prints a short status only; details go to the log.
 [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || exit 0
@@ -28,6 +29,11 @@ fi
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 [ -n "${CLAUDE_ENV_FILE:-}" ] && echo "export COREPACK_ENABLE_DOWNLOAD_PROMPT=0" >>"$CLAUDE_ENV_FILE"
 status+=("node $(node --version 2>/dev/null)")
+
+# Chromium for the worker's PDF tests and E2E: keep a path the environment already set (the shared
+# `vertex` environment installs browsers in /opt/ms-playwright) and hand it to Claude's commands.
+export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/ms-playwright}"
+[ -n "${CLAUDE_ENV_FILE:-}" ] && echo "export PLAYWRIGHT_BROWSERS_PATH=\"$PLAYWRIGHT_BROWSERS_PATH\"" >>"$CLAUDE_ENV_FILE"
 
 # PostgreSQL 17 in Docker, as in CI; the image's PostgreSQL 16 service is the fallback.
 start_docker_postgres() {
@@ -57,7 +63,20 @@ start_service_postgres() {
   $SUDO su postgres -c "psql -qc \"ALTER USER postgres PASSWORD 'postgres'\"" >/dev/null
 }
 
-if start_docker_postgres >>"$LOG" 2>&1; then
+pg_answers() {
+  command -v pg_isready >/dev/null && pg_isready -q -h 127.0.0.1 -p 5432
+}
+
+# The shared `vertex` environment may already run one server for every repository in the VM
+# (`vertex-session` starts `vertex-postgres`, postgres/postgres): reuse it instead of a second one.
+if pg_answers; then
+  version=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -tAc 'SHOW server_version' 2>>"$LOG")
+  status+=("postgres ${version%% *} (already running on 127.0.0.1:5432)")
+  case "$version" in
+    17*) ;;
+    *) problems+=("the PostgreSQL already on 127.0.0.1:5432 is ${version:-unreachable as postgres/postgres}, while CI and production use 17") ;;
+  esac
+elif start_docker_postgres >>"$LOG" 2>&1; then
   status+=("postgres 17 (docker)")
 elif start_service_postgres >>"$LOG" 2>&1; then
   status+=("postgres 16 (fallback service)")
