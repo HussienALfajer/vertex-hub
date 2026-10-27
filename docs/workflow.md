@@ -105,7 +105,7 @@ The owner runs one shared cloud environment, **`vertex`**, for all five Vertex r
 | Script | Runs | Does |
 |---|---|---|
 | `scripts/cloud-setup.sh` | Not used by the `vertex` environment; kept as this repository's own reference of what its environment needs (and for an environment made for this repository alone) | Installs Node 24, pulls the `postgres:17` image, installs Chromium for Playwright |
-| `scripts/cloud-session.sh` | On every cloud session start and resume (SessionStart hook in `.claude/settings.json`); exits at once outside the cloud | Reuses a PostgreSQL that already answers on `127.0.0.1:5432` (postgres/postgres), otherwise starts PostgreSQL 17 in Docker; sets `PLAYWRIGHT_BROWSERS_PATH` (default `/opt/ms-playwright`) for the session; `pnpm install`, creates `.env` and the dev and test databases (`db:setup-local`), `db:migrate`, checks Chromium |
+| `scripts/cloud-session.sh` | On every cloud session start and resume (SessionStart hook in `.claude/settings.json`); exits at once outside the cloud | Reuses a PostgreSQL that already answers on `127.0.0.1:5432` (postgres/postgres), otherwise starts PostgreSQL 17 in Docker; sets `PLAYWRIGHT_BROWSERS_PATH` (default `/opt/ms-playwright`) for the session, and adds `--max-old-space-size=6144` to `NODE_OPTIONS` when it is missing (the session's `NODE_OPTIONS` can replace the environment's, and the api typecheck needs about 3 GB of heap); `pnpm install`, creates `.env` and the dev and test databases (`db:setup-local`), `db:migrate`, checks Chromium |
 
 The dev database in a cloud session is disposable, so the hook migrates it without asking. No secret is needed: `.env` gets a random password on each VM.
 
