@@ -74,7 +74,9 @@ import {
   businessTimeOfDay,
   CAMPAIGN_LIMITS,
   type Calendar,
+  type CalendarIssue,
   type CalendarLeave,
+  type CalendarOccasion,
   type Campaign,
   type CampaignDetail,
   type CampaignStatusChange,
@@ -92,6 +94,7 @@ import {
   type ClientEmail,
   type ClientEmailKind,
   type ClientMonthlyReport,
+  type ClientPlanning,
   type ClientResponse,
   type ClientResponseEntry,
   type ClientStatement,
@@ -103,9 +106,11 @@ import {
   type CompanyDashboard,
   type Contact,
   type ContentCalendar,
+  type ContentGrid,
   type ContentIdea,
   type ContentOccasion,
   type ContentPillar,
+  type ContentPlanning,
   type ContentSnippet,
   type ContractAnnex,
   type ContractArticle,
@@ -115,6 +120,10 @@ import {
   type CreateAmendmentInput,
   type CreateApprovalRequest,
   type CreateCampaign,
+  type CreateContentIdea,
+  type CreateContentOccasion,
+  type CreateContentPillar,
+  type CreateContentSnippet,
   type CreateCycleAdjustment,
   type CreateCycleLine,
   type CreateExtraWork,
@@ -141,6 +150,7 @@ import {
   canChangeCampaignStatus,
   captionGroupsOf,
   changeInvoiceDueDateSchema,
+  commitmentsOf,
   computeDay,
   conversionRate,
   convertLeadSchema,
@@ -311,9 +321,11 @@ import {
   manualLeadMoveRefusal,
   mentionedUserIds,
   mergeDeliverableLines,
+  lastOfMonth as monthEnd,
   monthEnded,
   monthPeriod,
   monthRange,
+  firstOfMonth as monthStart,
   monthTotals,
   moveWorkDays,
   NOTIFICATION_CATALOG,
@@ -337,11 +349,15 @@ import {
   OPEN_LEAD_STAGES,
   OPEN_TASK_STATUSES,
   type OverdueInvoicesReport,
+  occasionApplies,
+  occasionDates,
+  occasionYearKey,
   onTimeRate,
   type PasskeyState,
   type PatchCampaignUpdate,
   type Payment,
   type Permission,
+  type PlannedPost,
   type PlatformAccount,
   POST_LIMITS,
   POST_STATUSES,
@@ -387,6 +403,8 @@ import {
   periodInOneMonth,
   periodsOverlap,
   permissionMinutes,
+  pillarBalance,
+  planningIssues,
   planTemplateRun,
   postChecks,
   postMove,
@@ -504,6 +522,11 @@ import {
   termEndDate,
   toUsdMinor,
   type UpdateCampaign,
+  type UpdateClientContentSettings,
+  type UpdateContentIdea,
+  type UpdateContentOccasion,
+  type UpdateContentPillar,
+  type UpdateContentSnippet,
   type UpdateCycleLine,
   type UpdateExtraWork,
   type UpdateFollowing,
@@ -7444,6 +7467,32 @@ function contentRoutes({
     archived: false,
     occurrences: [{ year: 2026, startDate: '2026-10-16', endDate: '2026-10-16', confirmed: false }],
   };
+  const ramadan: ContentOccasion = {
+    id: id(1796),
+    name: 'رمضان',
+    category: 'general',
+    calendar: 'hijri',
+    month: 9,
+    day: 1,
+    date: null,
+    durationDays: 30,
+    leadDays: 14,
+    client: null,
+    archived: false,
+    occurrences: [{ year: 2027, startDate: '2027-02-08', endDate: '2027-03-09', confirmed: false }],
+  };
+  const occasions: ContentOccasion[] = [foodDay, ramadan];
+  // PR 4: Jasmine's open cycle commits 8 posts and 2 reels this month (rule C9).
+  const jasmineCycle = {
+    cycleId: id(1798),
+    retainer: { id: id(1799), name: 'باقة الياسمين الشهرية' },
+    from: '2026-10-01',
+    to: '2026-10-31',
+    lines: [
+      { kind: 'post', count: 8 },
+      { kind: 'reel', count: 2 },
+    ],
+  };
   const ideas: ContentIdea[] = [
     {
       id: id(1797),
@@ -7459,7 +7508,7 @@ function contentRoutes({
       permissions: { canEdit: true, canDrop: true, canRestore: false, canUse: true },
     },
   ];
-  const clientSettings = (clientId: string): ClientContentSettings => ({
+  const defaultSettings = (clientId: string): ClientContentSettings => ({
     clientId,
     saved: clientId === id(601),
     postingTimes:
@@ -7474,6 +7523,10 @@ function contentRoutes({
     skippedOccasions: [],
     effectivePostingTimes: [],
   });
+  // PR 4: client settings saved from the dialog replace the defaults above.
+  const savedSettings = new Map<string, ClientContentSettings>();
+  const clientSettings = (clientId: string) =>
+    savedSettings.get(clientId) ?? defaultSettings(clientId);
   const agencyTimes: ClientContentSettings['postingTimes'] = [
     { platform: 'instagram', weekdays: [0, 1, 2, 3, 4, 6], from: '19:00', to: '22:00' },
     { platform: 'facebook', weekdays: [0, 1, 2, 3, 4, 6], from: '19:00', to: '22:00' },
@@ -7652,6 +7705,7 @@ function contentRoutes({
       (statuses.length === 0 || statuses.includes(post.status)) &&
       (!q.get('platform') || post.platforms.includes(q.get('platform') as PostPlatform)) &&
       (!q.get('type') || post.type === q.get('type')) &&
+      (!q.get('pillarId') || post.pillarId === q.get('pillarId')) &&
       (!responsible ||
         post.responsibleId === (responsible === 'me' ? me().user.id : responsible)) &&
       (!q.get('reviewStage') || post.reviewStage === q.get('reviewStage'))
@@ -7673,10 +7727,128 @@ function contentRoutes({
     returned: (post) => post.responsibleId === me().user.id && returned(post),
     to_review: (post) =>
       post.status === 'internal_review' && post.reviewStage === 'internal' && rights(post).review,
-    // F08B: no fixture post is at risk yet; PR 4 mocks the section.
-    at_risk: () => false,
+    // F08B: the user's open posts not yet approved, due within two days (two work days here).
+    at_risk: (post) =>
+      post.responsibleId === me().user.id &&
+      ['idea', 'in_production', 'internal_review', 'awaiting_client'].includes(post.status) &&
+      post.publishDate >= PROJECTS_TODAY &&
+      post.publishDate <= addDays(PROJECTS_TODAY, 2),
   };
   const live = () => posts.filter((post) => !post.archived && !clientOf(post)?.archived);
+
+  // F08B planning (PR 4): the calendar's occasions and marks, the planning check and the grid,
+  // computed with the contracts' own rules over the fixture posts.
+  const occurrencesOf = (occasion: CreateContentOccasion) =>
+    occasionDates(occasion, PROJECTS_TODAY, addDays(PROJECTS_TODAY, 399)).map((occurrence) => ({
+      year: occurrence.year,
+      startDate: occurrence.start,
+      endDate: occurrence.end,
+      confirmed: false,
+    }));
+  const coveredBy = (clientId: string, occasionId: string, year: number) =>
+    live().some(
+      (post) =>
+        post.clientId === clientId &&
+        post.status !== 'cancelled' &&
+        !!post.occasionId &&
+        occasionYearKey(post.occasionId, post.publishDate) === occasionYearKey(occasionId, year),
+    );
+  const calendarOccasions = (from: string, to: string, clientId: string | null) =>
+    occasions
+      .filter((occasion) => !occasion.archived)
+      .flatMap((occasion) => {
+        const settings = clientId ? clientSettings(clientId) : null;
+        if (
+          clientId &&
+          settings &&
+          !occasionApplies(
+            { id: occasion.id, clientId: occasion.client?.id ?? null, category: occasion.category },
+            { id: clientId, ...settings },
+          )
+        ) {
+          return [];
+        }
+        return occasion.occurrences
+          .filter((occurrence) => occurrence.startDate <= to && occurrence.endDate >= from)
+          .map(
+            (occurrence): CalendarOccasion => ({
+              id: occasion.id,
+              name: occasion.name,
+              category: occasion.category,
+              clientId: occasion.client?.id ?? null,
+              startDate: occurrence.startDate,
+              endDate: occurrence.endDate,
+              leadDays: occasion.leadDays,
+              confirmed: occurrence.confirmed,
+              covered: clientId ? coveredBy(clientId, occasion.id, occurrence.year) : null,
+              skipped: settings
+                ? settings.skippedOccasions.some(
+                    (skip) => skip.occasionId === occasion.id && skip.year === occurrence.year,
+                  )
+                : null,
+            }),
+          );
+      });
+  // Jasmine has an open cycle with posts; other clients join once their settings are saved.
+  const planningClients = (clientId: string | null) => {
+    const all = [...new Set([id(601), ...savedSettings.keys()])];
+    return clientId ? all.filter((candidate) => candidate === clientId) : all;
+  };
+  const planningOf = (clientId: string, from: string, to: string): ClientPlanning => {
+    const settings = clientSettings(clientId);
+    const planned: PlannedPost[] = live()
+      .filter((post) => post.clientId === clientId && post.status !== 'cancelled')
+      .map((post) => ({
+        id: post.id,
+        type: post.type,
+        platforms: post.platforms,
+        publishDate: post.publishDate,
+        publishTime: post.publishTime,
+        pillarId: post.pillarId ?? null,
+        occasionId: post.occasionId ?? null,
+      }));
+    const pillarIds = pillars.filter((pillar) => !pillar.archived).map((pillar) => pillar.id);
+    const cycles = clientId === id(601) ? [jasmineCycle] : [];
+    const monthPosts = planned.filter(
+      (post) => post.publishDate >= monthStart(from) && post.publishDate <= monthEnd(from),
+    );
+    const client = clients.find((c) => c.id === clientId);
+    return {
+      client: { id: clientId, name: client?.tradeName ?? '', imageId: null },
+      issues: planningIssues({
+        from,
+        to,
+        maxGapDays: settings.maxGapDays,
+        posts: planned,
+        occasions: calendarOccasions(from, addDays(to, 30), clientId).map((occasion) => ({
+          id: occasion.id,
+          start: occasion.startDate,
+          end: occasion.endDate,
+          leadDays: occasion.leadDays,
+          skipped: occasion.skipped === true,
+        })),
+        commitments: cycles,
+        pillarTargets: settings.pillarTargets,
+        pillarIds,
+      }),
+      pillarBalance: {
+        month: from.slice(0, 7),
+        posts: monthPosts.length,
+        items: pillarBalance(monthPosts, settings.pillarTargets, pillarIds),
+      },
+      commitments: cycles
+        .filter((cycle) => cycle.from <= to && cycle.to >= from)
+        .flatMap((cycle) =>
+          commitmentsOf(cycle, planned).map((line) => ({
+            cycleId: cycle.cycleId,
+            retainer: cycle.retainer,
+            from: cycle.from,
+            to: cycle.to,
+            ...line,
+          })),
+        ),
+    };
+  };
 
   // Answers a content request, or returns undefined to let the other mocks try.
   const handle = (
@@ -7723,9 +7895,13 @@ function contentRoutes({
             inRange.filter((post) => post.status === status && matches(post, unfiltered)).length,
           ]),
         ) as ContentCalendar['counts'],
-        // F08B overlays: PR 4 mocks occasions and planning issues with the calendar screens.
-        occasions: [],
-        issues: [],
+        // F08B overlays: the occasions on the range's days and the planning check's marks.
+        occasions: calendarOccasions(from, to, q.get('clientId')),
+        issues: planningClients(q.get('clientId')).flatMap((clientId) =>
+          planningOf(clientId, from, to).issues.map(
+            (issue): CalendarIssue => ({ ...issue, clientId }),
+          ),
+        ),
       };
       return json(route, calendar);
     }
@@ -7759,8 +7935,18 @@ function contentRoutes({
     if (path === '/api/content/occasions' && method === 'GET') {
       const from = q.get('from') ?? '';
       const to = q.get('to') ?? '';
-      const inRange = foodDay.occurrences.some((o) => o.startDate <= to && o.endDate >= from);
-      return json(route, { items: inRange ? [foodDay] : [] });
+      const withArchived = q.get('includeArchived') === 'true';
+      const items = occasions
+        .filter((occasion) => withArchived || !occasion.archived)
+        .map((occasion) => ({
+          ...occasion,
+          occurrences: occasion.occurrences.filter((o) => o.startDate <= to && o.endDate >= from),
+        }))
+        .filter((occasion) => occasion.occurrences.length > 0)
+        .sort((a, b) =>
+          (a.occurrences[0]?.startDate ?? '').localeCompare(b.occurrences[0]?.startDate ?? ''),
+        );
+      return json(route, { items });
     }
     if (path === '/api/content/ideas' && method === 'GET') {
       const status = q.get('status') ?? 'open';
@@ -7769,6 +7955,225 @@ function contentRoutes({
         (idea) => idea.status === status && (!clientId || idea.client?.id === clientId),
       );
       return json(route, { items, total: items.length, page: 1, pageSize: 25 });
+    }
+    if (path === '/api/content/planning' && method === 'GET') {
+      const from = q.get('from') ?? '';
+      const to = q.get('to') ?? '';
+      const planning: ContentPlanning = {
+        from,
+        to,
+        clients: planningClients(q.get('clientId')).map((clientId) =>
+          planningOf(clientId, from, to),
+        ),
+      };
+      return json(route, planning);
+    }
+    if (path === '/api/content/grid' && method === 'GET') {
+      const clientId = q.get('clientId') ?? '';
+      const month = q.get('month') ?? '';
+      const client = clients.find((c) => c.id === clientId);
+      if (!client) return fail(route, 404, null);
+      const start = monthStart(addDays(monthStart(addDays(`${month}-01`, -1)), -1));
+      const grid: ContentGrid = {
+        client: { id: client.id, name: client.tradeName, imageId: null },
+        month,
+        tiles: live()
+          .filter(
+            (post) =>
+              post.clientId === clientId &&
+              post.status !== 'cancelled' &&
+              post.platforms.includes('instagram') &&
+              post.type !== 'story' &&
+              post.publishDate >= start &&
+              post.publishDate <= monthEnd(`${month}-01`),
+          )
+          .sort((a, b) => byPublish(b, a))
+          .map((post) => ({
+            postId: post.id,
+            title: post.title,
+            type: post.type,
+            status: post.status,
+            publishDate: post.publishDate,
+            publishTime: post.publishTime,
+            thumbnailVersionId: summary(post).thumbnailVersionId,
+          })),
+      };
+      return json(route, grid);
+    }
+    // F08B settings: pillars, best times, client settings, occasions, snippets (PR 4).
+    if (path === '/api/content/pillars' && method === 'POST') {
+      const input = body<CreateContentPillar>();
+      const pillar: ContentPillar = {
+        id: id(next++),
+        ...input,
+        position: pillars.filter((item) => !item.archived).length + 1,
+        archived: false,
+      };
+      pillars.push(pillar);
+      return json(route, pillar, 201);
+    }
+    if (path === '/api/content/pillars/order' && method === 'PUT') {
+      const { ids } = body<{ ids: string[] }>();
+      ids.forEach((pillarId, index) => {
+        const pillar = pillars.find((item) => item.id === pillarId);
+        if (pillar) pillar.position = index + 1;
+      });
+      pillars.sort((a, b) => Number(a.archived) - Number(b.archived) || a.position - b.position);
+      return json(route, { items: pillars });
+    }
+    const pillarMatch = path.match(/^\/api\/content\/pillars\/([^/]+)(?:\/(archive|restore))?$/);
+    if (pillarMatch) {
+      const pillar = pillars.find((item) => item.id === pillarMatch[1]);
+      if (!pillar) return fail(route, 404, null);
+      if (pillarMatch[2]) pillar.archived = pillarMatch[2] === 'archive';
+      else Object.assign(pillar, body<UpdateContentPillar>());
+      pillars.sort((a, b) => Number(a.archived) - Number(b.archived) || a.position - b.position);
+      return json(route, pillar);
+    }
+    if (path === '/api/content/settings' && method === 'PUT') {
+      agencyTimes.splice(
+        0,
+        agencyTimes.length,
+        ...body<{ postingTimes: typeof agencyTimes }>().postingTimes,
+      );
+      return json(route, { postingTimes: agencyTimes });
+    }
+    if (settingsMatch && method === 'PUT') {
+      const clientId = settingsMatch[1] ?? '';
+      const input = body<UpdateClientContentSettings>();
+      const total = input.pillarTargets.reduce((sum, target) => sum + target.percent, 0);
+      if (input.pillarTargets.length > 0 && total !== 100) {
+        return fail(route, 400, 'INVALID_TARGETS');
+      }
+      const saved: ClientContentSettings = {
+        ...clientSettings(clientId),
+        ...input,
+        occasionCategories: [...new Set(['general' as const, ...input.occasionCategories])],
+        saved: true,
+      };
+      savedSettings.set(clientId, saved);
+      return json(route, saved);
+    }
+    const skipMatch = path.match(
+      /^\/api\/content\/clients\/([^/]+)\/occasion-skips(?:\/([^/]+)\/(\d+))?$/,
+    );
+    if (skipMatch) {
+      const clientId = skipMatch[1] ?? '';
+      const settings = { ...clientSettings(clientId), saved: true };
+      settings.skippedOccasions =
+        method === 'POST'
+          ? [...settings.skippedOccasions, body<{ occasionId: string; year: number }>()]
+          : settings.skippedOccasions.filter(
+              (skip) => !(skip.occasionId === skipMatch[2] && skip.year === Number(skipMatch[3])),
+            );
+      savedSettings.set(clientId, settings);
+      return json(route, settings);
+    }
+    if (path === '/api/content/occasions' && method === 'POST') {
+      const input = body<CreateContentOccasion>();
+      const { clientId, ...fields } = input;
+      const client = clients.find((c) => c.id === clientId);
+      const occasion: ContentOccasion = {
+        id: id(next++),
+        ...fields,
+        client: client ? { id: client.id, name: client.tradeName, imageId: null } : null,
+        archived: false,
+        occurrences: occurrencesOf(input),
+      };
+      occasions.push(occasion);
+      return json(route, occasion, 201);
+    }
+    const occasionMatch = path.match(
+      /^\/api\/content\/occasions\/([^/]+)(?:\/(archive|restore)|\/dates\/(\d+))?$/,
+    );
+    if (occasionMatch && method !== 'GET') {
+      const occasion = occasions.find((item) => item.id === occasionMatch[1]);
+      if (!occasion) return fail(route, 404, null);
+      if (occasionMatch[2]) {
+        occasion.archived = occasionMatch[2] === 'archive';
+      } else if (occasionMatch[3]) {
+        const year = Number(occasionMatch[3]);
+        const confirmed = method === 'PUT' ? body<{ startDate: string }>().startDate : null;
+        occasion.occurrences = occasion.occurrences.map((occurrence) =>
+          occurrence.year !== year
+            ? occurrence
+            : confirmed
+              ? {
+                  year,
+                  startDate: confirmed,
+                  endDate: addDays(confirmed, occasion.durationDays - 1),
+                  confirmed: true,
+                }
+              : (occurrencesOf({ ...occasion, clientId: null })[0] ?? occurrence),
+        );
+      } else {
+        Object.assign(occasion, body<UpdateContentOccasion>());
+      }
+      return json(route, occasion);
+    }
+    if (path === '/api/content/snippets' && method === 'POST') {
+      const input = body<CreateContentSnippet>();
+      const client = clients.find((c) => c.id === input.clientId);
+      const snippet: ContentSnippet = {
+        id: id(next++),
+        client: client ? { id: client.id, name: client.tradeName, imageId: null } : null,
+        kind: input.kind,
+        name: input.name,
+        body: input.body,
+        canEdit: true,
+      };
+      snippets.push(snippet);
+      return json(route, snippet, 201);
+    }
+    const snippetMatch = path.match(/^\/api\/content\/snippets\/([^/]+)(\/archive)?$/);
+    if (snippetMatch) {
+      const index = snippets.findIndex((item) => item.id === snippetMatch[1]);
+      const snippet = snippets[index];
+      if (!snippet) return fail(route, 404, null);
+      if (snippetMatch[2]) snippets.splice(index, 1);
+      else Object.assign(snippet, body<UpdateContentSnippet>());
+      return json(route, snippet);
+    }
+    if (path === '/api/content/ideas' && method === 'POST') {
+      const input = body<CreateContentIdea>();
+      const client = clients.find((c) => c.id === input.clientId);
+      const idea: ContentIdea = {
+        id: id(next++),
+        text: input.text,
+        client: client ? { id: client.id, name: client.tradeName, imageId: null } : null,
+        pillar: pillars.find((pillar) => pillar.id === input.pillarId) ?? null,
+        occasion: null,
+        status: 'open',
+        post: null,
+        dropReason: null,
+        createdBy: { id: me().user.id, name: me().user.name, imageId: null },
+        createdAt: `${PROJECTS_TODAY}T09:00:00.000Z`,
+        permissions: { canEdit: true, canDrop: true, canRestore: false, canUse: true },
+      };
+      ideas.unshift(idea);
+      return json(route, idea, 201);
+    }
+    const ideaMatch = path.match(/^\/api\/content\/ideas\/([^/]+)(?:\/(drop|restore))?$/);
+    if (ideaMatch) {
+      const idea = ideas.find((item) => item.id === ideaMatch[1]);
+      if (!idea) return fail(route, 404, null);
+      if (ideaMatch[2] === 'drop') {
+        Object.assign(idea, {
+          status: 'dropped',
+          dropReason: body<{ reason?: string }>().reason ?? null,
+          permissions: { canEdit: false, canDrop: false, canRestore: true, canUse: false },
+        });
+      } else if (ideaMatch[2] === 'restore') {
+        Object.assign(idea, {
+          status: 'open',
+          dropReason: null,
+          permissions: { canEdit: true, canDrop: true, canRestore: false, canUse: true },
+        });
+      } else {
+        const input = body<UpdateContentIdea>();
+        if (input.text) idea.text = input.text;
+      }
+      return json(route, idea);
     }
     if (path === '/api/content/posts' && method === 'POST') {
       const input = body<CreatePost>();

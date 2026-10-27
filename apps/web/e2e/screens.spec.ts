@@ -2252,6 +2252,51 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `post-move-dialog-${colorScheme}`);
     });
 
+    test('F08B: planning calendar, Planning check, grid, settings and quick idea', async ({
+      page,
+    }, testInfo) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize({ width: 1440, height: 1500 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, content: true });
+      await page.goto(`/content?clientId=${seedIds.jasmine}&ideas=true`);
+      await expect(page.locator('[data-occasion]').first()).toBeVisible();
+      await expect(page.locator('[data-ideas-panel] li').first()).toBeVisible();
+      await screenshot(page, testInfo, `content-planning-calendar-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1200 });
+      await page.goto('/content?tab=planning');
+      await expect(page.locator('[data-planning-client]').first()).toBeVisible();
+      await screenshot(page, testInfo, `content-planning-check-${colorScheme}`);
+
+      await page.goto(`/clients/${seedIds.jasmine}?tab=content`);
+      await expect(page.locator('[data-pillar-balance]')).toBeVisible();
+      await page.getByRole('button', { name: ar.calendar.views.grid }).click();
+      await expect(page.locator('[data-grid] li').first()).toBeVisible();
+      await screenshot(page, testInfo, `client-content-grid-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 1600 });
+      await page.getByRole('button', { name: ar.content.clientSettings.open }).click();
+      await expect(page.getByRole('dialog').locator('[data-posting-times]')).toBeVisible();
+      await screenshot(page, testInfo, `client-content-settings-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.setViewportSize({ width: 1280, height: 2200 });
+      await page.goto('/content/settings');
+      await expect(page.locator('[data-occasion-row]').first()).toBeVisible();
+      await screenshot(page, testInfo, `content-settings-${colorScheme}`);
+
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.getByRole('button', { name: ar.content.ideas.quick }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `quick-idea-${colorScheme}`);
+
+      await page.setViewportSize({ width: 390, height: 1400 });
+      await page.goto(`/content?clientId=${seedIds.jasmine}`);
+      await expect(page.locator('[data-occasion]:visible').first()).toBeVisible();
+      await screenshot(page, testInfo, `content-planning-agenda-phone-${colorScheme}`);
+    });
+
     test('post page: in production, linking a task, approved, medical stage, published', async ({
       page,
     }, testInfo) => {

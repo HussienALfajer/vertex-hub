@@ -17,9 +17,12 @@ import {
   CalendarClockIcon,
   CalendarDaysIcon,
   ClipboardCheckIcon,
+  ClipboardListIcon,
   type LucideIcon,
   PlusIcon,
+  Settings2Icon,
   SunIcon,
+  TriangleAlertIcon,
   UndoIcon,
   UserRoundSearchIcon,
 } from 'lucide-react';
@@ -28,22 +31,27 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
+import { oneOfParam } from '../../lib/search-params';
+import { clientListQuery } from '../clients/clients.queries';
 import { myContentSummaryQuery, postListQuery } from './content.queries';
 import { type CalendarState, ContentCalendar, parseCalendarState } from './content-calendar';
-import { PostRows } from './post-parts';
+import { PlanningCheck } from './planning-check';
+import { canEditPostsOf, PostRows } from './post-parts';
+
+const CONTENT_TABS = ['mine', 'planning'] as const;
 
 export interface ContentSearch extends CalendarState {
   /** Unset means the calendar. */
-  tab?: 'mine';
+  tab?: (typeof CONTENT_TABS)[number];
 }
 
 export function parseContentSearch(search: Record<string, unknown>): ContentSearch {
-  return { tab: search.tab === 'mine' ? 'mine' : undefined, ...parseCalendarState(search) };
+  return { tab: oneOfParam(CONTENT_TABS, search.tab), ...parseCalendarState(search) };
 }
 
 /**
- * The Content page (spec F08, screen 1): the calendar of every client and My posts, the tab and
- * the calendar's state kept in the URL.
+ * The Content page (spec F08, screen 1): the calendar of every client, My posts and the Planning
+ * check (F08B), the tab and the calendar's state kept in the URL.
  */
 export function ContentPage({ search }: { search: ContentSearch }) {
   const { t } = useTranslation();
@@ -55,11 +63,33 @@ export function ContentPage({ search }: { search: ContentSearch }) {
       navigate({ search: (previous) => ({ ...previous, ...next }), replace: true }),
     [navigate],
   );
-  const newPost = can(me, 'content.manage') && (
+  const canCreate = can(me, 'content.manage');
+  // Edit scope per client (F08 rule 1): every client under `all`, the AM's own otherwise.
+  const clients = useQuery({
+    ...clientListQuery({ status: ['active', 'paused', 'ended'], pageSize: 100 }),
+    enabled: canCreate,
+  });
+  const managers = new Map(
+    (clients.data?.items ?? []).map((client) => [client.id, client.accountManager.id]),
+  );
+  const canEditClient = (clientId: string) => {
+    const manager = managers.get(clientId);
+    return manager !== undefined && canEditPostsOf(me, manager);
+  };
+  const newPost = canCreate && (
     <Button render={<Link to="/content/new" search={state.date ? { date: state.date } : {}} />}>
       <PlusIcon />
       {t('content.actions.new')}
     </Button>
+  );
+  const actions = (
+    <span className="flex flex-wrap items-center gap-2">
+      <Button variant="outline" render={<Link to="/content/settings" />}>
+        <Settings2Icon />
+        {t('content.settings.open')}
+      </Button>
+      {newPost}
+    </span>
   );
 
   return (
@@ -67,13 +97,13 @@ export function ContentPage({ search }: { search: ContentSearch }) {
       <PageHeader
         title={t('content.title')}
         description={t('content.subtitle')}
-        actions={newPost}
+        actions={actions}
       />
       <Tabs
         value={tab ?? 'calendar'}
-        onValueChange={(value: 'calendar' | 'mine') =>
+        onValueChange={(value: 'calendar' | ContentSearch['tab']) =>
           navigate({
-            search: (previous) => ({ ...previous, tab: value === 'mine' ? 'mine' : undefined }),
+            search: (previous) => ({ ...previous, tab: value === 'calendar' ? undefined : value }),
             replace: true,
           })
         }
@@ -87,12 +117,25 @@ export function ContentPage({ search }: { search: ContentSearch }) {
             <UserRoundSearchIcon />
             {t('content.tabs.mine')}
           </TabsTrigger>
+          <TabsTrigger value="planning">
+            <ClipboardListIcon />
+            {t('content.tabs.planning')}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="calendar">
-          <ContentCalendar state={state} onChange={setState} emptyAction={newPost} />
+          <ContentCalendar
+            state={state}
+            onChange={setState}
+            canCreate={canCreate}
+            canEditClient={canEditClient}
+            emptyAction={newPost}
+          />
         </TabsContent>
         <TabsContent value="mine">
           <MyPosts />
+        </TabsContent>
+        <TabsContent value="planning">
+          <PlanningCheck />
         </TabsContent>
       </Tabs>
     </>
@@ -109,6 +152,7 @@ interface Section {
 
 const SECTIONS: Section[] = [
   { key: 'overdue', view: 'overdue', icon: CalendarClockIcon, alert: true },
+  { key: 'atRisk', view: 'at_risk', icon: TriangleAlertIcon, alert: true },
   { key: 'publishToday', view: 'publish_today', icon: SunIcon },
   { key: 'returned', view: 'returned', icon: UndoIcon },
   { key: 'toReview', view: 'to_review', icon: ClipboardCheckIcon },
@@ -118,7 +162,8 @@ const SECTIONS: Section[] = [
 const SECTION_SIZE = 20;
 
 /**
- * My posts: what the user publishes today, what is overdue or was returned to them, and for
+ * My posts: what the user publishes today, what is overdue, close to its date and not yet
+ * approved (F08B), or was returned to them, and for
  * reviewers what waits for their review. Counts come from the summary; a section loads its posts
  * only when it has some.
  */

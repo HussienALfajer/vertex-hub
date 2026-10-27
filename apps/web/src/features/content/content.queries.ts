@@ -6,13 +6,27 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type {
+  ConfirmOccasionDate,
+  ContentPillarOrder,
+  CreateContentIdea,
+  CreateContentOccasion,
+  CreateContentPillar,
+  CreateContentSnippet,
   CreatePost,
   CreatePostTask,
+  DropContentIdea,
   DuplicatePost,
   MedicalReview,
   MovePost,
+  OccasionSkip,
   PostStatusChange,
   ReturnPostTask,
+  UpdateClientContentSettingsInput,
+  UpdateContentAgencySettings,
+  UpdateContentIdea,
+  UpdateContentOccasion,
+  UpdateContentPillar,
+  UpdateContentSnippet,
   UpdatePost,
   UpdatePostLayout,
 } from '@vertex-hub/contracts';
@@ -38,6 +52,10 @@ export type OccasionFilters = paths['/api/content/occasions']['get']['parameters
 
 export type IdeaFilters = NonNullable<paths['/api/content/ideas']['get']['parameters']['query']>;
 
+export type PlanningFilters = paths['/api/content/planning']['get']['parameters']['query'];
+
+export type GridFilters = paths['/api/content/grid']['get']['parameters']['query'];
+
 export const contentKeys = {
   all: ['content'] as const,
   calendar: (filters: ContentCalendarFilters) => ['content', 'calendar', filters] as const,
@@ -52,6 +70,8 @@ export const contentKeys = {
   snippets: (filters: SnippetFilters) => ['content', 'snippets', filters] as const,
   occasions: (filters: OccasionFilters) => ['content', 'occasions', filters] as const,
   ideas: (filters: IdeaFilters) => ['content', 'ideas', filters] as const,
+  planning: (filters: PlanningFilters) => ['content', 'planning', filters] as const,
+  grid: (filters: GridFilters) => ['content', 'grid', filters] as const,
   movePreview: (id: string, publishDate: string) =>
     ['content', 'move-preview', id, publishDate] as const,
 };
@@ -132,6 +152,22 @@ export const contentIdeasQuery = (filters: IdeaFilters) =>
   queryOptions({
     queryKey: contentKeys.ideas(filters),
     queryFn: () => call(api.GET('/api/content/ideas', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+/** Rule C10: per client, the period's issues, the month's pillar balance and commitments. */
+export const contentPlanningQuery = (filters: PlanningFilters) =>
+  queryOptions({
+    queryKey: contentKeys.planning(filters),
+    queryFn: () => call(api.GET('/api/content/planning', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+/** Rule C11: a client's Instagram grid up to the end of a month. */
+export const contentGridQuery = (filters: GridFilters) =>
+  queryOptions({
+    queryKey: contentKeys.grid(filters),
+    queryFn: () => call(api.GET('/api/content/grid', { params: { query: filters } })),
     placeholderData: keepPreviousData,
   });
 
@@ -270,3 +306,134 @@ export const useReturnPostTask = (id: string) =>
       ),
     WITH_WORK,
   );
+
+// F08B settings: pillars, best times, client settings, occasions and snippets (screens 3 and 6)
+
+export const useCreatePillar = () =>
+  useContentMutation((input: CreateContentPillar) =>
+    call(api.POST('/api/content/pillars', { body: input })),
+  );
+
+export const useUpdatePillar = () =>
+  useContentMutation(({ id, ...input }: UpdateContentPillar & { id: string }) =>
+    call(api.PATCH('/api/content/pillars/{id}', { ...path(id), body: input })),
+  );
+
+export const useOrderPillars = () =>
+  useContentMutation((input: ContentPillarOrder) =>
+    call(api.PUT('/api/content/pillars/order', { body: input })),
+  );
+
+export const useArchivePillar = () =>
+  useContentMutation((id: string) => call(api.POST('/api/content/pillars/{id}/archive', path(id))));
+
+export const useRestorePillar = () =>
+  useContentMutation((id: string) => call(api.POST('/api/content/pillars/{id}/restore', path(id))));
+
+export const useUpdateAgencySettings = () =>
+  useContentMutation((input: UpdateContentAgencySettings) =>
+    call(api.PUT('/api/content/settings', { body: input })),
+  );
+
+export const useUpdateClientSettings = (clientId: string) =>
+  useContentMutation((input: UpdateClientContentSettingsInput) =>
+    call(
+      api.PUT('/api/content/clients/{clientId}/settings', {
+        params: { path: { clientId } },
+        body: input,
+      }),
+    ),
+  );
+
+/** Rule C6: "No post this year" for an occasion, and its undo. */
+export const useSkipOccasion = (clientId: string) =>
+  useContentMutation((input: OccasionSkip) =>
+    call(
+      api.POST('/api/content/clients/{clientId}/occasion-skips', {
+        params: { path: { clientId } },
+        body: input,
+      }),
+    ),
+  );
+
+export const useUnskipOccasion = (clientId: string) =>
+  useContentMutation(({ occasionId, year }: OccasionSkip) =>
+    call(
+      api.DELETE('/api/content/clients/{clientId}/occasion-skips/{occasionId}/{year}', {
+        params: { path: { clientId, occasionId, year } },
+      }),
+    ),
+  );
+
+export const useCreateOccasion = () =>
+  useContentMutation((input: CreateContentOccasion) =>
+    call(api.POST('/api/content/occasions', { body: input })),
+  );
+
+export const useUpdateOccasion = () =>
+  useContentMutation(({ id, ...input }: UpdateContentOccasion & { id: string }) =>
+    call(api.PATCH('/api/content/occasions/{id}', { ...path(id), body: input })),
+  );
+
+export const useArchiveOccasion = () =>
+  useContentMutation((id: string) =>
+    call(api.POST('/api/content/occasions/{id}/archive', path(id))),
+  );
+
+export const useRestoreOccasion = () =>
+  useContentMutation((id: string) =>
+    call(api.POST('/api/content/occasions/{id}/restore', path(id))),
+  );
+
+/** Rule C5: a manager's start for one year (a Hijri date after the moon sighting), or back to the computed one. */
+export const useConfirmOccasionDate = () =>
+  useContentMutation(({ id, year, ...input }: ConfirmOccasionDate & { id: string; year: number }) =>
+    call(
+      api.PUT('/api/content/occasions/{id}/dates/{year}', {
+        params: { path: { id, year } },
+        body: input,
+      }),
+    ),
+  );
+
+export const useClearOccasionDate = () =>
+  useContentMutation(({ id, year }: { id: string; year: number }) =>
+    call(
+      api.DELETE('/api/content/occasions/{id}/dates/{year}', { params: { path: { id, year } } }),
+    ),
+  );
+
+export const useCreateSnippet = () =>
+  useContentMutation((input: CreateContentSnippet) =>
+    call(api.POST('/api/content/snippets', { body: input })),
+  );
+
+export const useUpdateSnippet = () =>
+  useContentMutation(({ id, ...input }: UpdateContentSnippet & { id: string }) =>
+    call(api.PATCH('/api/content/snippets/{id}', { ...path(id), body: input })),
+  );
+
+export const useArchiveSnippet = () =>
+  useContentMutation((id: string) =>
+    call(api.POST('/api/content/snippets/{id}/archive', path(id))),
+  );
+
+// Ideas (rule C12)
+
+export const useCreateIdea = () =>
+  useContentMutation((input: CreateContentIdea) =>
+    call(api.POST('/api/content/ideas', { body: input })),
+  );
+
+export const useUpdateIdea = () =>
+  useContentMutation(({ id, ...input }: UpdateContentIdea & { id: string }) =>
+    call(api.PATCH('/api/content/ideas/{id}', { ...path(id), body: input })),
+  );
+
+export const useDropIdea = () =>
+  useContentMutation(({ id, ...input }: DropContentIdea & { id: string }) =>
+    call(api.POST('/api/content/ideas/{id}/drop', { ...path(id), body: input })),
+  );
+
+export const useRestoreIdea = () =>
+  useContentMutation((id: string) => call(api.POST('/api/content/ideas/{id}/restore', path(id))));

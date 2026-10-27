@@ -56,6 +56,7 @@ import { useInstallOffer } from '../features/app/install';
 import { OfflineBanner } from '../features/app/offline-banner';
 import { UpdateBanner } from '../features/app/update-banner';
 import { hasApprovalQueue } from '../features/approvals/approvals-page';
+import { QuickIdea } from '../features/content/quick-idea';
 import { readsHr } from '../features/hr/hr-approvals-page';
 import { readsMonths } from '../features/hr/hr-month-page';
 import { managesHr } from '../features/hr/hr-settings-page';
@@ -314,6 +315,7 @@ function TopBar({ me }: { me: MeResponse }) {
         <VertexMark className="w-6 text-primary" label={t('app.brand')} />
       </div>
       <div className="flex items-center gap-2">
+        <QuickIdea />
         <ThemeToggle />
         <NotificationBell />
         <UserMenu me={me} />

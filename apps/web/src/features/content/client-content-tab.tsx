@@ -9,7 +9,7 @@ import {
   POST_STATUSES,
 } from '@vertex-hub/contracts';
 import { Button } from '@vertex-hub/ui';
-import { LinkIcon, PlusIcon } from 'lucide-react';
+import { HashIcon, LinkIcon, PlusIcon, Settings2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
@@ -19,24 +19,27 @@ import { formatMonth, formatNumber } from '../../lib/format';
 import { approvalReadyQuery } from '../approvals/approvals.queries';
 import { RequestDialog, useRequestDialog } from '../approvals/request-dialog';
 import { hasClientScope } from '../tasks/task-access';
-import { contentCalendarQuery } from './content.queries';
+import { ClientSettingsDialog } from './client-settings-dialog';
+import { contentCalendarQuery, contentPillarsQuery, contentPlanningQuery } from './content.queries';
 import { type CalendarState, ContentCalendar } from './content-calendar';
+import { Commitments, PillarBalance } from './planning-check';
 import { canEditPostsOf, PostStatusBadge } from './post-parts';
+import { SnippetsDialog } from './snippets-manager';
 
 /**
  * The Content tab of the client profile (spec F08, screen 2): the calendar fixed to the client,
  * the month's posts counted by status, "New post" preset to the client, and for client-scope
- * users "Send month for approval" (rule 21).
+ * users "Send month for approval" (rule 21). F08B screen 3 adds the month's pillar balance and
+ * commitments, the Grid view, and the client's content settings and snippets.
  */
 export function ClientContentTab({ client }: { client: ClientDetailResponse }) {
   const { t } = useTranslation();
   const me = useMe();
   const [state, setState] = useState<CalendarState>({});
+  const [dialog, setDialog] = useState<'settings' | 'snippets' | null>(null);
+  const editScope = canEditPostsOf(me, client.accountManager.id);
   // Rule 2: posts are created for a non-archived client that is active or paused.
-  const canCreate =
-    client.archivedAt === null &&
-    client.status !== 'ended' &&
-    canEditPostsOf(me, client.accountManager.id);
+  const canCreate = client.archivedAt === null && client.status !== 'ended' && editScope;
   const newPost = canCreate && (
     <Button
       size="sm"
@@ -58,14 +61,49 @@ export function ClientContentTab({ client }: { client: ClientDetailResponse }) {
       <TabHeader
         title={t('content.clientTab.title')}
         description={t('content.clientTab.hint')}
-        action={newPost}
+        action={
+          <span className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setDialog('snippets')}>
+              <HashIcon />
+              {t('content.snippets.open')}
+            </Button>
+            {editScope && (
+              <Button size="sm" variant="outline" onClick={() => setDialog('settings')}>
+                <Settings2Icon />
+                {t('content.clientSettings.open')}
+              </Button>
+            )}
+            {newPost}
+          </span>
+        }
       />
-      <MonthBar client={client} date={date} sends={hasClientScope(me, client.accountManager.id)} />
       <ContentCalendar
         state={state}
         onChange={(next) => setState((previous) => ({ ...previous, ...next }))}
         clientId={client.id}
+        canCreate={canCreate}
+        canEditClient={() => editScope}
         emptyAction={newPost}
+        monthBar={
+          <MonthBar
+            client={client}
+            date={date}
+            sends={hasClientScope(me, client.accountManager.id)}
+          />
+        }
+      />
+      <ClientSettingsDialog
+        clientId={client.id}
+        clientName={client.tradeName}
+        open={dialog === 'settings'}
+        onClose={() => setDialog(null)}
+      />
+      <SnippetsDialog
+        clientId={client.id}
+        clientName={client.tradeName}
+        canEdit={editScope}
+        open={dialog === 'snippets'}
+        onClose={() => setDialog(null)}
       />
     </>
   );
@@ -73,7 +111,8 @@ export function ClientContentTab({ client }: { client: ClientDetailResponse }) {
 
 /**
  * The calendar month of `date`: its posts per status, whatever the calendar's filters, and
- * "Send month for approval" for client-scope users.
+ * "Send month for approval" for client-scope users; then the month's pillar balance against the
+ * client's targets and "planned / committed" per kind (F08B rules C2 and C9).
  */
 function MonthBar({
   client,
@@ -85,28 +124,50 @@ function MonthBar({
   sends: boolean;
 }) {
   const { t } = useTranslation();
+  const from = firstOfMonth(date);
   const month = useQuery(
-    contentCalendarQuery({ from: firstOfMonth(date), to: lastOfMonth(date), clientId: client.id }),
+    contentCalendarQuery({ from, to: lastOfMonth(date), clientId: client.id }),
   );
+  const planning = useQuery(
+    contentPlanningQuery({ from, to: lastOfMonth(date), clientId: client.id }),
+  );
+  const pillars = useQuery(contentPillarsQuery);
   const counts = month.data?.counts;
   const counted = POST_STATUSES.filter((status) => (counts?.[status] ?? 0) > 0);
-  if (counted.length === 0 && !sends) return null;
+  const plan = planning.data?.clients.find((entry) => entry.client.id === client.id);
+  if (counted.length === 0 && !sends && !plan) return null;
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-border bg-surface px-4 py-3">
-      <span className="text-sm font-medium">
-        {t('content.clientTab.monthCounts', { month: formatMonth(date) })}
-      </span>
-      {counted.length > 0 && (
-        <ul className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          {counted.map((status) => (
-            <li key={status} className="flex items-center gap-1.5 text-sm tabular-nums">
-              <PostStatusBadge status={status} />
-              {formatNumber(counts?.[status] ?? 0)}
-            </li>
-          ))}
-        </ul>
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface px-4 py-3">
+      {(counted.length > 0 || sends) && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <span className="text-sm font-medium">
+            {t('content.clientTab.monthCounts', { month: formatMonth(date) })}
+          </span>
+          {counted.length > 0 && (
+            <ul className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              {counted.map((status) => (
+                <li key={status} className="flex items-center gap-1.5 text-sm tabular-nums">
+                  <PostStatusBadge status={status} />
+                  {formatNumber(counts?.[status] ?? 0)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {sends && <SendMonth client={client} date={date} />}
+        </div>
       )}
-      {sends && <SendMonth client={client} date={date} />}
+      {plan && (
+        <div className="grid gap-4 border-t border-border pt-3 md:grid-cols-[2fr_1fr]">
+          <PillarBalance
+            month={plan.pillarBalance.month}
+            posts={plan.pillarBalance.posts}
+            items={plan.pillarBalance.items}
+            pillars={pillars.data?.items ?? []}
+            compact
+          />
+          <Commitments commitments={plan.commitments} />
+        </div>
+      )}
     </div>
   );
 }
