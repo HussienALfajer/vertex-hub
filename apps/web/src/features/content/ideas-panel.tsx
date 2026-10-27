@@ -22,7 +22,16 @@ import {
   Textarea,
   toast,
 } from '@vertex-hub/ui';
-import { LightbulbIcon, PlusIcon, UserRoundIcon, WandSparklesIcon, XIcon } from 'lucide-react';
+import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
+  LightbulbIcon,
+  PencilIcon,
+  PlusIcon,
+  UserRoundIcon,
+  WandSparklesIcon,
+  XIcon,
+} from 'lucide-react';
 import { type ComponentProps, type DragEvent, useId, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +46,8 @@ import {
   contentPillarsQuery,
   useCreateIdea,
   useDropIdea,
+  useRestoreIdea,
+  useUpdateIdea,
 } from './content.queries';
 
 /*
@@ -70,11 +81,13 @@ export function IdeasPanel({
   const me = useMe();
   const titleId = useId();
   const [mine, setMine] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [dropped, setDropped] = useState(false);
+  const [editing, setEditing] = useState<ContentIdea | 'new' | null>(null);
   const [dropping, setDropping] = useState<ContentIdea | null>(null);
+  const restore = useRestoreIdea();
   const ideas = useQuery(
     contentIdeasQuery({
-      status: 'open',
+      status: dropped ? 'dropped' : 'open',
       clientId,
       ...(mine && { mine: 'true' as const }),
       pageSize: PANEL_SIZE,
@@ -103,14 +116,23 @@ export function IdeasPanel({
           <UserRoundIcon />
           {t('content.ideas.mine')}
         </Button>
+        <Button
+          variant={dropped ? 'secondary' : 'ghost'}
+          size="sm"
+          aria-pressed={dropped}
+          onClick={() => setDropped((current) => !current)}
+        >
+          <ArchiveIcon />
+          {t('content.ideas.droppedFilter')}
+        </Button>
         {can(me, 'content.suggest') && (
-          <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+          <Button variant="outline" size="sm" onClick={() => setEditing('new')}>
             <PlusIcon />
             {t('content.ideas.add')}
           </Button>
         )}
       </div>
-      {canDrag && items.length > 0 && (
+      {canDrag && !dropped && items.length > 0 && (
         <p className="px-3 pt-2 text-xs text-muted-foreground">{t('content.ideas.dragHint')}</p>
       )}
       {ideas.isPending ? (
@@ -125,8 +147,8 @@ export function IdeasPanel({
       ) : items.length === 0 ? (
         <EmptyState
           icon={<LightbulbIcon />}
-          title={t('content.ideas.emptyTitle')}
-          description={t('content.ideas.emptyHint')}
+          title={dropped ? t('content.ideas.emptyDropped') : t('content.ideas.emptyTitle')}
+          description={dropped ? undefined : t('content.ideas.emptyHint')}
         />
       ) : (
         <ul className="flex max-h-[70dvh] flex-col gap-2 overflow-y-auto p-3">
@@ -137,15 +159,31 @@ export function IdeasPanel({
               showClient={!clientId}
               dragging={draggedId === idea.id}
               onDragStart={
-                canDrag && idea.permissions.canUse ? (event) => onDragStart(event, idea) : undefined
+                canDrag && idea.status === 'open' && idea.permissions.canUse
+                  ? (event) => onDragStart(event, idea)
+                  : undefined
               }
               onDragEnd={onDragEnd}
+              onEdit={() => setEditing(idea)}
               onDrop={() => setDropping(idea)}
+              onRestore={async () => {
+                try {
+                  await restore.mutateAsync(idea.id);
+                  toast.add({ title: t('content.ideas.restored'), type: 'success' });
+                } catch (error) {
+                  toast.add({ title: errorMessage(t, error), type: 'error' });
+                }
+              }}
             />
           ))}
         </ul>
       )}
-      <IdeaDialog open={adding} onClose={() => setAdding(false)} clientId={clientId} />
+      <IdeaDialog
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        clientId={clientId}
+        idea={editing === 'new' ? undefined : (editing ?? undefined)}
+      />
       <DropIdeaDialog idea={dropping} onClose={() => setDropping(null)} />
     </section>
   );
@@ -157,15 +195,20 @@ function IdeaCard({
   dragging,
   onDragStart,
   onDragEnd,
+  onEdit,
   onDrop,
+  onRestore,
 }: {
   idea: ContentIdea;
   showClient: boolean;
   dragging: boolean;
   onDragStart?: (event: DragEvent) => void;
   onDragEnd: () => void;
+  onEdit: () => void;
   onDrop: () => void;
+  onRestore: () => Promise<void>;
 }) {
+  const open = idea.status === 'open';
   const { t } = useTranslation();
   const meta = [
     showClient ? (idea.client?.name ?? t('content.ideas.noClient')) : null,
@@ -196,31 +239,49 @@ function IdeaCard({
         {idea.occasion && <span>{idea.occasion.name}</span>}
         <span className="truncate">{meta}</span>
       </span>
-      {(idea.permissions.canUse || idea.permissions.canDrop) && (
-        <span className="flex flex-wrap items-center gap-1.5">
-          {idea.permissions.canUse && (
-            <Button
-              size="sm"
-              variant="outline"
-              draggable={false}
-              render={
-                <Link
-                  to="/content/new"
-                  search={{ ideaId: idea.id, ...(idea.client && { clientId: idea.client.id }) }}
-                />
-              }
-            >
-              <WandSparklesIcon />
-              {t('content.ideas.use')}
-            </Button>
-          )}
-          {idea.permissions.canDrop && (
-            <Button size="sm" variant="ghost" onClick={onDrop}>
-              <XIcon />
-              {t('content.ideas.drop')}
-            </Button>
-          )}
-        </span>
+      {!open && idea.dropReason && (
+        <p className="text-xs text-muted-foreground">
+          {t('content.ideas.dropReasonShown', { reason: idea.dropReason })}
+        </p>
+      )}
+      {open &&
+        (idea.permissions.canUse || idea.permissions.canEdit || idea.permissions.canDrop) && (
+          <span className="flex flex-wrap items-center gap-1.5">
+            {idea.permissions.canUse && (
+              <Button
+                size="sm"
+                variant="outline"
+                draggable={false}
+                render={
+                  <Link
+                    to="/content/new"
+                    search={{ ideaId: idea.id, ...(idea.client && { clientId: idea.client.id }) }}
+                  />
+                }
+              >
+                <WandSparklesIcon />
+                {t('content.ideas.use')}
+              </Button>
+            )}
+            {idea.permissions.canEdit && (
+              <Button size="sm" variant="ghost" onClick={onEdit}>
+                <PencilIcon />
+                {t('content.ideas.edit')}
+              </Button>
+            )}
+            {idea.permissions.canDrop && (
+              <Button size="sm" variant="ghost" onClick={onDrop}>
+                <XIcon />
+                {t('content.ideas.drop')}
+              </Button>
+            )}
+          </span>
+        )}
+      {!open && idea.permissions.canRestore && (
+        <Button size="sm" variant="outline" className="w-fit" onClick={() => void onRestore()}>
+          <ArchiveRestoreIcon />
+          {t('content.ideas.restore')}
+        </Button>
       )}
     </li>
   );
@@ -234,29 +295,35 @@ interface IdeaValues {
 
 /**
  * Screen 7: an idea in one line, with an optional client and pillar. From the top bar for every
- * user, or the ideas panel with its client preset.
+ * user, or the ideas panel with its client preset; with `idea`, its author (or an edit-scope
+ * user) edits it while open (rule C12).
  */
 export function IdeaDialog({
   open,
   onClose,
   clientId,
+  idea,
   finalFocus,
 }: {
   open: boolean;
   onClose: () => void;
   clientId?: string;
+  idea?: ContentIdea;
   finalFocus?: ComponentProps<typeof FormDialog>['finalFocus'];
 }) {
   const { t } = useTranslation();
   const textId = useId();
   const create = useCreateIdea();
+  const update = useUpdateIdea();
   const [failure, setFailure] = useState<string | null>(null);
   const clients = useQuery({
     ...clientListQuery({ status: ['active', 'paused'], pageSize: 100 }),
     enabled: open,
   });
   const pillars = useQuery({ ...contentPillarsQuery, enabled: open });
-  const defaults: IdeaValues = { text: '', clientId: clientId ?? ALL, pillarId: ALL };
+  const defaults: IdeaValues = idea
+    ? { text: idea.text, clientId: idea.client?.id ?? ALL, pillarId: idea.pillar?.id ?? ALL }
+    : { text: '', clientId: clientId ?? ALL, pillarId: ALL };
   const form = useForm<IdeaValues>({ values: defaults });
   const { errors } = form.formState;
   const clientItems = [
@@ -284,8 +351,14 @@ export function IdeaDialog({
       return;
     }
     try {
-      await create.mutateAsync(checked.data);
-      toast.add({ title: t('content.ideas.added'), type: 'success' });
+      if (idea) {
+        const { occasionId: _occasion, ...changes } = checked.data;
+        await update.mutateAsync({ id: idea.id, ...changes });
+        toast.add({ title: t('content.ideas.saved'), type: 'success' });
+      } else {
+        await create.mutateAsync(checked.data);
+        toast.add({ title: t('content.ideas.added'), type: 'success' });
+      }
       onClose();
     } catch (error) {
       setFailure(errorMessage(t, error));
@@ -302,9 +375,9 @@ export function IdeaDialog({
       }}
       finalFocus={finalFocus}
       submitting={form.formState.isSubmitting}
-      title={t('content.ideas.addTitle')}
+      title={idea ? t('content.ideas.editTitle') : t('content.ideas.addTitle')}
       description={t('content.ideas.addBody')}
-      action={t('content.ideas.addAction')}
+      action={idea ? t('common.save') : t('content.ideas.addAction')}
       failure={failure}
       onSubmit={submit}
     >

@@ -292,7 +292,10 @@ export function ContentCalendar({
               {...drop}
               onClick={(event) => {
                 // The empty space of a day opens the wizard; its cards and buttons keep theirs.
-                if (!opens(day) || (event.target as HTMLElement).closest('a, button')) return;
+                // Clicks from a portal (an occasion's popover) bubble here too: only the day's own.
+                const target = event.target as HTMLElement;
+                if (!event.currentTarget.contains(target)) return;
+                if (!opens(day) || target.closest('a, button')) return;
                 void openWizard(day);
               }}
               className={cn(
@@ -364,7 +367,7 @@ export function ContentCalendar({
         <div className="min-w-0">{body}</div>
         {ideasOpen && (
           <IdeasPanel
-            clientId={clientId}
+            clientId={clientId ?? state.clientId}
             canDrag={canCreate}
             draggedId={dragged?.kind === 'idea' ? dragged.idea.id : null}
             onDragStart={(event, idea) => startDrag(event, { kind: 'idea', idea })}

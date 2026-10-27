@@ -226,6 +226,9 @@ test('the calendar: occasions, gaps, a day click, a drag with the move dialog, a
   await expect(page.getByText(ar.content.planning.tooCloseBadge).first()).toBeVisible();
   await foodDay.click();
   await expect(page.getByRole('dialog').getByText(ar.content.occasions.uncovered)).toBeVisible();
+  // A click inside the popover stays there: only the day's own space opens the wizard.
+  await page.getByRole('dialog').getByText(ar.content.occasions.uncovered).click();
+  await expect(page).toHaveURL(/\/content\?/);
   await page.keyboard.press('Escape');
 
   // Rule B4: a past day is read-only; a day from today opens the wizard on it.
@@ -362,4 +365,28 @@ test('any employee adds an idea from the top bar; the content settings are read-
   await idea.getByLabel(ar.content.ideas.text).fill('مسابقة صور الزبائن في العيد');
   await idea.getByRole('button', { name: ar.content.ideas.addAction }).click();
   await expect(page.getByText(ar.content.ideas.added)).toBeVisible();
+});
+
+test('the ideas panel: an idea edited, dropped and restored', async ({ page }) => {
+  await mockApi(page, { signedIn: true, content: true });
+  await page.goto(`/content?clientId=${seedIds.jasmine}&ideas=true`);
+  const panel = page.locator('[data-ideas-panel]');
+  const idea = panel.locator('li').filter({ hasText: 'فطور الجمعة العائلي' });
+  await idea.getByRole('button', { name: ar.content.ideas.edit }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(ar.content.ideas.text).fill('فطور الجمعة العائلي مع الأطفال');
+  await dialog.getByRole('button', { name: ar.common.save }).click();
+  await expect(page.getByText(ar.content.ideas.saved)).toBeVisible();
+  await expect(panel.getByText('فطور الجمعة العائلي مع الأطفال')).toBeVisible();
+
+  await idea.getByRole('button', { name: ar.content.ideas.drop }).click();
+  await page.getByRole('dialog').getByLabel(ar.content.ideas.dropReason).fill('تكررت الفكرة');
+  await page.getByRole('dialog').getByRole('button', { name: ar.content.ideas.drop }).click();
+  await expect(page.getByText(ar.content.ideas.dropped)).toBeVisible();
+  await expect(panel.getByText(ar.content.ideas.emptyTitle)).toBeVisible();
+
+  await panel.getByRole('button', { name: ar.content.ideas.droppedFilter }).click();
+  await expect(panel.getByText('تكررت الفكرة')).toBeVisible();
+  await panel.getByRole('button', { name: ar.content.ideas.restore }).click();
+  await expect(page.getByText(ar.content.ideas.restored)).toBeVisible();
 });

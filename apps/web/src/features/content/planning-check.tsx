@@ -52,7 +52,8 @@ export function PlanningCheck() {
   const from = businessDate();
   const to = addDays(from, PLANNING_RULES.weekCheckDays - 1);
   const planning = useQuery(contentPlanningQuery({ from, to }));
-  const occasions = useQuery(contentOccasionsQuery({ from, to }));
+  // An occasion is flagged from its lead days before it starts (up to 30): name those too.
+  const occasions = useQuery(contentOccasionsQuery({ from, to: addDays(to, 30) }));
   const pillars = useQuery(contentPillarsQuery);
   if (planning.isPending) {
     return (

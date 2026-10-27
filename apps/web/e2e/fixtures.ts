@@ -8161,9 +8161,14 @@ function contentRoutes({
         Object.assign(idea, {
           status: 'dropped',
           dropReason: body<{ reason?: string }>().reason ?? null,
+          permissions: { canEdit: false, canDrop: false, canRestore: true, canUse: false },
         });
       } else if (ideaMatch[2] === 'restore') {
-        Object.assign(idea, { status: 'open', dropReason: null });
+        Object.assign(idea, {
+          status: 'open',
+          dropReason: null,
+          permissions: { canEdit: true, canDrop: true, canRestore: false, canUse: true },
+        });
       } else {
         const input = body<UpdateContentIdea>();
         if (input.text) idea.text = input.text;
