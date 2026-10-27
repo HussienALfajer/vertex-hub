@@ -46,7 +46,7 @@ Run from the repository root (Node 24, pnpm via Corepack). Turborepo builds depe
 | Install | `pnpm install` |
 | First-time local DB (creates `.env`, role, dev + test databases and the api suite's per-worker test databases; asks for the postgres password; the api tests create missing worker databases when the role may, otherwise run it again) | `pnpm db:setup-local` |
 | Dev (api :3000, worker, web :5173) | `pnpm dev` |
-| Check a change, each check once: lint; typecheck, test and build (Turborepo replays unchanged packages); the changed E2E specs; migration and OpenAPI drift. Summary on the console, logs in `.verify/` (`docs/testing.md`) · only some test files (paths from the root; `--grep <title>` for part of a spec) | `pnpm verify` · `pnpm verify <file>...` |
+| Check a change, each check once: lint; typecheck, test and build (Turborepo replays unchanged packages); the changed E2E specs; migration and OpenAPI drift. Summary on the console, logs in `.verify/` (`docs/testing.md`) · only some test files (paths from the root; a package or a folder in one runs the tests under it; `--grep <title>` for part of a spec) | `pnpm verify` · `pnpm verify <file or folder>...` |
 | Typecheck | `pnpm typecheck` |
 | Lint + format check / fix | `pnpm lint` / `pnpm lint:fix` |
 | Unit + integration tests (need `TEST_DATABASE_URL`; migrations run automatically; `db` → `worker` share the test database and run one after another, the api suite runs at the same time on a database per Vitest worker, `TEST_WORKERS`, see `turbo.json` and `packages/db/src/testing.ts`; a second run of a suite waits for the first); Turbo replays packages whose inputs did not change | `pnpm test` |

@@ -5,7 +5,9 @@
 //                               replays what did not change), the E2E specs the branch changed, and
 //                               migration and OpenAPI drift when their sources changed
 //   pnpm verify <files...>      only these test files: Vitest in their package, Playwright for
-//                               apps/web/e2e specs (with --grep <pattern> to pick tests)
+//                               apps/web/e2e specs (with --grep <pattern> to pick tests); a
+//                               package folder runs its whole Vitest suite, a folder inside one
+//                               the tests under it
 //   --e2e-all                   the whole E2E suite instead of the changed specs (CI runs it on
 //                               four shards; here it takes minutes)
 //   --base <ref>                compare with <ref> instead of the merge base with origin/main
@@ -21,6 +23,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { connect } from 'node:net';
@@ -149,17 +152,28 @@ async function verifyFiles(files) {
   for (const file of files) {
     const path = relative(root, resolve(root, file)).replaceAll('\\', '/');
     if (path.startsWith('..') || !existsSync(join(root, path))) refuse(`No such file: ${file}`);
+    const folder = statSync(join(root, path)).isDirectory();
+    if (folder && `${path}/`.startsWith(E2E_DIR)) {
+      refuse(
+        `${file} is the whole E2E suite: name its specs, or run it on purpose with --e2e-all.`,
+      );
+    }
     if (path.startsWith(E2E_DIR)) {
       specs.push(path);
       continue;
     }
-    const owner = packages.find((pkg) => path.startsWith(`${pkg.dir}/`));
+    const owner = packages.find((pkg) => `${path}/`.startsWith(`${pkg.dir}/`));
     if (!owner) refuse(`${file} is not inside a workspace package.`);
-    if (!byPackage.has(owner)) byPackage.set(owner, []);
-    byPackage.get(owner).push(path.slice(owner.dir.length + 1));
+    // Vitest filters match a path prefix, so `test/` picks a folder; the package folder itself
+    // becomes `null`: its whole suite, no filter.
+    const filter =
+      path === owner.dir ? null : path.slice(owner.dir.length + 1) + (folder ? '/' : '');
+    const picked = byPackage.has(owner) ? byPackage.get(owner) : [];
+    byPackage.set(owner, filter === null || picked === null ? null : [...picked, filter]);
   }
-  for (const [pkg, tests] of byPackage) {
+  for (const [pkg, picked] of byPackage) {
     const short = pkg.name.replace('@vertex-hub/', '');
+    const tests = picked ?? [];
     const deps = await run(`build-${short}`, process.execPath, [
       bin(root, 'turbo'),
       'run',
@@ -185,7 +199,11 @@ async function verifyFiles(files) {
       ],
       { cwd: join(root, pkg.dir) },
     );
-    section(`${short}: ${tests.join(' ')}`, result, vitestFailures(json, pkg.dir, result));
+    section(
+      `${short}: ${tests.length === 0 ? 'every test' : tests.join(' ')}`,
+      result,
+      vitestFailures(json, pkg.dir, result),
+    );
   }
   if (specs.length > 0) {
     const build = await run('build-web', process.execPath, [
