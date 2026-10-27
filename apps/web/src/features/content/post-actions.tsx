@@ -53,6 +53,7 @@ import type { TFunction } from 'i18next';
 import {
   ArchiveIcon,
   BanIcon,
+  CalendarArrowUpIcon,
   CalendarCheckIcon,
   CalendarXIcon,
   CheckCheckIcon,
@@ -72,7 +73,7 @@ import {
   UndoIcon,
 } from 'lucide-react';
 import { type ComponentProps, type ReactNode, useId, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import { FormAlert } from '../../components/form-alert';
@@ -82,12 +83,11 @@ import { fromBusinessDateTimeInput, toBusinessDateTimeInput } from '../../lib/fo
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientQuery } from '../clients/clients.queries';
 import { focusTarget, type TaskFocus } from '../tasks/task-actions';
+import { CaptionEditor } from './caption-editor';
 import { useChangePostStatus, useDuplicatePost, useUpdatePost } from './content.queries';
 import {
   ApprovalField,
-  CaptionFields,
   CycleLineField,
-  firstGroupCaptions,
   NotesField,
   PlatformsField,
   type PostFormMethods,
@@ -97,7 +97,10 @@ import {
   TitleField,
   TypeField,
 } from './post-form';
+import { MovePostDialog } from './post-move-dialog';
 import { type MedicalDecision, PostMedicalReviewDialog } from './post-review';
+import { captionsOf } from './post-wizard-draft';
+import { OccasionField, PillarField } from './post-wizard-steps';
 
 const MOVE_ICONS: Record<PostMove, LucideIcon> = {
   start: PlayIcon,
@@ -154,7 +157,7 @@ const moveDone = (t: TFunction, move: PostMove, post: Pick<PostDetail, 'reviewSt
     ? t('content.moves.done.to_medical')
     : t(`content.moves.done.${move}`);
 
-type ActionDialog = Target | 'details' | 'content' | 'duplicate' | 'published';
+type ActionDialog = Target | 'details' | 'content' | 'duplicate' | 'published' | 'move';
 
 type FinalFocus = ComponentProps<typeof DialogContent>['finalFocus'];
 
@@ -292,6 +295,12 @@ export function PostActions({
                 {t('content.actions.editDetails')}
               </DropdownMenuItem>
             )}
+            {editable && post.status !== 'published' && (
+              <DropdownMenuItem onClick={() => open('move', true)}>
+                <CalendarArrowUpIcon />
+                {t('content.actions.move')}
+              </DropdownMenuItem>
+            )}
             {canEdit && post.status === 'published' && (
               <DropdownMenuItem onClick={() => open('published', true)}>
                 <PencilIcon />
@@ -379,6 +388,12 @@ export function PostActions({
       <DuplicateDialog
         post={post}
         open={dialog === 'duplicate'}
+        onClose={() => setDialog(null)}
+        finalFocus={finalFocus}
+      />
+      <MovePostDialog
+        post={post}
+        open={dialog === 'move'}
         onClose={() => setDialog(null)}
         finalFocus={finalFocus}
       />
@@ -748,13 +763,9 @@ function usePostForm(post: PostDetail): PostFormMethods {
       platforms: post.platforms,
       publishDate: post.publishDate,
       publishTime: post.publishTime,
-      captions: [
-        {
-          group: post.captions[0]?.group ?? 'facebook_instagram',
-          caption: post.captions[0]?.caption ?? '',
-          hashtags: post.captions[0]?.hashtags ?? '',
-        },
-      ],
+      captions: post.captions,
+      pillarId: post.pillar?.id ?? null,
+      occasionId: post.occasion?.id ?? null,
       notes: post.notes ?? '',
       needsClientApproval: post.needsClientApproval,
       responsibleId: post.responsible.id,
@@ -847,11 +858,12 @@ function ContentForm({ post, onClose }: { post: PostDetail; onClose: () => void 
   const { t } = useTranslation();
   const form = usePostForm(post);
   const { failure, save } = useSavePost(post, form, onClose);
+  const captions = useWatch({ control: form.control, name: 'captions' }) ?? [];
   const submit = form.handleSubmit((values) => {
     const dirty = form.formState.dirtyFields;
     return save({
       ...(dirty.type && { type: values.type }),
-      ...(dirty.captions && { captions: firstGroupCaptions(post.platforms, values.captions) }),
+      ...(dirty.captions && { captions: captionsOf(post.platforms, values.captions) }),
     });
   });
   return (
@@ -861,7 +873,14 @@ function ContentForm({ post, onClose }: { post: PostDetail; onClose: () => void 
         <DialogDescription>{t('content.edit.contentBody')}</DialogDescription>
       </DialogHeader>
       <TypeField form={form} />
-      <CaptionFields form={form} />
+      <CaptionEditor
+        clientId={post.client.id}
+        platforms={post.platforms}
+        captions={captions}
+        onChange={(next) =>
+          form.setValue('captions', next as CreatePostInput['captions'], { shouldDirty: true })
+        }
+      />
       <SaveFooter form={form} failure={failure} />
     </form>
   );
@@ -894,6 +913,8 @@ function DetailsForm({ post, onClose }: { post: PostDetail; onClose: () => void 
       ...(dirty.needsClientApproval && { needsClientApproval: values.needsClientApproval }),
       ...(dirty.responsibleId && { responsibleId: values.responsibleId }),
       ...(dirty.cycleLineId && { cycleLineId: values.cycleLineId }),
+      ...(dirty.pillarId && { pillarId: values.pillarId }),
+      ...(dirty.occasionId && { occasionId: values.occasionId }),
     });
   });
   return (
@@ -907,6 +928,8 @@ function DetailsForm({ post, onClose }: { post: PostDetail; onClose: () => void 
       <PlatformsField form={form} />
       <ResponsibleField form={form} current={post.responsible} />
       <CycleLineField form={form} current={post.cycleLine} />
+      <PillarField form={form} />
+      <OccasionField form={form} />
       <NotesField form={form} />
       <ApprovalField form={form} />
       <SaveFooter form={form} failure={failure} />

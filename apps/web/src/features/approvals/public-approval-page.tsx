@@ -50,10 +50,13 @@ import { LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, SCREEN_ERROR } from '../../lib/errors';
 import { formatDateTime, formatFileSize, formatNumber } from '../../lib/format';
+import { PostCaptionsView } from '../content/post-captions-view';
 import { formatPublish, POST_TYPE_ICONS, PostPlatforms } from '../content/post-parts';
+import { PostPreview } from '../content/post-preview-panel';
 import { FileTypeIcon } from '../files/file-parts';
 import {
   publicApprovalQuery,
+  publicClientImageUrl,
   publicVersionUrl,
   useApproveAllPosts,
   useRespondToApproval,
@@ -189,6 +192,10 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
                 key={item.id}
                 token={token}
                 item={item}
+                client={{
+                  name: approval.clientName,
+                  image: approval.clientImage ? publicClientImageUrl(token) : null,
+                }}
                 onDecide={setDecided}
                 onDecided={focusDecided}
               />
@@ -215,11 +222,14 @@ function ApprovalView({ token, approval }: { token: string; approval: PublicAppr
 function ItemCard({
   token,
   item,
+  client,
   onDecide,
   onDecided,
 }: {
   token: string;
   item: PublicApprovalItem;
+  /** Post items: the client as the previews show it (F08B rule A8). */
+  client?: { name: string; image: string | null };
   /** Opening a decision names the heading that takes the focus once it is sent. */
   onDecide: (heading: HTMLElement | null) => void;
   /** After the decision was sent and its dialog closed. */
@@ -266,6 +276,21 @@ function ItemCard({
           {item.text}
         </p>
       )}
+      {post && client && (
+        <PostPreview
+          clientName={client.name}
+          clientImage={client.image}
+          type={post.type}
+          platforms={post.platforms}
+          captions={post.captions}
+          media={item.files.map((file) => ({
+            key: file.versionId,
+            src: file.previewAvailable ? publicVersionUrl(token, file.versionId, 'preview') : null,
+            type: file.type,
+            slideCaption: file.slideCaption,
+          }))}
+        />
+      )}
       {files.length > 0 && (
         <ul
           aria-label={strip ? t('approvals.public.mediaStrip') : undefined}
@@ -283,22 +308,14 @@ function ItemCard({
               token={token}
               file={file}
               showName={post === null}
+              caption={file.slideCaption}
               className={strip ? 'w-4/5 shrink-0 snap-start sm:w-1/2' : undefined}
               onPreview={() => setPreviewing(file)}
             />
           ))}
         </ul>
       )}
-      {post?.caption && (
-        <p className="whitespace-pre-line" dir="auto">
-          {post.caption}
-        </p>
-      )}
-      {post?.hashtags && (
-        <p className="text-sm text-muted-foreground" dir="auto">
-          {post.hashtags}
-        </p>
-      )}
+      {post && <PostCaptionsView captions={post.captions} />}
       {item.status === 'pending' ? (
         <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row">
           <Button size="lg" className="sm:flex-1" onClick={() => decide('approved')}>
@@ -379,6 +396,7 @@ function FileTile({
   token,
   file,
   showName = true,
+  caption,
   className,
   onPreview,
 }: {
@@ -386,6 +404,8 @@ function FileTile({
   file: PublicApprovalFile;
   /** Post media is shown without names. */
   showName?: boolean;
+  /** A slide's caption (F08B rule A8). */
+  caption?: string | null;
   className?: string;
   onPreview: () => void;
 }) {
@@ -402,10 +422,19 @@ function FileTile({
   ) : (
     <FileTypeIcon type={file.type} className="size-8" />
   );
-  const name = showName && (
-    <span className="truncate text-sm" dir="auto" title={file.name}>
-      {file.name}
-    </span>
+  const name = (
+    <>
+      {showName && (
+        <span className="truncate text-sm" dir="auto" title={file.name}>
+          {file.name}
+        </span>
+      )}
+      {caption && (
+        <span className="text-sm" dir="auto">
+          {caption}
+        </span>
+      )}
+    </>
   );
   // An image the browser cannot show itself (TIFF) still has its rendered preview.
   if (file.display === 'inline' || (file.type === 'image' && file.previewAvailable)) {

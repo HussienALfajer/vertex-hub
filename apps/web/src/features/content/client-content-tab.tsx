@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import {
   APPROVAL_LIMITS,
   businessDate,
@@ -20,7 +21,6 @@ import { RequestDialog, useRequestDialog } from '../approvals/request-dialog';
 import { hasClientScope } from '../tasks/task-access';
 import { contentCalendarQuery } from './content.queries';
 import { type CalendarState, ContentCalendar } from './content-calendar';
-import { NewPostDialog } from './post-form';
 import { canEditPostsOf, PostStatusBadge } from './post-parts';
 
 /**
@@ -32,14 +32,21 @@ export function ClientContentTab({ client }: { client: ClientDetailResponse }) {
   const { t } = useTranslation();
   const me = useMe();
   const [state, setState] = useState<CalendarState>({});
-  const [creating, setCreating] = useState(false);
   // Rule 2: posts are created for a non-archived client that is active or paused.
   const canCreate =
     client.archivedAt === null &&
     client.status !== 'ended' &&
     canEditPostsOf(me, client.accountManager.id);
   const newPost = canCreate && (
-    <Button size="sm" onClick={() => setCreating(true)}>
+    <Button
+      size="sm"
+      render={
+        <Link
+          to="/content/new"
+          search={{ clientId: client.id, ...(state.date && { date: state.date }) }}
+        />
+      }
+    >
       <PlusIcon />
       {t('content.actions.new')}
     </Button>
@@ -59,12 +66,6 @@ export function ClientContentTab({ client }: { client: ClientDetailResponse }) {
         onChange={(next) => setState((previous) => ({ ...previous, ...next }))}
         clientId={client.id}
         emptyAction={newPost}
-      />
-      <NewPostDialog
-        open={creating}
-        client={{ id: client.id, name: client.tradeName }}
-        defaultDate={state.date}
-        onClose={() => setCreating(false)}
       />
     </>
   );

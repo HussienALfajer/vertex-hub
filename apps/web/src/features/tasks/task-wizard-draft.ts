@@ -126,7 +126,7 @@ export function clearDraft(storage: Storage, userId: string) {
  * `expired` after 24 (upload it again).
  */
 export function uploadAge(
-  file: WizardFile,
+  file: Pick<WizardFile, 'uploadedAt'>,
   now: Date,
 ): 'uploading' | 'fresh' | 'aging' | 'expired' {
   if (!file.uploadedAt) return 'uploading';

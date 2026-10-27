@@ -168,6 +168,15 @@
   --status-success-foreground: var(--color-success-700);
   --status-brand: var(--color-green-800);
   --status-brand-foreground: var(--color-white);
+  /* Data series (content pillars): eight steps of the palettes, told apart by hue. */
+  --chart-1: var(--color-green-700);
+  --chart-2: var(--color-gold-500);
+  --chart-3: var(--color-info-500);
+  --chart-4: var(--color-success-500);
+  --chart-5: var(--color-warning-500);
+  --chart-6: var(--color-danger-500);
+  --chart-7: var(--color-neutral-500);
+  --chart-8: var(--color-green-400);
 
   color-scheme: light;
 }
@@ -220,6 +229,14 @@
   --status-success-foreground: var(--color-success-100);
   --status-brand: var(--color-green-700);
   --status-brand-foreground: var(--color-neutral-100);
+  --chart-1: var(--color-green-400);
+  --chart-2: var(--color-gold-400);
+  --chart-3: var(--color-info-500);
+  --chart-4: var(--color-success-500);
+  --chart-5: var(--color-warning-500);
+  --chart-6: var(--color-danger-500);
+  --chart-7: var(--color-neutral-400);
+  --chart-8: var(--color-green-200);
 
   color-scheme: dark;
 }
@@ -259,6 +276,14 @@
   --color-sidebar-marker: var(--sidebar-marker);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
   --color-status-neutral: var(--status-neutral);
   --color-status-neutral-foreground: var(--status-neutral-foreground);
   --color-status-info: var(--status-info);

@@ -92,6 +92,49 @@ export const filePreviewUrl = (versionId: string) => versionUrl(versionId, 'prev
 
 // Upload (rule 1)
 
+/** A medium's size and length as the browser reads them; null where it cannot. */
+export interface MediaInfo {
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+}
+
+const NO_MEDIA_INFO: MediaInfo = { width: null, height: null, durationMs: null };
+
+/**
+ * F08B rule A4: an image's or a video's dimensions (and a video's length) read in the browser,
+ * for the warnings only. Anything else, or a file the browser cannot read, gives nulls.
+ */
+export function readMediaInfo(file: File): Promise<MediaInfo> {
+  const kind = file.type.split('/')[0];
+  if (kind !== 'image' && kind !== 'video') return Promise.resolve(NO_MEDIA_INFO);
+  const url = URL.createObjectURL(file);
+  return new Promise<MediaInfo>((resolve) => {
+    const done = (info: MediaInfo) => {
+      URL.revokeObjectURL(url);
+      resolve(info);
+    };
+    if (kind === 'image') {
+      const image = new Image();
+      image.onload = () =>
+        done({ width: image.naturalWidth, height: image.naturalHeight, durationMs: null });
+      image.onerror = () => done(NO_MEDIA_INFO);
+      image.src = url;
+      return;
+    }
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () =>
+      done({
+        width: video.videoWidth || null,
+        height: video.videoHeight || null,
+        durationMs: Number.isFinite(video.duration) ? Math.round(video.duration * 1000) : null,
+      });
+    video.onerror = () => done(NO_MEDIA_INFO);
+    video.src = url;
+  });
+}
+
 /** The upload could not reach the API (offline, connection dropped). */
 export class UploadNetworkError extends Error {
   constructor() {
@@ -107,13 +150,26 @@ export class UploadNetworkError extends Error {
  */
 export function uploadFile(
   file: File,
-  { onProgress, signal }: { onProgress: (sent: number) => void; signal: AbortSignal },
+  {
+    onProgress,
+    signal,
+    mediaInfo,
+  }: {
+    onProgress: (sent: number) => void;
+    signal: AbortSignal;
+    /** What the browser read of a video (F08B): the API keeps it for the post checks. */
+    mediaInfo?: MediaInfo | null;
+  },
 ): Promise<FileUpload> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     const body = new FormData();
     body.append('file', file);
-    request.open('POST', '/api/files/uploads');
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(mediaInfo ?? {})) {
+      if (value !== null) query.set(key, String(value));
+    }
+    request.open('POST', `/api/files/uploads${query.size > 0 ? `?${query}` : ''}`);
     request.responseType = 'json';
     // The share of the request sent: the multipart envelope counts too.
     request.upload.onprogress = (event) => {

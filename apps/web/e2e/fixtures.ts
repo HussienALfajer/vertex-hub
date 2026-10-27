@@ -87,6 +87,7 @@ import {
   type ChannelMode,
   type ClientApprovals,
   type ClientBilling,
+  type ClientContentSettings,
   type ClientDetailResponse,
   type ClientEmail,
   type ClientEmailKind,
@@ -102,6 +103,10 @@ import {
   type CompanyDashboard,
   type Contact,
   type ContentCalendar,
+  type ContentIdea,
+  type ContentOccasion,
+  type ContentPillar,
+  type ContentSnippet,
   type ContractAnnex,
   type ContractArticle,
   type ContractSettings,
@@ -296,6 +301,8 @@ import {
   type MonthPending,
   type MonthSheet,
   type MonthSheetRow,
+  type MovedPost,
+  type MovePost,
   type MyAttendanceToday,
   type MyClientsDashboard,
   type MyContentSummary,
@@ -308,6 +315,7 @@ import {
   monthPeriod,
   monthRange,
   monthTotals,
+  moveWorkDays,
   NOTIFICATION_CATALOG,
   NOTIFICATION_TYPES,
   type Note,
@@ -345,6 +353,7 @@ import {
   type PostClientResponse,
   type PostDetail,
   type PostMedia,
+  type PostMovePreview,
   type PostPlatform,
   type PostReview,
   type PostRights,
@@ -453,6 +462,7 @@ import {
   sendQuoteSchema,
   serviceIssues,
   setRetainerTemplateSchema,
+  shiftDueDate,
   shiftedHoliday,
   shootTaskTitle,
   snoozeUntil,
@@ -501,6 +511,7 @@ import {
   type UpdateNotificationPolicy,
   type UpdateNotificationSettings,
   type UpdatePost,
+  type UpdatePostLayout,
   type UpdateRetainerTerm,
   type UpdateShoot,
   type UpdateTaskInput,
@@ -5736,6 +5747,7 @@ function taskRoutes({
     me,
     taskSummary: summary,
     media: taskFiles.media,
+    attach: taskFiles.attach,
     // Called once a request arrives, when the approvals helpers below exist.
     approval: {
       pending: (post) => postPendingApproval(post),
@@ -5987,10 +5999,14 @@ function taskRoutes({
       post: item.postId && !withdrawn ? shownPost(item) : null,
       files: withdrawn
         ? []
-        : sentOf(item).flatMap((version) => {
+        : sentOf(item).flatMap((version, index) => {
             const file = taskFiles.shown(version.id);
+            // F08B rule A8: the slide captions of the snapshot the client is shown.
+            const slideCaption =
+              posts.find((p) => p.id === item.postId)?.reviews.find((r) => r.id === item.reviewId)
+                ?.slideCaptions[index] ?? null;
             // Rule 27: never the internal titles of a post's files.
-            return file ? [item.postId ? { ...file, name: '' } : file] : [];
+            return file ? [item.postId ? { ...file, name: '', slideCaption } : file] : [];
           }),
       status: item.status,
       note: response?.note ?? null,
@@ -6065,7 +6081,8 @@ function taskRoutes({
       (!q.get('dueTo') || task.dueDate <= (q.get('dueTo') as string)) &&
       (q.get('createdBy') !== 'me' || task.createdById === meId) &&
       (q.get('reviewer') !== 'me' || (r.manage && task.status === 'internal_review')) &&
-      (!q.get('reviewStage') || task.reviewStage === q.get('reviewStage'))
+      (!q.get('reviewStage') || task.reviewStage === q.get('reviewStage')) &&
+      (!flag('linkedToPost') || !!task.postId === (flag('linkedToPost') === 'true'))
     );
   };
   // Like the database enum: low first.
@@ -6906,18 +6923,22 @@ function taskRoutes({
 // Content (F08)
 
 /**
- * F08B: a mock post keeps one caption, under the first caption group of its platforms; the other
- * groups are empty (the caption editor per platform arrives with F08B PR 3).
+ * F08B: a mock post's caption per group of its platforms. Posts seeded before F08B keep one
+ * caption under their first group; posts made in the wizard or edited carry `captions`.
  */
 const mockCaptions = (
-  post: Pick<PostRecord, 'platforms' | 'caption' | 'hashtags'>,
+  post: Pick<PostRecord, 'platforms' | 'caption' | 'hashtags' | 'captions'>,
 ): PostCaption[] =>
-  captionGroupsOf(post.platforms).map((group, index) => ({
-    group,
-    caption: index === 0 ? post.caption : null,
-    hashtags: index === 0 ? post.hashtags : null,
-    title: null,
-  }));
+  captionGroupsOf(post.platforms).map((group, index) => {
+    const own = post.captions?.find((caption) => caption.group === group);
+    if (post.captions) return own ?? { group, caption: null, hashtags: null, title: null };
+    return {
+      group,
+      caption: index === 0 ? post.caption : null,
+      hashtags: index === 0 ? post.hashtags : null,
+      title: null,
+    };
+  });
 
 interface PostRecord {
   id: string;
@@ -6927,6 +6948,12 @@ interface PostRecord {
   platforms: PostPlatform[];
   caption: string | null;
   hashtags: string | null;
+  /** F08B: every group's text, kept while a platform is away; unset on posts seeded before. */
+  captions?: PostCaption[];
+  /** F08B rule A6: the slide order and captions; media it does not list follow. */
+  layout?: { fileItemId: string; caption: string | null }[];
+  pillarId?: string | null;
+  occasionId?: string | null;
   notes: string | null;
   publishDate: string;
   publishTime: string | null;
@@ -7187,6 +7214,15 @@ export function contentSeed(): {
               { id: id(1646), fileItemId: id(1636), name: 'بلورية بالفستق', number: 1 },
             ]),
             hashtags: '#مطعم_الياسمين #حلويات',
+            captions: [
+              {
+                group: 'facebook_instagram',
+                caption: sweetsCaption,
+                hashtags: '#مطعم_الياسمين #حلويات',
+                title: null,
+              },
+            ],
+            slideCaptions: ['الكنافة النابلسية بالقشطة', null],
             type: 'carousel',
             platforms: ['instagram', 'facebook'],
             publishDate: '2026-10-16',
@@ -7304,6 +7340,11 @@ interface ContentState {
   taskSummary: (task: TaskRecord) => Task;
   /** Rule 5: the post's own files, then the finals of its linked tasks. */
   media: (postId: string, taskIds: string[]) => PostMediaRecord[];
+  /** Turns held uploads into files of an owner, returning their ids (F08B rule B2). */
+  attach: (
+    owner: { type: FileOwnerType; id: string },
+    held: readonly { uploadId: string; name?: string }[],
+  ) => string[];
   /** The post's place in approval requests (F08 rules 20–25), kept by the approvals mocks. */
   approval: {
     pending: (post: PostRecord) => PostDetail['pendingApproval'];
@@ -7323,6 +7364,7 @@ function contentRoutes({
   me,
   taskSummary,
   media,
+  attach,
   approval,
 }: ContentState) {
   let next = 1700;
@@ -7350,11 +7392,93 @@ function contentRoutes({
   });
   const linked = (post: PostRecord) =>
     tasks.filter((t) => t.postId === post.id && !t.archived && t.status !== 'cancelled');
-  const mediaOf = (post: PostRecord) =>
-    media(
+  /** Rule 5's media in the layout's order (F08B rule A6), each with its slide caption. */
+  const mediaOf = (post: PostRecord) => {
+    const all = media(
       post.id,
       linked(post).map((t) => t.id),
     );
+    const listed = (post.layout ?? []).flatMap((entry) => {
+      const found = all.find((m) => m.fileItemId === entry.fileItemId);
+      return found ? [{ ...found, slideCaption: entry.caption }] : [];
+    });
+    return [...listed, ...all.filter((m) => !listed.some((l) => l.id === m.id))];
+  };
+  // F08B planning data: the agency's pillars, snippets, an occasion and an idea of Jasmine.
+  const pillars: ContentPillar[] = [
+    { id: id(1781), name: 'توعية', color: 'chart_1', position: 1, archived: false },
+    { id: id(1782), name: 'ترويج', color: 'chart_2', position: 2, archived: false },
+    { id: id(1783), name: 'ترفيه', color: 'chart_3', position: 3, archived: false },
+    { id: id(1784), name: 'خلف الكواليس', color: 'chart_4', position: 4, archived: false },
+  ];
+  const jasmineRef = { id: id(601), name: 'مطعم الياسمين', imageId: null };
+  const snippets: ContentSnippet[] = [
+    {
+      id: id(1791),
+      client: jasmineRef,
+      kind: 'hashtags',
+      name: 'وسوم الياسمين',
+      body: '#مطعم_الياسمين #دمشق #فطور_شامي',
+      canEdit: true,
+    },
+    {
+      id: id(1792),
+      client: null,
+      kind: 'caption',
+      name: 'دعوة للحجز',
+      body: 'احجزوا طاولتكم الآن عبر الرابط في الحساب.',
+      canEdit: false,
+    },
+  ];
+  const foodDay: ContentOccasion = {
+    id: id(1795),
+    name: 'يوم الغذاء العالمي',
+    category: 'food',
+    calendar: 'gregorian',
+    month: 10,
+    day: 16,
+    date: null,
+    durationDays: 1,
+    leadDays: 7,
+    client: null,
+    archived: false,
+    occurrences: [{ year: 2026, startDate: '2026-10-16', endDate: '2026-10-16', confirmed: false }],
+  };
+  const ideas: ContentIdea[] = [
+    {
+      id: id(1797),
+      text: 'فطور الجمعة العائلي بصور من المطبخ',
+      client: jasmineRef,
+      pillar: pillars[3] ?? null,
+      occasion: null,
+      status: 'open',
+      post: null,
+      dropReason: null,
+      createdBy: { id: id(1), name: 'سارة الخطيب', imageId: null },
+      createdAt: '2026-10-07T09:00:00.000Z',
+      permissions: { canEdit: true, canDrop: true, canRestore: false, canUse: true },
+    },
+  ];
+  const clientSettings = (clientId: string): ClientContentSettings => ({
+    clientId,
+    saved: clientId === id(601),
+    postingTimes:
+      clientId === id(601)
+        ? [{ platform: 'instagram', weekdays: [0, 1, 2, 3, 4, 6], from: '13:00', to: '15:00' }]
+        : [],
+    pillarTargets: [],
+    maxGapDays: 3,
+    occasionCategories: ['general', 'food'],
+    excludedOccasionIds: [],
+    xLongPosts: false,
+    skippedOccasions: [],
+    effectivePostingTimes: [],
+  });
+  const agencyTimes: ClientContentSettings['postingTimes'] = [
+    { platform: 'instagram', weekdays: [0, 1, 2, 3, 4, 6], from: '19:00', to: '22:00' },
+    { platform: 'facebook', weekdays: [0, 1, 2, 3, 4, 6], from: '19:00', to: '22:00' },
+    { platform: 'x', weekdays: [0, 1, 2, 3, 4], from: '09:00', to: '11:00' },
+  ];
   const overdue = (post: PostRecord) => isPostOverdue(post, TASKS_NOW);
   const readOnly = (post: PostRecord) => post.archived || !!clientOf(post)?.archived;
   const lineOf = (lineId: string | null) => {
@@ -7381,8 +7505,8 @@ function contentRoutes({
     thumbnailVersionId: mediaOf(post).find((m) => m.previewStatus === 'ready')?.id ?? null,
     linkedTaskCount: linked(post).length,
     overdue: overdue(post),
-    pillar: null,
-    occasionId: null,
+    pillar: pillars.find((pillar) => pillar.id === post.pillarId) ?? null,
+    occasionId: post.occasionId ?? null,
   });
   const allowed = (post: PostRecord) =>
     readOnly(post)
@@ -7409,7 +7533,10 @@ function contentRoutes({
         healthcare: clientOf(post)?.isHealthcare ?? false,
       },
       responsible: { ...archivable(post.responsibleId), inScope: true, imageId: null },
-      occasion: null,
+      occasion:
+        post.occasionId === foodDay.id
+          ? { id: foodDay.id, name: foodDay.name, archived: false }
+          : null,
       caption: post.caption,
       hashtags: post.hashtags,
       captions: mockCaptions(post),
@@ -7502,7 +7629,7 @@ function contentRoutes({
       caption: passed ? post.caption : null,
       hashtags: passed ? post.hashtags : null,
       captions: passed ? mockCaptions(post) : [],
-      slideCaptions: passed ? mediaOf(post).map(() => null) : [],
+      slideCaptions: passed ? mediaOf(post).map((m) => m.slideCaption) : [],
       type: passed ? post.type : null,
       platforms: passed ? post.platforms : [],
       publishDate: passed ? post.publishDate : null,
@@ -7610,30 +7737,100 @@ function contentRoutes({
         .map(summary);
       return json(route, { items, total: items.length, page: 1, pageSize: 25 });
     }
+    // F08B planning data, read by the wizard and the caption editor.
+    if (path === '/api/content/pillars' && method === 'GET') return json(route, { items: pillars });
+    if (path === '/api/content/settings' && method === 'GET') {
+      return json(route, { postingTimes: agencyTimes });
+    }
+    const settingsMatch = path.match(/^\/api\/content\/clients\/([^/]+)\/settings$/);
+    if (settingsMatch && method === 'GET') {
+      return json(route, clientSettings(settingsMatch[1] ?? ''));
+    }
+    if (path === '/api/content/snippets' && method === 'GET') {
+      const clientId = q.get('clientId');
+      const kind = q.get('kind');
+      return json(route, {
+        items: snippets.filter(
+          (snippet) =>
+            (!snippet.client || snippet.client.id === clientId) && (!kind || snippet.kind === kind),
+        ),
+      });
+    }
+    if (path === '/api/content/occasions' && method === 'GET') {
+      const from = q.get('from') ?? '';
+      const to = q.get('to') ?? '';
+      const inRange = foodDay.occurrences.some((o) => o.startDate <= to && o.endDate >= from);
+      return json(route, { items: inRange ? [foodDay] : [] });
+    }
+    if (path === '/api/content/ideas' && method === 'GET') {
+      const status = q.get('status') ?? 'open';
+      const clientId = q.get('clientId');
+      const items = ideas.filter(
+        (idea) => idea.status === status && (!clientId || idea.client?.id === clientId),
+      );
+      return json(route, { items, total: items.length, page: 1, pageSize: 25 });
+    }
     if (path === '/api/content/posts' && method === 'POST') {
       const input = body<CreatePost>();
       const client = clients.find((c) => c.id === input.clientId);
       if (!client) return fail(route, 404, null);
+      const [first] = input.captions ?? [];
       const post = postRecord(next++, {
         clientId: input.clientId,
         title: input.title,
         type: input.type,
         platforms: input.platforms,
-        caption: input.captions[0]?.caption ?? null,
-        hashtags: input.captions[0]?.hashtags ?? null,
+        caption: first?.caption ?? null,
+        hashtags: first?.hashtags ?? null,
+        captions: input.captions ?? [],
         notes: input.notes ?? null,
         publishDate: input.publishDate,
         publishTime: input.publishTime ?? null,
         needsClientApproval: input.needsClientApproval,
         responsibleId: input.responsibleId ?? me().user.id,
         cycleLineId: input.cycleLineId,
+        pillarId: input.pillarId ?? null,
+        occasionId: input.occasionId ?? null,
         createdById: me().user.id,
         createdAt: now(),
       });
       if (!rights(post).edit) return fail(route, 403, null);
       if (client.status === 'ended') return fail(route, 409, 'CLIENT_ENDED');
       if (post.publishDate < PROJECTS_TODAY) return fail(route, 400, 'INVALID_DATES');
+      const idea = ideas.find((item) => item.id === input.ideaId);
+      if (input.ideaId && idea?.status !== 'open') {
+        return fail(route, 409, 'IDEA_USED', { part: 'idea' });
+      }
       posts.push(post);
+      // Rule B2: the held files are the first slides, in order, with their captions.
+      const fileIds = attach({ type: 'post', id: post.id }, input.files ?? []);
+      post.layout = fileIds.map((fileItemId, index) => ({
+        fileItemId,
+        caption: input.files?.[index]?.slideCaption ?? null,
+      }));
+      for (const taskId of input.linkTaskIds ?? []) {
+        const task = tasks.find((t) => t.id === taskId);
+        if (task) {
+          task.postId = post.id;
+          task.needsClientApproval = false;
+        }
+      }
+      for (const task of input.tasks ?? []) {
+        tasks.push(
+          taskRecord(next++, {
+            title: task.title,
+            department: task.department,
+            assigneeId: task.assigneeId ?? null,
+            dueDate: task.dueDate,
+            clientId: post.clientId,
+            createdById: me().user.id,
+            createdAt: now(),
+            postId: post.id,
+          }),
+        );
+      }
+      if (linked(post).length > 0) post.status = 'in_production';
+      if (idea) Object.assign(idea, { status: 'used', post: { id: post.id, title: post.title } });
       return json(route, detail(post), 201);
     }
 
@@ -7654,9 +7851,66 @@ function contentRoutes({
         return fail(route, 409, 'POST_COUNTED_BY_TASK');
       }
       Object.assign(post, input);
-      const [first] = captions ?? [];
-      if (first) Object.assign(post, { caption: first.caption, hashtags: first.hashtags });
+      if (captions) {
+        // F08B rule A1: the groups sent are written, the others kept.
+        const others = (post.captions ?? mockCaptions(post)).filter(
+          (c) => !captions.some((n) => n.group === c.group),
+        );
+        post.captions = [...captions, ...others];
+        const [first] = mockCaptions(post);
+        Object.assign(post, { caption: first?.caption ?? null, hashtags: first?.hashtags ?? null });
+      }
       return json(route, detail(post));
+    }
+    if (action === 'layout' && method === 'PUT') {
+      if (!r.edit) return fail(route, 403, null);
+      if (!isPostContentEditable(post.status)) return fail(route, 409, 'POST_LOCKED');
+      post.layout = body<UpdatePostLayout>().items;
+      return json(route, detail(post));
+    }
+    if (action === 'move-preview' || action === 'move') {
+      if (!r.edit) return fail(route, 403, null);
+      const publishDate =
+        action === 'move' ? body<MovePost>().publishDate : (q.get('publishDate') ?? '');
+      if (publishDate < PROJECTS_TODAY) return fail(route, 400, 'INVALID_DATES');
+      const workDays = moveWorkDays(post.publishDate, publishDate);
+      const open = linked(post).filter(
+        (t) => !['approved', 'delivered', 'cancelled'].includes(t.status),
+      );
+      const shifted = open.map((t) => ({
+        task: t,
+        ...shiftDueDate(t.dueDate, workDays, PROJECTS_TODAY),
+      }));
+      if (action === 'move-preview') {
+        const preview: PostMovePreview = {
+          workDays,
+          tasks: shifted.map(({ task, date, clamped }) => ({
+            id: task.id,
+            title: task.title,
+            parentId: null,
+            dueDate: task.dueDate,
+            newDueDate: date,
+            clamped,
+          })),
+          suggestShift: open.some((t) => t.dueDate > publishDate),
+        };
+        return json(route, preview);
+      }
+      const input = body<MovePost>();
+      if (post.status === 'published' || post.status === 'cancelled') {
+        return fail(route, 409, 'POST_LOCKED');
+      }
+      post.publishDate = publishDate;
+      if (input.shiftTasks) for (const { task, date } of shifted) task.dueDate = date;
+      const moved: MovedPost = {
+        ...detail(post),
+        shiftedTaskIds: input.shiftTasks ? shifted.map(({ task }) => task.id) : [],
+      };
+      return json(route, moved);
+    }
+    if (action === 'pack' && method === 'GET') {
+      if (!hasPostPack(post.status)) return fail(route, 409, 'INVALID_TRANSITION');
+      return route.fulfill({ status: 200, contentType: 'application/zip', body: 'PK' });
     }
     if (action === 'status') {
       const input = body<PostStatusChange>();
@@ -8667,6 +8921,30 @@ function fileRoutes({
     files.filter((f) => f.ownerId === taskId && f.role === role && !f.archivedAt).length;
   return {
     handle,
+    /** F08B rule B2: the wizard's held uploads become the post's files, in order. */
+    attach: (
+      owner: { type: FileOwnerType; id: string },
+      held: readonly { uploadId: string; name?: string }[],
+    ): string[] =>
+      held.flatMap((item) => {
+        const version = versionFrom({ uploadId: item.uploadId }, 1, null);
+        if (!version) return [];
+        const record: FileRecord = {
+          id: id(next++),
+          ownerType: owner.type,
+          ownerId: owner.id,
+          role: 'deliverable',
+          name: item.name ?? version.originalName ?? 'File',
+          brandKind: null,
+          confidential: false,
+          createdById: me().user.id,
+          createdAt: now(),
+          archivedAt: null,
+          versions: [version],
+        };
+        files.push(record);
+        return [record.id];
+      }),
     counts: (taskId: string) => ({
       deliverables: count(taskId, 'deliverable'),
       references: count(taskId, 'reference'),

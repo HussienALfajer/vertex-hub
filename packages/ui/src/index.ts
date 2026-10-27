@@ -9,6 +9,8 @@ export * from './components/button';
 export * from './components/calendar-grid';
 export * from './components/callout';
 export * from './components/card';
+export * from './components/carousel';
+export * from './components/chart-dot';
 export * from './components/checkbox';
 export * from './components/collapsible';
 export * from './components/color-swatch';
