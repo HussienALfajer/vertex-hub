@@ -46,6 +46,8 @@ The hook is `.claude/hooks/test-guard.mjs` (PreToolUse on Bash and PowerShell). 
 - The api global setup creates the worker databases that are missing (the test role needs `CREATEDB`; otherwise `pnpm db:setup-local` creates them), migrates them and removes what an interrupted run left behind.
 - Each suite holds a session advisory lock on the test database for the length of its run (`holdTestDatabases`): a second run of the same suite prints that it waits, and starts when the first ends. PostgreSQL drops the lock if a run dies.
 - In tests the api's pool opens at most 4 connections (`DATABASE_POOL_MAX`), so 12 workers stay under PostgreSQL's default `max_connections` of 100: measured with the whole graph running (the db and worker suites at the same time), though each test file's own pool can open more. "Too many clients" errors mean fewer workers (`TEST_WORKERS`) or a higher limit.
+- The api suite's timeouts are 15 s per test and 30 s per hook (`apps/api/vitest.config.ts`), above Vitest's 5 s and 10 s: its slowest tests take 2–3 s on an idle machine and crossed the defaults on a 4-core cloud VM with the rest of `pnpm verify` running.
+- In a cloud session the typecheck needs more heap than Node's default there: the session hook adds `--max-old-space-size=6144` to `NODE_OPTIONS` (`scripts/cloud-session.sh`, `docs/workflow.md`).
 
 ## Vitest
 
