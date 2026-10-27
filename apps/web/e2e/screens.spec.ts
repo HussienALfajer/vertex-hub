@@ -37,6 +37,11 @@ import {
 } from './fixtures';
 import { expect, test } from './test';
 
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+);
+
 // RTL screenshots of every screen in both themes: the design review evidence.
 for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`${colorScheme} theme`, () => {
@@ -2143,7 +2148,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `my-posts-${colorScheme}`);
     });
 
-    test('client content tab and the new post dialog', async ({ page }, testInfo) => {
+    test('client content tab and the new post wizard', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1440, height: 1700 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
       await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
@@ -2153,14 +2158,98 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `client-content-${colorScheme}`);
 
       await page.setViewportSize({ width: 1280, height: 1300 });
-      await page.getByRole('button', { name: ar.content.actions.new }).first().click();
-      const dialog = page.getByRole('dialog');
-      await dialog.getByLabel(ar.content.form.title).fill('عرض الفطور الشامي');
-      await dialog.getByRole('checkbox', { name: /إنستغرام/ }).click();
-      await dialog
-        .getByRole('textbox', { name: new RegExp(`^${ar.content.form.caption}`) })
-        .fill('فطور شامي كامل كل جمعة.');
+      await page.getByRole('link', { name: ar.content.actions.new }).first().click();
+      await page.getByLabel(ar.content.form.title).fill('عرض الفطور الشامي');
+      await page.getByRole('checkbox', { name: /إنستغرام/ }).click();
       await screenshot(page, testInfo, `new-post-${colorScheme}`);
+    });
+
+    test('F08B: the post wizard step by step, phone and desktop', async ({ page }, testInfo) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize({ width: 1440, height: 1500 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
+      await page.goto(`/content/new?clientId=${seedIds.jasmine}&date=2026-10-20`);
+      await page.getByLabel(ar.content.form.title).fill('فطور الجمعة العائلي');
+      for (const platform of ['إنستغرام', 'فيسبوك', 'إكس']) {
+        await page.getByRole('checkbox', { name: platform, exact: true }).click();
+      }
+      await expect(page.getByText(ar.content.wizard.bestTimes)).toBeVisible();
+      await screenshot(page, testInfo, `post-wizard-basics-${colorScheme}`);
+
+      const nav = page.getByRole('navigation', { name: ar.content.wizard.stepsLabel });
+      await nav.getByRole('button', { name: ar.content.wizard.steps.captions }).click();
+      await page
+        .getByRole('textbox', { name: `نص ${ar.content.captionGroups.facebook_instagram}` })
+        .fill(
+          'فطور العائلة كل جمعة من مطبخ الياسمين: فول، فتة، ومناقيش من الفرن.\nاحجزوا طاولتكم.',
+        );
+      await page
+        .getByRole('textbox', { name: ar.content.form.hashtags })
+        .fill('#مطعم_الياسمين #دمشق #فطور_شامي');
+      await screenshot(page, testInfo, `post-wizard-captions-${colorScheme}`);
+
+      await nav.getByRole('button', { name: ar.content.wizard.steps.media }).click();
+      await page.locator('input[type="file"]').setInputFiles(
+        ['ful', 'fatteh'].map((name) => ({
+          name: `${name}.png`,
+          mimeType: 'image/png',
+          buffer: PNG,
+        })),
+      );
+      await expect(
+        page.getByRole('list', { name: ar.content.slides.title }).locator(':scope > li'),
+      ).toHaveCount(2);
+      await screenshot(page, testInfo, `post-wizard-media-${colorScheme}`);
+
+      await nav.getByRole('button', { name: ar.content.wizard.steps.tasks }).click();
+      await page.getByRole('button', { name: ar.content.wizard.tasks.add }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `post-wizard-task-dialog-${colorScheme}`);
+      await page.getByRole('dialog').getByRole('button', { name: ar.common.cancel }).click();
+      await screenshot(page, testInfo, `post-wizard-tasks-${colorScheme}`);
+
+      await nav.getByRole('button', { name: ar.content.wizard.steps.review }).click();
+      await expect(
+        page.getByRole('heading', { name: ar.content.wizard.planning.title }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `post-wizard-review-${colorScheme}`);
+
+      // On a phone: one step per screen, the preview below the step.
+      await page.setViewportSize({ width: 390, height: 844 });
+      await nav.getByRole('button', { name: ar.content.wizard.steps.basics }).click();
+      await screenshot(page, testInfo, `post-wizard-basics-phone-${colorScheme}`);
+      await nav.getByRole('button', { name: ar.content.wizard.steps.captions }).click();
+      await screenshot(page, testInfo, `post-wizard-captions-phone-${colorScheme}`);
+      await nav.getByRole('button', { name: ar.content.wizard.steps.media }).click();
+      await page.getByRole('button', { name: ar.content.preview.title, exact: true }).click();
+      await screenshot(page, testInfo, `post-wizard-preview-phone-${colorScheme}`);
+    });
+
+    test('F08B: post page captions, slides, checks, preview, move and pack', async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 2200 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
+      await page.goto(`/content/posts/${seedIds.weekendOffer}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('عرض نهاية الأسبوع');
+      await screenshot(page, testInfo, `post-captions-checks-${colorScheme}`);
+
+      await page.goto(`/content/posts/${seedIds.autumnCarousel}`);
+      await expect(page.getByRole('heading', { name: ar.content.pack.title })).toBeVisible();
+      await screenshot(page, testInfo, `post-slides-pack-${colorScheme}`);
+
+      await page.goto(`/content/posts/${seedIds.openingPost}`);
+      await page.getByRole('button', { name: ar.content.slides.arrange }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await screenshot(page, testInfo, `post-arrange-slides-${colorScheme}`);
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: ar.tasks.actions.more }).click();
+      await page.getByRole('menuitem', { name: ar.content.actions.move }).click();
+      await page.getByRole('dialog').getByLabel(ar.content.moveDate.newDate).fill('2026-10-14');
+      await expect(page.getByRole('dialog').getByText(ar.content.moveDate.noTasks)).toBeVisible();
+      await screenshot(page, testInfo, `post-move-dialog-${colorScheme}`);
     });
 
     test('post page: in production, linking a task, approved, medical stage, published', async ({

@@ -5,6 +5,7 @@ import {
   CLIENT_STATUSES,
   type ClientStatus,
   EMPHASIS_MARK,
+  PILLAR_COLORS,
   WORKFLOW_STATUSES,
   type WorkflowStatus,
 } from '@vertex-hub/contracts';
@@ -28,6 +29,8 @@ import {
   Card,
   CardHeader,
   CardTitle,
+  Carousel,
+  ChartDot,
   Checkbox,
   Collapsible,
   CollapsiblePanel,
@@ -304,6 +307,38 @@ function DesignSystemPage() {
             {t('designSystem.collapsibleBody')}
           </CollapsiblePanel>
         </Collapsible>
+      </Section>
+
+      <Section title={t('designSystem.carousel')}>
+        <Carousel
+          className="max-w-sm"
+          label={t('designSystem.carousel')}
+          previousLabel={t('designSystem.carouselPrevious')}
+          nextLabel={t('designSystem.carouselNext')}
+          slideLabel={(n, total) =>
+            t('designSystem.carouselSlide', { n: formatNumber(n), total: formatNumber(total) })
+          }
+          slideClassName="aspect-4/5"
+          slides={(['bg-primary', 'bg-accent', 'bg-muted'] as const).map((tone, index) => (
+            <div
+              key={tone}
+              className={`flex size-full items-center justify-center rounded-md text-3xl font-bold ${tone}`}
+            >
+              {formatNumber(index + 1)}
+            </div>
+          ))}
+        />
+      </Section>
+
+      <Section title={t('designSystem.chartColors')}>
+        <ul className="flex flex-wrap gap-4">
+          {PILLAR_COLORS.map((color, index) => (
+            <li key={color} className="flex items-center gap-2 text-sm">
+              <ChartDot color={color} />
+              {t('designSystem.chartSeries', { n: formatNumber(index + 1) })}
+            </li>
+          ))}
+        </ul>
       </Section>
 
       <Section title={t('designSystem.statuses')}>

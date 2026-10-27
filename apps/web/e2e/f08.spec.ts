@@ -34,26 +34,29 @@ test('create a post → link a task → review → publish delivers the task', a
   await onToday(page);
   const api = await mockApi(page, { signedIn: true, me: accountManagerMe, content: true });
 
-  // The account manager plans a post from the client's Content tab.
+  // The account manager plans a post from the client's Content tab, in the wizard (F08B).
   await page.goto(`/clients/${seedIds.jasmine}?tab=content`);
-  await page.getByRole('button', { name: ar.content.actions.new }).first().click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: ar.content.new.submit }).click();
+  await page.getByRole('link', { name: ar.content.actions.new }).first().click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: ar.content.wizard.title }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: ar.tasks.wizard.createNow }).click();
   // Validation in place: a title and a platform are required.
-  await expect(dialog.getByText(ar.content.form.errors.title)).toBeVisible();
-  await expect(dialog.getByText(ar.content.form.errors.platforms)).toBeVisible();
-  await dialog.getByLabel(ar.content.form.title).fill('عرض الفطور الشامي');
-  await dialog.getByRole('checkbox', { name: 'إنستغرام' }).click();
-  await dialog.getByLabel(ar.content.form.publishDate).fill('2026-10-20');
-  await dialog
-    .getByRole('textbox', { name: new RegExp(`^${ar.content.form.caption}`) })
+  await expect(page.getByText(ar.content.form.errors.title)).toBeVisible();
+  await expect(page.getByText(ar.content.form.errors.platforms)).toBeVisible();
+  await page.getByLabel(ar.content.form.title).fill('عرض الفطور الشامي');
+  await page.getByRole('checkbox', { name: 'إنستغرام' }).click();
+  await page.getByLabel(ar.content.form.publishDate).fill('2026-10-20');
+  await page.getByRole('switch', { name: ar.content.form.needsClientApproval }).click();
+  await page.getByRole('button', { name: ar.content.wizard.steps.captions }).click();
+  await page
+    .getByRole('textbox', { name: `نص ${ar.content.captionGroups.facebook_instagram}` })
     .fill('فطور شامي كامل كل جمعة.');
-  await dialog.getByRole('switch', { name: ar.content.form.needsClientApproval }).click();
-  await dialog.getByRole('button', { name: ar.content.new.submit }).click();
+  await page.getByRole('button', { name: ar.content.wizard.steps.basics }).click();
+  await page.getByRole('button', { name: ar.tasks.wizard.createNow }).click();
   await expect(page.getByText(ar.content.new.created)).toBeVisible();
 
-  // It shows on the client's calendar, and on the calendar of all clients.
-  await page.getByRole('link', { name: /عرض الفطور الشامي/ }).click();
+  // The post page opens on the new post.
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('عرض الفطور الشامي');
   await expectStatus(page, 'idea');
   const postUrl = page.url();
@@ -65,8 +68,10 @@ test('create a post → link a task → review → publish delivers the task', a
   await expect(offered.getByText(ar.content.link.inCycle)).toBeVisible();
   await offered.getByRole('button', { name: ar.content.link.choose }).click();
   await expectStatus(page, 'in_production');
-  // The task's final design is the post's media.
-  await expect(page.getByText(ar.content.media.fromTasks)).toBeVisible();
+  // The task's final design is the post's first slide.
+  await expect(
+    page.getByRole('link', { name: 'من مهمة «تصميم قائمة المشروبات»' }).first(),
+  ).toBeVisible();
 
   // The task page names the post and offers no delivery by hand.
   await page.getByRole('link', { name: 'تصميم قائمة المشروبات', exact: true }).click();
@@ -183,7 +188,7 @@ test('the calendar filters, moves between months and keeps its state in the URL'
   // Every active user reads the calendar; only edit scope creates posts.
   await page.goto('/content');
   await expect(page.getByRole('link', { name: /كاروسيل أطباق الخريف/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: ar.content.actions.new })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: ar.content.actions.new })).toHaveCount(0);
 
   await page.getByRole('combobox', { name: ar.content.filters.type }).click();
   await page.getByRole('option', { name: ar.content.types.reel }).click();

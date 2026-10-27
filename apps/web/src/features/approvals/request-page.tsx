@@ -25,8 +25,9 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
-import { formatDateTime, formatNumber } from '../../lib/format';
+import { formatDateTime, formatList, formatNumber } from '../../lib/format';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
+import { PostCaptionsView } from '../content/post-captions-view';
 import { PostFacts } from '../content/post-parts';
 import { EmailHistory } from '../email/email-history';
 import { FileThumbnail, VersionBadge } from '../files/file-parts';
@@ -364,13 +365,18 @@ function ItemCard({ item, mixed }: { item: ApprovalItem; mixed: boolean }) {
           ))}
         </ul>
       )}
-      {post?.caption && (
-        <p
-          className="line-clamp-3 rounded-md bg-muted px-3 py-2 text-sm whitespace-pre-line"
-          dir="auto"
-        >
-          {post.caption}
-        </p>
+      {post && (
+        <div className="flex flex-col gap-1 rounded-md bg-muted px-3 py-2 text-sm">
+          <span className="text-xs text-muted-foreground">
+            {t('content.reviews.summary', {
+              groups: formatList(
+                post.captions.map((caption) => t(`content.captionGroups.${caption.group}`)),
+              ),
+              n: formatNumber(item.versions.length),
+            })}
+          </span>
+          <PostCaptionsView captions={post.captions} />
+        </div>
       )}
       {item.text && (
         <div className="flex flex-col gap-1 rounded-md bg-muted px-3 py-2 text-sm">

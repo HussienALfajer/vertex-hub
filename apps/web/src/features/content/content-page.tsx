@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import type { MyContentSummary, PostView } from '@vertex-hub/contracts';
 import {
   Badge,
@@ -23,14 +23,13 @@ import {
   UndoIcon,
   UserRoundSearchIcon,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
 import { myContentSummaryQuery, postListQuery } from './content.queries';
 import { type CalendarState, ContentCalendar, parseCalendarState } from './content-calendar';
-import { NewPostDialog } from './post-form';
 import { PostRows } from './post-parts';
 
 export interface ContentSearch extends CalendarState {
@@ -50,7 +49,6 @@ export function ContentPage({ search }: { search: ContentSearch }) {
   const { t } = useTranslation();
   const me = useMe();
   const navigate = useNavigate({ from: '/content/' });
-  const [creating, setCreating] = useState(false);
   const { tab, ...state } = search;
   const setState = useCallback(
     (next: Partial<CalendarState>) =>
@@ -58,7 +56,7 @@ export function ContentPage({ search }: { search: ContentSearch }) {
     [navigate],
   );
   const newPost = can(me, 'content.manage') && (
-    <Button onClick={() => setCreating(true)}>
+    <Button render={<Link to="/content/new" search={state.date ? { date: state.date } : {}} />}>
       <PlusIcon />
       {t('content.actions.new')}
     </Button>
@@ -97,7 +95,6 @@ export function ContentPage({ search }: { search: ContentSearch }) {
           <MyPosts />
         </TabsContent>
       </Tabs>
-      <NewPostDialog open={creating} defaultDate={state.date} onClose={() => setCreating(false)} />
     </>
   );
 }

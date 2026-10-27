@@ -5,6 +5,7 @@ import {
   APPROVAL_LIMITS,
   type CreateApprovalRequest,
   type CreateApprovalRequestInput,
+  captionGroupsOf,
   createApprovalRequestSchema,
   type EmailSummary,
   type IssuedApprovalRequest,
@@ -41,7 +42,7 @@ import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { useFocusFirstError } from '../../lib/focus-first-invalid';
-import { formatDateTime, formatNumber, isolateLtr } from '../../lib/format';
+import { formatDateTime, formatList, formatNumber, isolateLtr } from '../../lib/format';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientQuery } from '../clients/clients.queries';
 import { PostFacts, PostThumbnail } from '../content/post-parts';
@@ -75,6 +76,9 @@ export function PostSnapshotSummary({ post }: { post: ReadyPost }) {
           {[
             post.snapshot.files > 0 &&
               t('approvals.ready.media', { n: formatNumber(post.snapshot.files) }),
+            formatList(
+              captionGroupsOf(post.platforms).map((group) => t(`content.captionGroups.${group}`)),
+            ),
             post.snapshot.caption,
           ]
             .filter(Boolean)

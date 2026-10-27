@@ -10,9 +10,11 @@ import type {
   CreatePostTask,
   DuplicatePost,
   MedicalReview,
+  MovePost,
   PostStatusChange,
   ReturnPostTask,
   UpdatePost,
+  UpdatePostLayout,
 } from '@vertex-hub/contracts';
 import { api, call } from '../../lib/api/client';
 import type { paths } from '../../lib/api/schema.gen';
@@ -28,6 +30,14 @@ export type LinkableTaskFilters = NonNullable<
   paths['/api/content/posts/{id}/linkable-tasks']['get']['parameters']['query']
 >;
 
+export type SnippetFilters = NonNullable<
+  paths['/api/content/snippets']['get']['parameters']['query']
+>;
+
+export type OccasionFilters = paths['/api/content/occasions']['get']['parameters']['query'];
+
+export type IdeaFilters = NonNullable<paths['/api/content/ideas']['get']['parameters']['query']>;
+
 export const contentKeys = {
   all: ['content'] as const,
   calendar: (filters: ContentCalendarFilters) => ['content', 'calendar', filters] as const,
@@ -36,6 +46,14 @@ export const contentKeys = {
   summary: ['content', 'summary'] as const,
   linkable: (id: string, filters: LinkableTaskFilters) =>
     ['content', 'linkable', id, filters] as const,
+  pillars: ['content', 'pillars'] as const,
+  agencySettings: ['content', 'settings'] as const,
+  clientSettings: (clientId: string) => ['content', 'settings', clientId] as const,
+  snippets: (filters: SnippetFilters) => ['content', 'snippets', filters] as const,
+  occasions: (filters: OccasionFilters) => ['content', 'occasions', filters] as const,
+  ideas: (filters: IdeaFilters) => ['content', 'ideas', filters] as const,
+  movePreview: (id: string, publishDate: string) =>
+    ['content', 'move-preview', id, publishDate] as const,
 };
 
 export const contentCalendarQuery = (filters: ContentCalendarFilters) =>
@@ -76,6 +94,62 @@ export const linkableTasksQuery = (id: string, filters: LinkableTaskFilters) =>
     placeholderData: keepPreviousData,
   });
 
+// F08B planning data, read by the wizard and the caption editor
+
+export const contentPillarsQuery = queryOptions({
+  queryKey: contentKeys.pillars,
+  queryFn: () => call(api.GET('/api/content/pillars')),
+});
+
+export const agencyContentSettingsQuery = queryOptions({
+  queryKey: contentKeys.agencySettings,
+  queryFn: () => call(api.GET('/api/content/settings')),
+});
+
+/** The client's settings with the agency's defaults resolved (best times, X long posts). */
+export const clientContentSettingsQuery = (clientId: string) =>
+  queryOptions({
+    queryKey: contentKeys.clientSettings(clientId),
+    queryFn: () =>
+      call(api.GET('/api/content/clients/{clientId}/settings', { params: { path: { clientId } } })),
+  });
+
+/** The client's snippets and the agency's (rule A10). */
+export const contentSnippetsQuery = (filters: SnippetFilters) =>
+  queryOptions({
+    queryKey: contentKeys.snippets(filters),
+    queryFn: () => call(api.GET('/api/content/snippets', { params: { query: filters } })),
+  });
+
+export const contentOccasionsQuery = (filters: OccasionFilters) =>
+  queryOptions({
+    queryKey: contentKeys.occasions(filters),
+    queryFn: () => call(api.GET('/api/content/occasions', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+export const contentIdeasQuery = (filters: IdeaFilters) =>
+  queryOptions({
+    queryKey: contentKeys.ideas(filters),
+    queryFn: () => call(api.GET('/api/content/ideas', { params: { query: filters } })),
+    placeholderData: keepPreviousData,
+  });
+
+/** Rule B7: the linked tasks' due dates before and after a move. */
+export const movePreviewQuery = (id: string, publishDate: string) =>
+  queryOptions({
+    queryKey: contentKeys.movePreview(id, publishDate),
+    queryFn: () =>
+      call(
+        api.GET('/api/content/posts/{id}/move-preview', {
+          params: { path: { id }, query: { publishDate } },
+        }),
+      ),
+  });
+
+/** Rule A11: the publishing pack, streamed by the API as a zip. */
+export const postPackUrl = (id: string) => `/api/content/posts/${id}/pack`;
+
 /**
  * A change to posts, refreshing also on failure: a refusal after the post moved (edge case 1)
  * reloads the page with its current actions. Every change refreshes the whole `content` cache;
@@ -101,8 +175,26 @@ const path = (id: string) => ({ params: { path: { id } } });
 
 const taskPath = (id: string, taskId: string) => ({ params: { path: { id, taskId } } });
 
+/** The wizard's save: the post, its files, captions and tasks in one request (rule B2). */
 export const useCreatePost = () =>
-  useContentMutation((input: CreatePost) => call(api.POST('/api/content/posts', { body: input })));
+  useContentMutation(
+    (input: CreatePost) => call(api.POST('/api/content/posts', { body: input })),
+    WITH_WORK,
+  );
+
+/** Rule A6: the slide order and captions. */
+export const useUpdatePostLayout = (id: string) =>
+  useContentMutation((input: UpdatePostLayout) =>
+    call(api.PUT('/api/content/posts/{id}/layout', { ...path(id), body: input })),
+  );
+
+/** Rules B6–B9: the move, shifting the linked tasks when asked. */
+export const useMovePost = (id: string) =>
+  useContentMutation(
+    (input: MovePost) =>
+      call(api.POST('/api/content/posts/{id}/move', { ...path(id), body: input })),
+    WITH_WORK,
+  );
 
 export const useUpdatePost = (id: string) =>
   useContentMutation(

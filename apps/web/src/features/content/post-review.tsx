@@ -3,6 +3,7 @@ import {
   type MedicalReview,
   type MedicalReviewInput,
   medicalReviewSchema,
+  type PostCaption,
   type PostDetail,
   type PostReview,
   type ReviewVersion,
@@ -28,9 +29,10 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FormAlert } from '../../components/form-alert';
 import { errorMessage, SCREEN_ERROR } from '../../lib/errors';
-import { formatDateTime } from '../../lib/format';
+import { formatDateTime, formatNumber } from '../../lib/format';
 import { TaskSection } from '../tasks/task-parts';
 import { useMedicalReviewPost } from './content.queries';
+import { PostCaptionsView } from './post-captions-view';
 
 /*
  * The review loop on the post page (spec F08, screen 4): the medical review, and the history of
@@ -59,14 +61,22 @@ function SnapshotContent({
   versions,
   caption,
   hashtags,
+  captions = [],
 }: {
   versions: ReviewVersion[];
   caption?: string | null;
   hashtags?: string | null;
+  /** Per caption group (F08B rule A7); earlier snapshots have the single caption only. */
+  captions?: PostCaption[];
 }) {
   const { t } = useTranslation();
   return (
     <>
+      {versions.length > 0 && (
+        <span className="text-xs text-muted-foreground">
+          {t('content.reviews.slides', { n: formatNumber(versions.length) })}
+        </span>
+      )}
       {versions.length > 0 && (
         <ul className="flex flex-wrap gap-1.5">
           {versions.map((version) => (
@@ -78,20 +88,27 @@ function SnapshotContent({
           ))}
         </ul>
       )}
-      {(caption || hashtags) && (
+      {captions.length > 0 ? (
         <div className="flex flex-col gap-1 rounded-md bg-muted px-3 py-2">
           <span className="text-xs text-muted-foreground">{t('content.reviews.caption')}</span>
-          {caption && (
-            <p className="whitespace-pre-line" dir="auto">
-              {caption}
-            </p>
-          )}
-          {hashtags && (
-            <p className="text-muted-foreground" dir="auto">
-              {hashtags}
-            </p>
-          )}
+          <PostCaptionsView captions={captions} />
         </div>
+      ) : (
+        (caption || hashtags) && (
+          <div className="flex flex-col gap-1 rounded-md bg-muted px-3 py-2">
+            <span className="text-xs text-muted-foreground">{t('content.reviews.caption')}</span>
+            {caption && (
+              <p className="whitespace-pre-line" dir="auto">
+                {caption}
+              </p>
+            )}
+            {hashtags && (
+              <p className="text-muted-foreground" dir="auto">
+                {hashtags}
+              </p>
+            )}
+          </div>
+        )
       )}
     </>
   );
@@ -174,6 +191,7 @@ export function PostMedicalReviewDialog({
                 versions={snapshot.versions}
                 caption={snapshot.caption}
                 hashtags={snapshot.hashtags}
+                captions={snapshot.captions}
               />
             </div>
           )}
@@ -240,6 +258,7 @@ export function PostReviewHistorySection({ post }: { post: PostDetail }) {
                     versions={review.versions}
                     caption={review.caption}
                     hashtags={review.hashtags}
+                    captions={review.captions}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground">{t('content.reviews.noContent')}</p>

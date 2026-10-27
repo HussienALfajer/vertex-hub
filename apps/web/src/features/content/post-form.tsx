@@ -1,12 +1,8 @@
-import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useQuery } from '@tanstack/react-query';
 import {
   businessDate,
   type CreatePost,
   type CreatePostInput,
-  captionGroupsOf,
-  createPostSchema,
-  POST_LIMITS,
   POST_PLATFORMS,
   POST_TYPES,
   type PostDetail,
@@ -15,15 +11,7 @@ import {
 } from '@vertex-hub/contracts';
 import {
   Avatar,
-  Button,
   Checkbox,
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Field,
   FieldDescription,
   FieldError,
@@ -39,13 +27,11 @@ import {
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
-  toast,
 } from '@vertex-hub/ui';
 import type { TFunction } from 'i18next';
-import { useId, useState } from 'react';
-import { Controller, type FieldPath, type UseFormReturn, useForm, useWatch } from 'react-hook-form';
+import { useId } from 'react';
+import { Controller, type FieldPath, type UseFormReturn, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { FormAlert } from '../../components/form-alert';
 import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
 import { errorMessage, fieldError, SCREEN_ERROR } from '../../lib/errors';
@@ -55,7 +41,6 @@ import { clientQuery } from '../clients/clients.queries';
 import { lineName } from '../retainers/retainer-badges';
 import { retainerListQuery } from '../retainers/retainers.queries';
 import { useClientOptions, useDepartmentMembers } from '../tasks/task-form';
-import { useCreatePost } from './content.queries';
 import { canEditPostsOf, POST_TYPE_ICONS } from './post-parts';
 
 /*
@@ -254,81 +239,6 @@ export function PublishFields({ form, allowPast }: { form: PostFormMethods; allo
         <FieldDescription>{t('content.form.publishTimeHint')}</FieldDescription>
       </Field>
     </div>
-  );
-}
-
-/** "120 / 5000", in the danger color past the limit. */
-function CharacterCount({ length, max }: { length: number; max: number }) {
-  return (
-    <span
-      className={
-        length > max
-          ? 'text-xs text-destructive-text tabular-nums'
-          : 'text-xs text-muted-foreground tabular-nums'
-      }
-    >
-      {formatNumber(length)} / {formatNumber(max)}
-    </span>
-  );
-}
-
-/**
- * Until the caption editor per platform (F08B PR 3), the form's one caption is the first caption
- * group of the post's platforms.
- */
-export function firstGroupCaptions(
-  platforms: readonly PostPlatform[],
-  captions: CreatePost['captions'],
-): CreatePost['captions'] {
-  const [group] = captionGroupsOf(platforms);
-  const [first] = captions;
-  return group && first ? [{ ...first, group }] : [];
-}
-
-/** The caption and its hashtags of the first caption group, with their lengths. */
-export function CaptionFields({ form }: { form: PostFormMethods }) {
-  const { t } = useTranslation();
-  const [caption, hashtags] = useWatch({
-    control: form.control,
-    name: ['captions.0.caption', 'captions.0.hashtags'],
-  });
-  const captionError = form.formState.errors.captions?.[0]?.caption;
-  const hashtagsError = form.formState.errors.captions?.[0]?.hashtags;
-  return (
-    <>
-      <Field invalid={!!captionError}>
-        <div className="flex items-center justify-between gap-2">
-          <FieldLabel>
-            {t('content.form.caption')}
-            <Optional />
-          </FieldLabel>
-          <CharacterCount length={caption?.length ?? 0} max={POST_LIMITS.caption} />
-        </div>
-        <Textarea
-          rows={5}
-          dir="auto"
-          placeholder={t('content.form.captionPlaceholder')}
-          {...form.register('captions.0.caption')}
-        />
-        <FieldError match={!!captionError}>{t('content.form.errors.caption')}</FieldError>
-      </Field>
-      <Field invalid={!!hashtagsError}>
-        <div className="flex items-center justify-between gap-2">
-          <FieldLabel>
-            {t('content.form.hashtags')}
-            <Optional />
-          </FieldLabel>
-          <CharacterCount length={hashtags?.length ?? 0} max={POST_LIMITS.hashtags} />
-        </div>
-        <Textarea
-          rows={2}
-          dir="auto"
-          placeholder={t('content.form.hashtagsPlaceholder')}
-          {...form.register('captions.0.hashtags')}
-        />
-        <FieldError match={!!hashtagsError}>{t('content.form.errors.hashtags')}</FieldError>
-      </Field>
-    </>
   );
 }
 
@@ -533,7 +443,7 @@ export function CycleLineField({
   );
 }
 
-function ClientField({ form }: { form: PostFormMethods }) {
+export function ClientField({ form }: { form: PostFormMethods }) {
   const { t } = useTranslation();
   const me = useMe();
   // Rule 2: active and paused clients; those under the user's edit scope.
@@ -569,93 +479,5 @@ function ClientField({ form }: { form: PostFormMethods }) {
       />
       <FieldError match={!!error}>{fieldError(error, t('content.form.errors.client'))}</FieldError>
     </Field>
-  );
-}
-
-/**
- * The new-post dialog (screen 3). From a client's Content tab the client is fixed; on the Content
- * page it is chosen among the clients the user may edit.
- */
-export function NewPostDialog({ open, onClose, ...props }: NewPostProps & { open: boolean }) {
-  const { t } = useTranslation();
-  // The form mounts with the dialog's content: each opening starts empty, and the fields stay
-  // while the dialog fades out.
-  return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent closeLabel={t('common.close')} className="max-w-2xl">
-        <NewPostForm {...props} onClose={onClose} />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-interface NewPostProps {
-  client?: { id: string; name: string };
-  defaultDate?: string;
-  onClose: () => void;
-}
-
-function NewPostForm({ client, defaultDate, onClose }: NewPostProps) {
-  const { t } = useTranslation();
-  const me = useMe();
-  const create = useCreatePost();
-  const [failure, setFailure] = useState<string | null>(null);
-  const today = businessDate();
-  const form = useForm<CreatePostInput, unknown, CreatePost>({
-    resolver: standardSchemaResolver(createPostSchema),
-    defaultValues: {
-      clientId: client?.id ?? '',
-      title: '',
-      type: 'post',
-      platforms: [],
-      // A new post is never in the past (`INVALID_DATES`).
-      publishDate: defaultDate && defaultDate > today ? defaultDate : today,
-      publishTime: null,
-      captions: [{ group: 'facebook_instagram', caption: '', hashtags: '' }],
-      notes: '',
-      needsClientApproval: true,
-      responsibleId: me.user.id,
-    },
-  });
-  const submit = form.handleSubmit(async (values) => {
-    setFailure(null);
-    try {
-      await create.mutateAsync({
-        ...values,
-        captions: firstGroupCaptions(values.platforms, values.captions),
-      });
-      toast.add({ title: t('content.new.created'), type: 'success' });
-      onClose();
-    } catch (error) {
-      setFailure(postFormFailure(form, t, error));
-    }
-  });
-  return (
-    <form className="grid gap-5" onSubmit={submit} noValidate>
-      <DialogHeader>
-        <DialogTitle>{t('content.new.title')}</DialogTitle>
-        <DialogDescription>
-          {client ? t('content.new.forClient', { client: client.name }) : t('content.new.body')}
-        </DialogDescription>
-      </DialogHeader>
-      {!client && <ClientField form={form} />}
-      <TitleField form={form} />
-      <TypeField form={form} />
-      <PlatformsField form={form} />
-      <PublishFields form={form} />
-      <CaptionFields form={form} />
-      <NotesField form={form} />
-      <ResponsibleField form={form} />
-      <ApprovalField form={form} />
-      {failure && <FormAlert>{failure}</FormAlert>}
-      <DialogFooter>
-        <DialogClose render={<Button variant="outline" type="button" />}>
-          {t('common.cancel')}
-        </DialogClose>
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? t('common.saving') : t('content.new.submit')}
-        </Button>
-      </DialogFooter>
-    </form>
   );
 }

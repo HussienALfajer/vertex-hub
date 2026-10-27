@@ -35,6 +35,7 @@ import { Route as AppCatalogSettingsRouteImport } from './routes/_app/catalog/se
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppClientsNewRouteImport } from './routes/_app/clients/new'
 import { Route as AppContentIndexRouteImport } from './routes/_app/content/index'
+import { Route as AppContentNewRouteImport } from './routes/_app/content/new'
 import { Route as AppDepartmentsIndexRouteImport } from './routes/_app/departments/index'
 import { Route as AppDepartmentsDepartmentIdRouteImport } from './routes/_app/departments/$departmentId'
 import { Route as AppHrIndexRouteImport } from './routes/_app/hr/index'
@@ -222,6 +223,11 @@ const AppClientsNewRoute = AppClientsNewRouteImport.update({
 const AppContentIndexRoute = AppContentIndexRouteImport.update({
   id: '/content/',
   path: '/content/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContentNewRoute = AppContentNewRouteImport.update({
+  id: '/content/new',
+  path: '/content/new',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDepartmentsIndexRoute = AppDepartmentsIndexRouteImport.update({
@@ -544,6 +550,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
+  '/content/new': typeof AppContentNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/hr/approvals': typeof AppHrApprovalsRoute
   '/hr/settings': typeof AppHrSettingsRoute
@@ -629,6 +636,7 @@ export interface FileRoutesByTo {
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/catalog/settings': typeof AppCatalogSettingsRoute
   '/clients/new': typeof AppClientsNewRoute
+  '/content/new': typeof AppContentNewRoute
   '/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/hr/approvals': typeof AppHrApprovalsRoute
   '/hr/settings': typeof AppHrSettingsRoute
@@ -716,6 +724,7 @@ export interface FileRoutesById {
   '/_app/campaigns/$campaignId': typeof AppCampaignsCampaignIdRoute
   '/_app/catalog/settings': typeof AppCatalogSettingsRoute
   '/_app/clients/new': typeof AppClientsNewRoute
+  '/_app/content/new': typeof AppContentNewRoute
   '/_app/departments/$departmentId': typeof AppDepartmentsDepartmentIdRoute
   '/_app/hr/approvals': typeof AppHrApprovalsRoute
   '/_app/hr/settings': typeof AppHrSettingsRoute
@@ -803,6 +812,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId'
     | '/catalog/settings'
     | '/clients/new'
+    | '/content/new'
     | '/departments/$departmentId'
     | '/hr/approvals'
     | '/hr/settings'
@@ -888,6 +898,7 @@ export interface FileRouteTypes {
     | '/campaigns/$campaignId'
     | '/catalog/settings'
     | '/clients/new'
+    | '/content/new'
     | '/departments/$departmentId'
     | '/hr/approvals'
     | '/hr/settings'
@@ -974,6 +985,7 @@ export interface FileRouteTypes {
     | '/_app/campaigns/$campaignId'
     | '/_app/catalog/settings'
     | '/_app/clients/new'
+    | '/_app/content/new'
     | '/_app/departments/$departmentId'
     | '/_app/hr/approvals'
     | '/_app/hr/settings'
@@ -1233,6 +1245,13 @@ declare module '@tanstack/react-router' {
       path: '/content'
       fullPath: '/content/'
       preLoaderRoute: typeof AppContentIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/content/new': {
+      id: '/_app/content/new'
+      path: '/content/new'
+      fullPath: '/content/new'
+      preLoaderRoute: typeof AppContentNewRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/departments/': {
@@ -1657,6 +1676,7 @@ interface AppRouteChildren {
   AppCampaignsCampaignIdRoute: typeof AppCampaignsCampaignIdRoute
   AppCatalogSettingsRoute: typeof AppCatalogSettingsRoute
   AppClientsNewRoute: typeof AppClientsNewRoute
+  AppContentNewRoute: typeof AppContentNewRoute
   AppDepartmentsDepartmentIdRoute: typeof AppDepartmentsDepartmentIdRoute
   AppHrApprovalsRoute: typeof AppHrApprovalsRoute
   AppHrSettingsRoute: typeof AppHrSettingsRoute
@@ -1737,6 +1757,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCampaignsCampaignIdRoute: AppCampaignsCampaignIdRoute,
   AppCatalogSettingsRoute: AppCatalogSettingsRoute,
   AppClientsNewRoute: AppClientsNewRoute,
+  AppContentNewRoute: AppContentNewRoute,
   AppDepartmentsDepartmentIdRoute: AppDepartmentsDepartmentIdRoute,
   AppHrApprovalsRoute: AppHrApprovalsRoute,
   AppHrSettingsRoute: AppHrSettingsRoute,

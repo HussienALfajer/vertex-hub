@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { isPostOpen, POST_LIMITS, type PostDetail } from '@vertex-hub/contracts';
-import { Badge, Button, Callout, PlatformMark, Skeleton, toast } from '@vertex-hub/ui';
+import { isPostOpen, type PostDetail } from '@vertex-hub/contracts';
+import { Badge, Button, Callout, ChartDot, PlatformMark, Skeleton, toast } from '@vertex-hub/ui';
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
@@ -20,13 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/confirm-dialog';
 import { isMissing, LoadError } from '../../components/load-error';
 import { can, useMe } from '../../lib/auth';
-import {
-  formatCalendarDate,
-  formatDateTime,
-  formatLink,
-  formatNumber,
-  formatTimeOfDay,
-} from '../../lib/format';
+import { formatCalendarDate, formatDateTime, formatLink, formatTimeOfDay } from '../../lib/format';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { PostApprovalSection } from '../approvals/task-approval-panel';
@@ -36,10 +30,11 @@ import { lineName } from '../retainers/retainer-badges';
 import { focusTarget, type TaskFocus } from '../tasks/task-actions';
 import { TaskSection } from '../tasks/task-parts';
 import { postQuery, useArchivePost, useRestorePost } from './content.queries';
-import { ContentDialog, DetailsDialog, PostActions, PublishedDialog } from './post-actions';
+import { DetailsDialog, PostActions, PublishedDialog } from './post-actions';
 import { PostMediaSection } from './post-media';
 import { PostOverdueBadge, PostPlatforms, PostStatusBadge, PostTypeIcon } from './post-parts';
 import { PostClientResponsesSection, PostReviewHistorySection } from './post-review';
+import { ChecksSection, ContentSection, PackSection, PreviewSection } from './post-sections';
 import { PostTasksSection } from './post-tasks';
 
 /** The post page (spec F08, screen 4). */
@@ -97,8 +92,10 @@ function PostView({ post }: { post: PostDetail }) {
       <Banners post={post} restoreRef={restoreButton} onRestore={() => setConfirming('restore')} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
+          <ChecksSection post={post} />
           <ContentSection post={post} />
           <PostMediaSection post={post} />
+          <PreviewSection post={post} />
           <PostTasksSection post={post} />
           <PostReviewHistorySection post={post} />
           <PostClientResponsesSection post={post} />
@@ -106,6 +103,7 @@ function PostView({ post }: { post: PostDetail }) {
         <div className="flex min-w-0 flex-col gap-6">
           <PostApprovalSection post={post} />
           <ScheduleSection post={post} />
+          <PackSection post={post} />
           <PublishingSection post={post} />
         </div>
       </div>
@@ -338,64 +336,6 @@ function Banners({
   );
 }
 
-/** The caption and hashtags with their lengths: what the review and the client approve. */
-function ContentSection({ post }: { post: PostDetail }) {
-  const { t } = useTranslation();
-  const [editing, setEditing] = useState(false);
-  const count = (text: string | null, max: number) =>
-    t('content.page.characters', {
-      count: formatNumber(text?.length ?? 0),
-      max: formatNumber(max),
-    });
-  return (
-    <TaskSection
-      title={t('content.page.content')}
-      action={
-        post.permissions.canEditContent && (
-          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
-            <PencilIcon />
-            {t('common.edit')}
-          </Button>
-        )
-      }
-    >
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{t('content.form.caption')}</span>
-          <span className="tabular-nums">{count(post.caption, POST_LIMITS.caption)}</span>
-        </div>
-        {post.caption ? (
-          <p className="max-w-prose text-base whitespace-pre-line" dir="auto">
-            {post.caption}
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t('content.page.noCaption')}</p>
-        )}
-      </div>
-      <div className="flex flex-col gap-1 border-t border-border pt-3">
-        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{t('content.form.hashtags')}</span>
-          <span className="tabular-nums">{count(post.hashtags, POST_LIMITS.hashtags)}</span>
-        </div>
-        {post.hashtags ? (
-          <p className="max-w-prose text-sm whitespace-pre-line" dir="auto">
-            {post.hashtags}
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t('content.page.noHashtags')}</p>
-        )}
-      </div>
-      {post.permissions.canEdit && !post.permissions.canEditContent && isPostOpen(post.status) && (
-        <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <LockIcon aria-hidden="true" className="size-3.5 shrink-0" />
-          {t('content.page.contentLocked')}
-        </p>
-      )}
-      <ContentDialog post={post} open={editing} onClose={() => setEditing(false)} />
-    </TaskSection>
-  );
-}
-
 /**
  * When and where the post goes out, who answers for it, whether the client approves it, and the
  * retainer line it counts on (rule 16), with the internal notes.
@@ -422,6 +362,27 @@ function ScheduleSection({ post }: { post: PostDetail }) {
         <Row label={t('content.form.publishDate')}>{formatCalendarDate(post.publishDate)}</Row>
         <Row label={t('content.form.publishTime')}>
           {post.publishTime ? formatTimeOfDay(post.publishTime) : t('common.none')}
+        </Row>
+        <Row label={t('content.wizard.pillar')}>
+          {post.pillar ? (
+            <span className="inline-flex items-center gap-2">
+              <ChartDot color={post.pillar.color} muted={post.pillar.archived} />
+              <span className={post.pillar.archived ? 'text-muted-foreground' : undefined}>
+                {post.pillar.name}
+              </span>
+            </span>
+          ) : (
+            t('common.none')
+          )}
+        </Row>
+        <Row label={t('content.wizard.occasion')}>
+          {post.occasion ? (
+            <span className={post.occasion.archived ? 'text-muted-foreground' : undefined}>
+              {post.occasion.name}
+            </span>
+          ) : (
+            t('common.none')
+          )}
         </Row>
         <Row label={t('content.form.needsClientApproval')}>
           {post.needsClientApproval ? t('common.yes') : t('common.no')}

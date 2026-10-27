@@ -151,3 +151,7 @@ export const publicVersionUrl = (
   versionId: string,
   part: 'content' | 'preview' | 'thumbnail',
 ) => `/api/public/approvals/${encodeURIComponent(token)}/versions/${versionId}/${part}`;
+
+/** The client's picture for the post previews (F08B), served to the holder of the link. */
+export const publicClientImageUrl = (token: string) =>
+  `/api/public/approvals/${encodeURIComponent(token)}/client-image`;

@@ -27,11 +27,12 @@ Work branch: `feat/f08b-pr2-api` (pushed, no PR yet). Built on PR 1, merged as H
 - [x] owner acceptance (rule C6 per year, owner 2026-10-26), PR with auto-merge
 
 ## PR 3 — Wizard, captions, slides and previews (web)
-- [ ] ui: components the previews need (if missing) on the design-system page
-- [ ] web: `/content/new` wizard (five steps, local draft, "Create now", held uploads with paste, tasks with subtasks, review with checks, readiness and planning notes, suggested times), platform previews, caption editor (counters, Copy from, snippets); post page (caption tabs, Slides, Checks, Preview, Move dialog, Publishing pack, pillar and occasion); client approval page with platform tabs and slides; reviewers' summaries; `ar.json`
-- [ ] web unit tests (draft storage, preview caption cut)
-- [ ] e2e: mocks, wizard and post page flows, screens (each wizard step phone and desktop, previews, post page, move dialog, client page phone) in both themes
-- [ ] checks, reviewer, acceptance, PR with auto-merge
+Work branch: `feat/f08b-pr3-wizard`. Built on PR 2, merged as HussienALfajer/vertex-hub#180.
+- [x] ui: `Carousel` (slides to swipe, buttons and dots) and `ChartDot` with the `chart-1..8` tokens (light and dark, from the palette steps) the pillar colours name; both on the design-system page
+- [x] web: `/content/new` wizard (`new-post-page.tsx`, `post-wizard-steps.tsx`, `post-wizard-task-dialog.tsx`, pure draft rules in `post-wizard-draft.ts`; five steps, local draft per user and presets, "Create now", held uploads with paste and media info, slide captions and order, linked and new tasks with subtasks, review with checks, readiness and planning notes, best-time chips, start from an idea); "New post" links to it (the dialog is gone); `StepBar` shared with the task wizard (`components/step-bar.tsx`); platform previews (`post-preview-panel.tsx`, caption cut in `post-preview.ts`); caption editor (`caption-editor.tsx`: a tab per group, counters at the group limit, Copy from, snippets); post page: caption tabs, Slides (arrange dialog, slide captions, warnings), Checks, Preview, Move dialog (`post-move-dialog.tsx`), Publishing pack, pillar and occasion; client page: previews per platform, captions per group, slide captions; reviewers' summaries: caption groups and slide count; `uploadFile` sends a video's media info; `ar.json`
+- [x] web unit tests (`post-wizard-draft.test.ts`, `post-preview.test.ts`)
+- [x] e2e: mocks (captions, layout, move and preview, pack, pillars, settings, snippets, occasions, ideas, uploads attached to the post, `linkedToPost`), `f08b.spec.ts` (wizard, draft, post page), `f08.spec.ts` on the wizard, screens (wizard steps desktop and phone, task dialog, preview, post page sections, arrange and move dialogs; the client page shot now shows the previews) in both themes
+- [x] checks, reviewer, acceptance (delegated by the owner, 2026-10-26), PR with auto-merge
 
 ## PR 4 — Calendar, planning, grid, ideas and settings (web)
 - [ ] web: day click and drag with the move dialog, occasion strip, gap and too-close marks, pillar filter and dots, ideas panel (drag onto a day), Planning check tab, My posts "At risk", client tab month bar (pillar balance, planned / committed), Grid view, client settings and snippets dialogs, `/content/settings`, quick idea in the top bar; `ar.json`
