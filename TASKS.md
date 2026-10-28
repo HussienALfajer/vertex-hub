@@ -12,9 +12,9 @@ Owner request (2026-10-28): open PRs without asking, make every instruction file
 - [x] checks (documentation and config; CI runs everything), PR with auto-merge
 
 ## PR 2 — CI speed and flaky tests (`fix/ci-e2e-speed-flakes`)
-- [ ] E2E shards in the Playwright container image (no apt install)
-- [ ] `e2e/f16-push.spec.ts`: the second push is shown reliably
-- [ ] `e2e/screens.spec.ts` "new task wizard, every step and preview mode": split so no tour nears its timeout
-- [ ] `apps/api/test/client-contacts.test.ts`: the national ID check cannot match unrelated digits
-- [ ] `docs/testing.md` CI times and setup
-- [ ] checks, PR with auto-merge, CI green
+- [x] E2E shards in the Playwright container image (no apt install)
+- [x] `e2e/f16-push.spec.ts`: pushes carry notifications the mock lists as unread, so the app's rule A14 no longer closes them (old test: 20 of 20 failed with 10 workers; new: 20 of 20 passed)
+- [x] `pickOption` in `e2e/test.ts` for the wizard tour (`screens.spec.ts`) and `f06b.spec.ts`: a list that stays hidden to the click is reopened instead of waiting out the timeout
+- [x] `apps/api/test/client-contacts.test.ts`: the national ID check looks for the exact values, which no id or timestamp holds
+- [x] `docs/testing.md` CI time and setup, `apps/web/CLAUDE.md`
+- [x] checks, PR with auto-merge

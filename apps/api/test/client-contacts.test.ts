@@ -222,17 +222,19 @@ describe('client contacts', () => {
     });
 
     it('records that the national ID changed, never its value', async () => {
+      // Eleven digits no id or timestamp in the audit rows holds by chance ('111' once did).
+      const [first, second] = ['05173946208', '05173946219'];
       const { id } = await cast.createClient();
       const contact = contactSchema.parse(
-        await (await create(id, cast.gm.cookie, { name: 'ليلى', nationalId: '111' })).json(),
+        await (await create(id, cast.gm.cookie, { name: 'ليلى', nationalId: first })).json(),
       );
       const updated = await client.request('PATCH', path(id, contact.id), {
         cookie: cast.am.cookie,
-        body: { nationalId: '222', fatherName: 'خالد' },
+        body: { nationalId: second, fatherName: 'خالد' },
       });
       expect(updated.status).toBe(200);
       expect(contactSchema.parse(await updated.json())).toMatchObject({
-        nationalId: '222',
+        nationalId: second,
         fatherName: 'خالد',
       });
       const audit = await db
@@ -245,7 +247,8 @@ describe('client contacts', () => {
         before: { nationalId: NATIONAL_ID_AUDIT_MASK, fatherName: null },
         after: { clientId: id, nationalId: NATIONAL_ID_AUDIT_MASK, fatherName: 'خالد' },
       });
-      expect(JSON.stringify(audit)).not.toMatch(/111|222/);
+      expect(JSON.stringify(audit)).not.toContain(first);
+      expect(JSON.stringify(audit)).not.toContain(second);
     });
 
     it('keeps the stored national ID when a contact is edited without it (edge case 12)', async () => {

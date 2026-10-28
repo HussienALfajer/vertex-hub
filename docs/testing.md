@@ -11,7 +11,7 @@ Each check runs once, in the place where it is cheapest. The session checks what
 | While writing | Biome on each edited file (hook), the test file you are working on | `pnpm verify <file>` | seconds to 30 s |
 | A layer's gate | That layer's test files, `pnpm typecheck` | `pnpm verify <files>` | under 2 min |
 | Before the PR, once | Lint; typecheck, test and build of every package (Turborepo replays the unchanged ones); the changed E2E specs; migration and OpenAPI drift | `pnpm verify` | 1–3 min, seconds when nothing changed |
-| CI, before the merge | Everything, the whole E2E suite included, split over parallel jobs | — | about 4 min |
+| CI, before the merge | Everything, the whole E2E suite included, split over parallel jobs | — | about 7 min, set by the Playwright shards |
 
 The whole E2E suite (547 tests) never runs in a session unless asked for (`pnpm verify --e2e-all`): CI runs it on four shards.
 
@@ -60,6 +60,8 @@ The hook is `.claude/hooks/test-guard.mjs` (PreToolUse on Bash and PowerShell). 
 - Traces are recorded on the first retry only (`trace: 'on-first-retry'`): CI retries a failed test once and keeps its trace. Recording one for every test made the suite 30% slower and kept the antivirus scanning each trace file. Debug locally with `--trace on`.
 - A test that tours many screens (most of `screens.spec.ts`) sets `test.setTimeout(90_000)`.
 - CI fails a test that only passes on its retry (`failOnFlakyTests`).
+- Picking from a select goes through `pickOption` (`e2e/test.ts`): it takes the visible list's option, and reopens a list that stays hidden to the click on a loaded runner instead of waiting out the test's timeout.
+- A spec that lets the service worker run (`f16-push.spec.ts`) pushes notifications the mock lists as unread: the app closes pushes of notifications read elsewhere whenever it opens or regains focus (rule A14).
 
 ## CI
 
@@ -70,7 +72,7 @@ The hook is `.claude/hooks/test-guard.mjs` (PreToolUse on Bash and PowerShell). 
 | Lint, typecheck, build | Audit, Biome, typecheck, build, migration drift, OpenAPI drift, the built API and worker start |
 | Tests | Every package's tests but the api's |
 | API tests shard 1–2 | The api suite, split by file (`vitest --shard`) |
-| Playwright shard 1–4 | The whole E2E suite, split by test (`fullyParallel`) |
+| Playwright shard 1–4 | The whole E2E suite, split by test (`fullyParallel`), in Playwright's container image (`mcr.microsoft.com/playwright`, tag kept on the version of `@playwright/test`): installing Chromium's system libraries with apt took 3–10 min on one shard of most runs |
 | Typecheck, lint, test, build · Playwright smoke | Gate jobs: with the secret scan, the three checks the `main` ruleset requires |
 | Secret scan | gitleaks |
 

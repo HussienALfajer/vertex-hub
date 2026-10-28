@@ -9,7 +9,7 @@ import {
   mockF06bTree,
 } from './f06b-fixtures';
 import { accountManagerMe, manager, mockApi, PROJECTS_TODAY, seedIds } from './fixtures';
-import { expect, test } from './test';
+import { expect, pickOption, test } from './test';
 
 // F06B creation, templates, the tree and Workload against the mocked API (the rules are covered
 // by apps/api/test; the task page by f06b-task-page.spec.ts).
@@ -30,13 +30,7 @@ test.beforeEach(async ({ page }) => {
 const rows = (page: Page) => page.locator('li[draggable="true"]');
 
 async function pick(page: Page, scope: ReturnType<Page['locator']>, label: string, option: string) {
-  await scope.getByRole('combobox', { name: label, exact: true }).click();
-  await page
-    .getByRole('option', { name: new RegExp(`^${option}`) })
-    // A list opened before may stay in the page, hidden: pick from the open one.
-    .filter({ visible: true })
-    .first()
-    .click();
+  await pickOption(page, scope.getByRole('combobox', { name: label, exact: true }), option);
 }
 
 /** Basics: a Marketing task assigned to the signed-in account manager, due on the 20th. */
