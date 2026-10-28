@@ -6,7 +6,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 |---|---|---|
 | [0001](0001-monorepo-modular-monolith.md) | One repository, separate apps, modular monolith backend | Accepted |
 | [0002](0002-backend-nestjs.md) | NestJS backend with Zod contracts and Better Auth | Accepted (validation superseded by 0012) |
-| [0003](0003-frontend-react-vite-spa.md) | React + Vite SPA frontend | Accepted |
+| [0003](0003-frontend-react-vite-spa.md) | React + Vite SPA frontend | Accepted (FullCalendar not adopted) |
 | [0004](0004-design-system-shadcn-base-ui.md) | Vertex design system on shadcn/ui + Base UI | Accepted |
 | [0005](0005-database-postgres-drizzle.md) | PostgreSQL 17 with Drizzle ORM | Accepted |
 | [0006](0006-money-and-currencies.md) | Money in minor units; SYP and USD with stored rates | Accepted |

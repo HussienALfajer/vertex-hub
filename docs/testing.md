@@ -71,7 +71,7 @@ The hook is `.claude/hooks/test-guard.mjs` (PreToolUse on Bash and PowerShell). 
 | Tests | Every package's tests but the api's |
 | API tests shard 1–2 | The api suite, split by file (`vitest --shard`) |
 | Playwright shard 1–4 | The whole E2E suite, split by test (`fullyParallel`) |
-| Typecheck, lint, test, build · Playwright smoke | Gate jobs: the checks the `main` ruleset requires |
+| Typecheck, lint, test, build · Playwright smoke | Gate jobs: with the secret scan, the three checks the `main` ruleset requires |
 | Secret scan | gitleaks |
 
 Turborepo's cache is kept between runs with `actions/cache`, per job. A pull request reads its own runs' cache and `main`'s; `main` cannot read a pull request's (GitHub keeps caches per branch), so after a merge `main` runs what the pull request changed once more.

@@ -1,6 +1,6 @@
 # 0003 — React + Vite SPA frontend
 
-Status: Accepted · Date: 2026-09-28
+Status: Accepted, FullCalendar bullet not adopted (calendars are the design system's `CalendarGrid`, `docs/architecture.md`) · Date: 2026-09-28
 
 ## Context
 The app is internal, behind login; search-engine indexing is irrelevant. The public surface is limited to client approval pages. With a separate API (ADR 0001), a full-stack framework's server layer would duplicate the backend.

@@ -20,7 +20,7 @@ Today accounts exist only through a server command, every user's role is set by 
   - Self-service "forgot password": needs email (Q5). Until then the user asks a user manager for a reset link.
   - Adding or archiving departments (the ten are fixed in V1).
   - Field-level custom permissions, attendance, payroll (v1-scope).
-  - Daily backups: already running on the server (`docs/deployment.md`); off-server copies are Q4.
+  - Daily backups: already running on the server (`docs/deployment.md`); off-server copies are Q4 (resolved 2026-10-19: deferred until a storage service is subscribed, ADR 0034).
 
 ## Roles and access
 
@@ -222,8 +222,8 @@ All screens: Arabic RTL, strings through i18next (`users.*`, `departments.*`, `a
 13. Lists at ~20 users need no special limits; `pageSize` rules from ADR 0013 apply.
 
 ## Open questions
-- **Q14 (needed before F06):** should the Operations manager see and reassign tasks across all departments ("workload distribution" in v1-scope §2)? Recommendation: yes, `tasks.read` and `tasks.manage` with scope `all`, plus `reports.read` `all`. Not granted in F01.
-- **Q5:** email provider. Until it is decided, links are copied by hand and there is no self-service password reset.
+- **Q14 (needed before F06):** should the Operations manager see and reassign tasks across all departments ("workload distribution" in v1-scope §2)? Recommendation: yes, `tasks.read` and `tasks.manage` with scope `all`, plus `reports.read` `all`. Not granted in F01. *Resolved 2026-09-29: yes (`docs/open-questions.md`, F06).*
+- **Q5:** email provider. Until it is decided, links are copied by hand and there is no self-service password reset. *Resolved 2026-10-04: Hostinger Email SMTP (F14 email, ADR 0028).*
 
 ## Acceptance
 - Owner check in the browser:

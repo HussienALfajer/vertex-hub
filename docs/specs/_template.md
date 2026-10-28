@@ -1,9 +1,9 @@
 # <ID> — <Feature name>
 
-Status: Draft | Approved · Date: YYYY-MM-DD · Scope: `docs/product/v1-scope.md` §<ID> · ADRs: <list>
+Status: Draft | Approved · Date: YYYY-MM-DD · Scope: `docs/product/v1-scope.md` or `v2-scope.md` §<ID> · ADRs: <list>
 
 ## Summary
-Two or three sentences: the problem this solves for the agency and what V1 of the feature does.
+Two or three sentences: the problem this solves for the agency and what the feature does.
 
 ## In scope / out of scope
 - In: …

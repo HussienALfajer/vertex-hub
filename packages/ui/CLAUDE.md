@@ -20,4 +20,4 @@ The Vertex design system: shadcn/ui patterns on Base UI, Tailwind CSS v4 tokens,
 - New components appear on the design-system page (`apps/web/src/routes/_app/design-system.tsx`) and in its screenshots.
 - Fonts: Noto Kufi Arabic and Montserrat from `@fontsource` (OFL, ADR 0033). Never commit commercial font files: the repository is public.
 
-Run: `pnpm --filter @vertex-hub/ui test` · `pnpm --filter @vertex-hub/ui typecheck`.
+Run: `pnpm verify packages/ui` or `pnpm verify <file>` · `pnpm typecheck`.

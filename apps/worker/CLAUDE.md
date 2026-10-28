@@ -10,14 +10,14 @@ NestJS standalone context for background work: pg-boss queues and cron (ADR 0008
 - `src/push/`: Web Push (F16, ADR 0036). `push-sender.ts` holds the `webpush` transport (`web-push` encrypts and signs the VAPID header, `fetch` sends, so tests use a local fake push service) and the `log` transport (JSON files under `PUSH_LOG_DIR`); `src/jobs/push-send.job.ts` sends one device per job and reports `push.result`.
 
 ## Rules
-- Queue names are `<module>.<action>` (`system.heartbeat`), exported as constants next to the job.
+- Queue names are `<module>.<action>`. Shared queue names and crons live in `packages/contracts/src/jobs.ts`; only a queue no other app uses (`system.heartbeat`) is a constant next to its job.
 - Register queues and handlers in `onApplicationBootstrap` through `PgBossService`.
 - Every job is idempotent: pg-boss retries, so running a job twice must leave the same result (upsert, check-then-act inside a transaction).
 - Job payloads carry ids, not records. Load fresh data inside the job. Exception: a render job (`quotes.pdf`) carries its frozen, hashed payload, so the worker reads no business table; its result goes back to the API as a job (`quotes.pdf-ready`). `email.send` does the same with the whole email; its outcome goes back as `email.result`. `push.send` carries the rendered push and its subscription; its outcome goes back as `push.result`.
-- Business rules live in the API's module services. A scheduled job that needs one is only scheduled here and worked by the API through `JobQueue` (ADR 0008; pattern: `src/jobs/retainer-cycles.job.ts` with `apps/api/src/modules/projects/retainer-cycles.service.ts`). Shared queue names and crons live in `packages/contracts/src/jobs.ts`.
+- Business rules live in the API's module services. A scheduled job that needs one is only scheduled here and worked by the API through `JobQueue` (ADR 0008; pattern: `src/jobs/retainer-cycles.job.ts` with `apps/api/src/modules/projects/retainer-cycles.service.ts`).
 - Logs through the Nest `Logger`, never `console.log`.
 
 ## Tests
 Integration tests in `test/` run against the test database with a unique `WORKER_NAME` per run.
 
-Run: `pnpm --filter @vertex-hub/worker test` · `pnpm --filter @vertex-hub/worker typecheck`.
+Run: `pnpm verify apps/worker` (the suite) or `pnpm verify <file>` · `pnpm typecheck`.

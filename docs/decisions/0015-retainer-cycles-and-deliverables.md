@@ -1,6 +1,6 @@
 # 0015 — Retainer cycles and the deliverables counter
 
-Status: Accepted · Date: 2026-09-29
+Status: Accepted, calendar-month cycle superseded by [0030](0030-retainer-anniversary-cycles.md) · Date: 2026-09-29
 
 ## Context
 Retainers are monthly commitments to a counted set of deliverables (v1-scope F05). Success metric 4 requires that no retainer month closes without a known delivery rate. The owner's answers in the F05 spec (`docs/specs/F05-projects-retainers.md`) fix how months, counts and shortfalls behave; later features (F06 tasks, F08 posts, F13 invoices, A02 and A09) build on them.

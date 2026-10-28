@@ -250,8 +250,8 @@ Loading, empty and error states follow the existing list and detail pages. What 
 
 ## Open questions
 - None blocks F12. Related, not blocking:
-  - Q11: the receipt uses the fallback Arabic font until the Madani Arabic license and files arrive.
-  - Q7: swap on the server before the Phase 3 deploy (one more PDF kind).
+  - Q11: the receipt uses the fallback Arabic font until the Madani Arabic license and files arrive. *Resolved 2026-10-19: dropped; Noto Kufi Arabic (ADR 0033).*
+  - Q7: swap on the server before the Phase 3 deploy (one more PDF kind). *Resolved 2026-10-19: 4 GB swap (`docs/deployment.md`).*
 
 ## Acceptance
 - Owner check in the browser:

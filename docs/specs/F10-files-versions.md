@@ -203,10 +203,10 @@ What roles see differently: everyone sees task files, brand files and non-confid
 - **Jobs** (`packages/contracts/src/jobs.ts`, scheduled by `apps/worker`, worked by the API like `notifications.daily`, ADR 0008 and 0018):
   - `files.preview`: queued in the attaching transaction for previewable images; renders the thumbnail and preview (rule 18); retried 3 times, then `failed`.
   - `files.purge-uploads`: daily at 03:00 Asia/Damascus; deletes unattached uploads older than 24 hours and their content.
-- **Deploy** (`deploy/`, shipped with the next production deploy; server changes need the owner's approval then):
+- **Deploy** (`deploy/`, shipped with the next production deploy; server changes need no approval since 2026-10-27, `AGENTS.md`):
   - `FILES_ROOT` in the environment and `.env.example`; `shared/files/` created by `provision.sh`, owned by the site user, not web-readable except through the internal location.
   - nginx: `client_max_body_size 250m` on `/api/files/uploads` only (the site default stays); an `internal` location that serves `FILES_ROOT` for `X-Accel-Redirect` with its own header set (`nosniff`, HSTS, `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'` so the PDF preview can be framed), and the upload route's timeouts sized for slow links.
-  - `vertexhub-backup`: copies `shared/files/` into each daily backup as a hard-linked snapshot (`rsync --link-dest` of the previous backup), so unchanged files take no extra space. Off-server copies still wait on Q4.
+  - `vertexhub-backup`: copies `shared/files/` into each daily backup as a hard-linked snapshot (`rsync --link-dest` of the previous backup), so unchanged files take no extra space. Off-server copies wait until a storage service is subscribed (Q4, resolved 2026-10-19, ADR 0034).
 
 ## Edge cases
 1. **Two people add a version at the same time:** they get consecutive numbers (rule 3); both are audited; the later one is the latest.
@@ -238,7 +238,7 @@ Details settled while building PR 1 (API), within the rules above:
 
 ## Open questions
 - None block F10. The owner decided every question of the interview on 2026-09-30.
-- Q4 (off-server backups) becomes more pressing: files are backed up only on the same server until it is answered.
+- Q4 (off-server backups) becomes more pressing: files are backed up only on the same server until it is answered. *Resolved 2026-10-19: backups stay on the server until the owner subscribes a storage service (ADR 0034).*
 - A retention policy for old non-final versions is deferred until usage numbers exist (owner decision); the usage line is there to decide it.
 
 ## Acceptance

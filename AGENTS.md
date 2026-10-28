@@ -10,7 +10,7 @@ This project is independent. Do not read or reuse other folders on this machine 
 
 | File | Purpose |
 |---|---|
-| `docs/product/v1-scope.md` | What V1 includes and excludes. Anything not in it is out of scope: ask before adding. |
+| `docs/product/v1-scope.md`, `docs/product/v2-scope.md` | What V1 and V2 include and exclude (V1: F01–F15 with F01B, F05B and F05C, and A01–A13; V2: F16 onward, F01C, F06B and F08B). Anything in neither is out of scope: ask before adding. |
 | `docs/decisions/` | Architecture and business decisions (ADRs). Follow them; propose a new ADR to change one. ADR 0013 is the code shape: layout, module anatomy, naming, errors, lists, tests. |
 | `<app or package>/CLAUDE.md` | Local rules and the pattern to copy for `apps/api`, `apps/web`, `apps/worker`, `packages/{contracts,db,messages,ui}` and `deploy`. Any agent reads it before editing in that folder (Claude Code loads it on its own). |
 | `docs/architecture.md` | Stack, repo layout, module map, data conventions, deployment topology. |
@@ -22,7 +22,7 @@ This project is independent. Do not read or reuse other folders on this machine 
 | `brand/identity.md` | Visual identity: colors, typography, shape, motif, logo usage, patterns to avoid. Read before any UI work. |
 | `brand/` | The only home of logo files and brand assets. |
 
-Read these on demand. For a feature, read its spec, the ADRs it touches, and its section of `v1-scope.md`.
+Read these on demand. For a feature, read its spec, the ADRs it touches, and its section of `v1-scope.md` or `v2-scope.md`.
 
 ## Stack
 
@@ -83,8 +83,9 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 ## How to work
 
 - Continue without asking when the next step needs no input from the owner. Put brief status notes in the same message as the next action.
-- Stop and ask only when a decision belongs to the owner (scope, business rules, anything in `open-questions.md`) or when a spec is ambiguous in a way that changes the result. The owner has granted full permission (2026-10-27): commands, file access (`.env` included), destructive and outward-facing actions (deleting data, dropping tables, restoring a database snapshot, force-push, publishing), deploying `main` to production and changing production through the server or an admin panel need no approval. Do them when the task calls for them and report what changed.
-- A task is done only when `pnpm verify` passes on its final state and CI is green; for UI changes, a Playwright screenshot in RTL. Show the evidence (the verify summary) instead of asserting success.
+- Stop and ask only when a decision belongs to the owner (scope, business rules, anything in `open-questions.md`, approving a spec or a feature's PR split, redesigning a destructive or non-backward-compatible migration) or when a spec is ambiguous in a way that changes the result. The owner has granted full permission (2026-10-27): commands, file access (`.env` included), destructive and outward-facing actions (deleting data, dropping tables, restoring a database snapshot, force-push, publishing), deploying `main` to production and changing production through the server or an admin panel need no approval. Do them when the task calls for them and report what changed. For these actions, this permission overrides any older "ask first" or "needs approval" wording anywhere else.
+- Committing, pushing, opening the PR, enabling auto-merge and turning on Auto-fix are never questions: every finished task does them at once ("Finishing a task", owner, 2026-10-28).
+- A task is done only when `pnpm verify` passes on its final state and CI is green (auto-merge waits for green, and a failing run comes back to the session to fix); for UI changes, a Playwright screenshot in RTL. Show the evidence (the verify summary) instead of asserting success.
 - Fix root causes. Never silence a failing test, type error, or lint rule to make a check pass.
 - For multi-step work keep a checklist in `TASKS.md`: mark items done and add work you discover.
 - Mark anything you could not confirm and say where you looked.
@@ -92,7 +93,7 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 
 ## Context economy
 
-- Search before reading (file and content search), then read only the relevant range. For `v1-scope.md`, read the feature's section, not the whole file.
+- Search before reading (file and content search), then read only the relevant range. For the scope files, read the feature's section, not the whole file.
 - Never read generated or lock files: `pnpm-lock.yaml` (use `pnpm why <pkg>` or the `package.json`), `packages/db/migrations/meta/`, `routeTree.gen.ts`, `dist/`, `.turbo/`. Open Playwright screenshots only to verify a UI change.
 - Checks (`docs/testing.md`): while building, run only the tests you work on (`pnpm verify <file>`); before the PR, `pnpm verify` once, and again only after a change. Each check runs once: read its failures in the summary and in `.verify/`, never run a suite again to see its output, and rerun only the files that failed. One test run at a time, and no edits while it runs: the `test-guard` hook refuses a second run, the whole E2E suite and `timeout` around tests. CI runs everything.
 - In replies, point to `path:line` instead of pasting files or diffs.
@@ -105,7 +106,7 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 
 ## Finishing a task: open the PR at once
 
-When a task's work is done (a spec approved, a `/feature-slice` PR accepted, a fix, a docs change), finish it in the same turn, without waiting to be asked. There is no separate shipping command. Stop and report at the first step that fails.
+When a task's work is done (a spec approved, a `/feature-slice` PR checked and reviewed, a fix, a docs change), finish it in the same turn: never ask whether to commit, push, open the PR, enable auto-merge or turn on Auto-fix. There is no separate shipping command. The owner's acceptance of a feature comes after the PR is open: the report lists the acceptance steps, and what the owner finds becomes a fix PR. Stop and report at the first step that fails.
 
 1. **Branch:** not `main`; if on `main`, create the branch named by type. `TASKS.md` has no open items for this PR.
 2. **Docs:** update `docs/ROADMAP.md` when a feature or roadmap item is done, and every doc the change made stale (`docs/architecture.md`, a folder `CLAUDE.md`, `docs/open-questions.md`, the commands table above).
@@ -113,14 +114,14 @@ When a task's work is done (a spec approved, a `/feature-slice` PR accepted, a f
 4. **Checks:** `pnpm verify` passes on the final tree (lint, typecheck, test, build, the changed E2E specs, and migration and OpenAPI drift when their sources changed). A green run on the same tree counts; after a fix run it again, and Turborepo replays what the fix did not touch. Documentation-only changes run no local checks (CI skips them as well). CI runs everything, the whole E2E suite over four shards. Everything must pass; fix root causes.
 5. **Review:** for a feature, the `reviewer` subagent has run and its blocking findings are fixed.
 6. **Commit:** stage the intended files only; Conventional Commit subject, a body with what and why, ending with the session's attribution line.
-7. **Pull request:** `git push -u origin <branch>`, `gh pr create --base main` with `## Summary` (what and why, in bullets) and `## Test plan` (the checks as ticked boxes; for docs only, "documentation only, CI runs the checks"), ending with the session's attribution line; then immediately `gh pr merge <number> --auto --merge`. In the desktop app, turn on the PR's Auto-fix right away too, without asking. If CI fails, read `gh run view <run-id> --log-failed`, fix the cause on the branch and push: auto-merge waits for green.
-8. **Report** in the format below, in Arabic, with the PR link under Changed and the cleanup line at the end of "Needs from you".
+7. **Pull request:** `git push -u origin <branch>`, `gh pr create --base main` with `## Summary` (what and why, in bullets) and `## Test plan` (the checks as ticked boxes; for docs only, "documentation only, CI runs the checks"), ending with the session's attribution line; then immediately `gh pr merge <number> --auto --merge`. Where `gh pr create` is refused (a cloud session), open the PR from the pushed branch with the session's own PR tools or its **Create PR** button and enable auto-merge the same way. In the Claude desktop app, turn on the PR's Auto-fix right away too. If CI fails, read `gh run view <run-id> --log-failed`, fix the cause on the branch and push: auto-merge waits for green.
+8. **Report** in the format below, in Arabic, with the PR link under Changed, a feature's acceptance steps under "Needs from you" (to try after the merge), and the cleanup line at the end of that section.
 
 ## Reporting
 
 End every substantial task with these sections, in this order:
 
-1. **Needs from you** — decisions or approvals blocking progress, or "nothing". Whenever the task opened or merged a PR, always end this section with the local cleanup line for that PR's branch, in a code block, to run after the merge. Start it with `cd` to the owner's checkout so it works from any terminal: `cd D:\vertex-hub; git switch main; git pull --ff-only; git branch -d <branch>`
+1. **Needs from you** — decisions blocking progress, a feature's acceptance steps, or "nothing". Whenever the task opened or merged a PR, always end this section with the local cleanup line for that PR's branch, in a code block, to run after the merge. Start it with `cd` to the owner's checkout so it works from any terminal: `cd D:\vertex-hub; git switch main; git pull --ff-only; git branch -d <branch>`
 2. **Changed** — what was built or modified.
 3. **Verified** — checks run and their results.
 4. **Found** — issues, risks, or follow-ups noticed.
@@ -132,4 +133,4 @@ Talk to the owner in Arabic. That includes every card the owner answers: wrap-up
 
 ## Production server
 
-Deploys go to the owner's existing Ubuntu VPS: PM2 + nginx, one isolated system user per site, apps listen on `127.0.0.1` only, nginx is the only public gateway. Server commands, deploys and rollbacks need no approval in the conversation (owner, 2026-10-18); the destructive actions listed under "How to work" still do. Deploys, rollbacks and server layout: `docs/deployment.md`.
+Deploys go to the owner's existing Ubuntu VPS: PM2 + nginx, one isolated system user per site, apps listen on `127.0.0.1` only, nginx is the only public gateway. Server commands, deploys, rollbacks and the destructive actions listed under "How to work" need no approval in the conversation (owner, 2026-10-18 and 2026-10-27). Deploys, rollbacks and server layout: `docs/deployment.md`.
