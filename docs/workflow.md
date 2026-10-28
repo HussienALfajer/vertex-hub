@@ -22,7 +22,7 @@ A feature runs through separate sessions. Each session ends with its PR open on 
 | 4 | Phase deploy (once per phase) | Opus 5.5, `low` | `Deploy phase <n> to production` | Starts the session; checks the live site | Deploy done, the phase's deploy item ticked in `docs/ROADMAP.md` |
 
 - A small feature (about one table and one screen) does sessions 2 and 3 in one session and one PR.
-- `/feature-slice` reads `TASKS.md` and continues from the first open PR, so a session can stop between PRs and a new one picks up. `TASKS.md` is committed with each PR (the finishing steps stage it), so a new session, local or cloud, finds the plan in the checkout.
+- `/feature-slice` reads `TASKS.md` and continues from the first open PR, so a session can stop between PRs, or in the middle of one, and a new one picks up ("Continuing in another session" below).
 - After each merge the owner runs the cleanup line from the report, then the acceptance steps if the report gives any, then `/clear`. Notes from acceptance go to a new session as a fix (`fix/<id>-<topic>`), or to the same session if it is still open.
 - **Deploys happen at the end of a phase, not after each feature.** Merging to `main` does not deploy; the phase-deploy session, which the owner starts, runs `vertexhub-deploy` on the server without further approval (`docs/deployment.md`). A hotfix for a bug in production is the exception, deployed when the owner asks.
 - Inside session 2 or 3, use `/compact` between layers if the context grows, never in the middle of one.
@@ -95,6 +95,16 @@ Avoid `max` unless a gain is measured. Agent teams (~7× tokens), fast mode (2×
 - Several Claude Pro accounts: switch accounts **between** tasks, not in the middle of one; the prompt cache does not carry over.
 - Codex reads `AGENTS.md` directly and can continue work when Claude limits are reached.
 - Everything needed to resume lives in `docs/`, `TASKS.md` and git history.
+
+## Continuing in another session
+
+One feature often moves between machines: one PR built locally, the next in the cloud, or a PR started in one session and finished in another. Nothing that only exists in a session or on one machine survives that move: not the conversation, not uncommitted files, and not the agent's personal memory (`~/.claude/`, which cloud sessions do not load). So the state of the work lives in git:
+
+- **`TASKS.md` is the handover note.** Its header names the feature, the spec, the branch of the PR in progress and, while a PR is open or unfinished, a "Stopped at" line: the last finished step and the next one. The checklist below it is the plan, ticked as it goes.
+- **Push as you go.** The plan is committed and pushed on the first PR's branch as soon as the owner approves it (`chore: plan <id>`), before any code. Each layer is committed and pushed once its gate passes. A session that ends with work unfinished commits what it has (a `wip:` subject is fine if the step's checks do not pass yet, and `TASKS.md` says so) and pushes. PRs merge with a merge commit, so these commits stay in the history as they are.
+- **Pick up from git.** A new session, local or cloud, starts with `git fetch --prune`, then `git branch -r` and `gh pr list` (in the cloud, the session's PR tools): if the task's branch exists, it switches to it and reads its `TASKS.md`, which is newer than the one on `main`; otherwise `main`'s `TASKS.md` shows the next PR to start. `/feature-slice` does this on its own.
+- **Facts go into the repository.** Something a later session must know (an owner decision, a production fact, a pitfall) is written into the doc it belongs to (a spec, `docs/deployment.md`, `docs/testing.md`, a folder `CLAUDE.md`), not only into the agent's memory.
+- **Locally, after a cloud session**, run the cleanup line from its report, or `git fetch --prune` and `git switch <branch>` to continue its unmerged branch.
 
 ## Cloud sessions
 

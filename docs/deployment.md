@@ -94,6 +94,9 @@ ssh vertex "journalctl -t vertexhub-geoip -n 20"                  # GeoIP refres
 ssh vertex "sudo -u vertexhub vertexhub-geoip-update"            # refresh GeoIP now
 ```
 
+- Run one-off commands inside a release as `vertexhub` (`sudo -u vertexhub -H ...`), never as root. Root-owned files left in a release (pnpm's `node_modules/.pnpm-task-run-state-v1/` did it on 2026-10-20) make the next `vertexhub-deploy` fail at "pruning old releases" after a healthy switch, hiding its final "deployed <sha>" line. `find /srv/hub.vertexmedia.pro -xdev -user root` lists them; `chown -h vertexhub` fixes them.
+- Production data starts on 2026-10-08: at that deploy the owner had the database dropped and recreated empty. The backups taken before that reset have since passed the 14-day retention and are gone (checked 2026-10-28), so no data from before 2026-10-08 remains.
+
 ## Backups and restore
 
 `vertexhub-backup` writes the database dump, its table of contents, the environment, the nginx site, the deployed revision and the uploaded files. Files are a hard-linked snapshot of the previous backup (`rsync --link-dest`): a stored file never changes, so unchanged files take no extra space. Restore the database from a daily backup:

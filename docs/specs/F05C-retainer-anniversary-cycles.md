@@ -313,7 +313,7 @@ All Arabic RTL through i18next, dates in Asia/Damascus with Latin digits, period
 
 ## Appendix — default contract articles (seed, Arabic)
 
-Seeded into `contract_article_templates` in this order; the owner edits, adds and removes them in the settings. The blocks `{services}`, `{term}` and `{fees}` (K7) stand on their own lines at the end of articles 2, 3 and 4. Article texts are product content in Arabic.
+Seeded into `contract_article_templates` in this order; the owner edits, adds and removes them in the settings. The agency's paper contract that these articles follow held a real client's personal data (name, national ID, phone, email) and a named agency representative: none of it is copied into the repository, its fixtures or its tests; those details are entered in the app's settings and client records. The blocks `{services}`, `{term}` and `{fees}` (K7) stand on their own lines at the end of articles 2, 3 and 4. Article texts are product content in Arabic.
 
 1. **موضوع العقد** — تلتزم الوكالة بتقديم الخدمات الإعلامية والتسويقية والإبداعية والتقنية المتفق عليها مع العميل، وفق عرض السعر ونطاق العمل المعتمدين، واللذين يُعدّان جزءاً لا يتجزأ من هذا العقد. ولا تلتزم الوكالة بأي خدمات أو أعمال غير واردة ضمن نطاق العمل إلا بموافقة الطرفين على عرض أو ملحق إضافي.
 2. **نطاق الخدمات** — تشمل الخدمات المتفق عليها ما يلي، بالكميات المحددة لكل دورة. تُحتسب الكميات لكل دورة على حدة، ولا يُرحَّل ما لم يُستخدم منها إلى دورة لاحقة، ويُعالَج أي نقص من جهة الوكالة بالاتفاق على تعويضه في دورة لاحقة.
