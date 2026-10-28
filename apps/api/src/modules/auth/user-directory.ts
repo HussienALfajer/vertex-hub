@@ -453,10 +453,13 @@ export class UserDirectory implements OnModuleInit {
   ): Promise<void> {
     const unique = [...new Set(codes)];
     if (unique.length === 0) return;
+    // A share lock waits for an archive in progress (F23 rule 12, edge case 2): the write then
+    // reads the department as archived, instead of adding work the archive did not move.
     const rows = await executor
       .select({ archivedAt: departments.archivedAt })
       .from(departments)
-      .where(inArray(departments.code, unique));
+      .where(inArray(departments.code, unique))
+      .for('share');
     if (rows.length !== unique.length) {
       throw new CodedException(400, 'UNKNOWN_DEPARTMENT', 'A department does not exist');
     }

@@ -190,6 +190,42 @@ describe('departments management', () => {
       ).toBe(403);
     });
 
+    it('answers 404 for a department that does not exist', async () => {
+      const id = randomUUID();
+      expect(
+        (
+          await client.request('PATCH', `/api/departments/${id}`, {
+            cookie: operations.cookie,
+            body: { color: 'c2' },
+          })
+        ).status,
+      ).toBe(404);
+      expect(
+        (await client.get(`/api/departments/${id}/archive-preview`, cast.gm.cookie)).status,
+      ).toBe(404);
+      expect((await client.post(`/api/departments/${id}/restore`, cast.gm.cookie)).status).toBe(
+        404,
+      );
+    });
+
+    it('lets only a General Manager change a General Manager’s memberships', async () => {
+      const department = await createDepartment('general managers');
+      expect(
+        (
+          await client.post(`/api/departments/${department.id}/members`, operations.cookie, {
+            userIds: [cast.gm.id],
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await client.post(`/api/departments/${department.id}/members`, cast.gm.cookie, {
+            userIds: [cast.gm.id],
+          })
+        ).status,
+      ).toBe(200);
+    });
+
     it('keeps edits, order and members to user managers', async () => {
       const department = await createDepartment('edits');
       const id = department.id;
@@ -769,6 +805,38 @@ describe('departments management', () => {
         }),
         409,
         'DEPARTMENT_ARCHIVED',
+      );
+
+      // Every change on an archived department is refused; so is moving a member into it.
+      for (const response of [
+        await client.request('PATCH', `/api/departments/${archived.id}`, {
+          cookie: operations.cookie,
+          body: { color: 'c1' },
+        }),
+        await client.post(
+          `/api/departments/${archived.id}/members/${secondary.id}/primary`,
+          operations.cookie,
+        ),
+        await client.post(
+          `/api/departments/${archived.id}/members/${secondary.id}/move`,
+          operations.cookie,
+          { departmentId: target.id },
+        ),
+        await client.request('DELETE', `/api/departments/${archived.id}/members/${secondary.id}`, {
+          cookie: operations.cookie,
+        }),
+        await client.get(`/api/departments/${archived.id}/archive-preview`, cast.gm.cookie),
+      ]) {
+        await expectError(response, 409, 'DEPARTMENT_ARCHIVED');
+      }
+      await expectError(
+        await client.post(
+          `/api/departments/${target.id}/members/${manager.id}/move`,
+          operations.cookie,
+          { departmentId: archived.id },
+        ),
+        400,
+        'INVALID_TRANSFER_TARGET',
       );
 
       // Restore: empty, last in the order, once.
