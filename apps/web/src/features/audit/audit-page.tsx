@@ -54,7 +54,7 @@ import { departmentListQuery } from '../departments/departments.queries';
 import { projectListQuery } from '../projects/projects.queries';
 import { retainerListQuery } from '../retainers/retainers.queries';
 import { userListQuery } from '../users/users.queries';
-import { auditListQuery } from './audit.queries';
+import { type AuditFilters, auditListQuery } from './audit.queries';
 import { shownFields } from './audit-fields';
 import { type AuditNames, AuditValue } from './audit-value';
 
@@ -89,29 +89,11 @@ export function AuditPage({ search }: { search: AuditSearch }) {
   const names = useEntityNames();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const entries = useQuery(
-    auditListQuery({
-      entityType: search.entityType,
-      action: search.action,
-      actorId: search.actorId,
-      entityId: search.entityId,
-      from: search.from ? businessDayStart(search.from) : undefined,
-      to: search.to ? businessDayEnd(search.to) : undefined,
-      page,
-      pageSize: PAGE_SIZE,
-    }),
+  const openPage = useCallback(
+    (next: number | undefined, replace: boolean) =>
+      navigate({ search: (previous) => ({ ...previous, page: next }), replace }),
+    [navigate],
   );
-  usePageInRange(
-    page,
-    entries.data?.total,
-    PAGE_SIZE,
-    useCallback(
-      (next: number | undefined) =>
-        navigate({ search: (previous) => ({ ...previous, page: next }), replace: true }),
-      [navigate],
-    ),
-  );
-
   const setFilter = (next: Partial<AuditSearch>) =>
     navigate({ search: (previous) => ({ ...previous, ...next, page: undefined }), replace: true });
   const filtered = Object.entries(search).some(([key, value]) => key !== 'page' && value);
@@ -141,44 +123,80 @@ export function AuditPage({ search }: { search: AuditSearch }) {
           </Button>
         </p>
       )}
-      {entries.isPending ? (
-        <div className="flex flex-col gap-2">
-          {['a', 'b', 'c', 'd', 'e', 'f'].map((row) => (
-            <Skeleton key={row} className="h-14" />
-          ))}
-        </div>
-      ) : entries.isError ? (
-        <LoadError message={t('audit.loadError')} onRetry={() => entries.refetch()} />
-      ) : entries.data.items.length === 0 ? (
-        <EmptyState
-          icon={<HistoryIcon />}
-          title={t('audit.emptyTitle')}
-          description={t('audit.emptyHint')}
-        />
-      ) : (
-        <div className="flex flex-col gap-4">
-          <ol className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface">
-            {entries.data.items.map((entry) => (
-              <AuditRow key={entry.id} entry={entry} names={names} />
-            ))}
-          </ol>
-          <Pagination
-            page={page}
-            pageCount={Math.ceil(entries.data.total / PAGE_SIZE)}
-            onPageChange={(next) =>
-              navigate({ search: (previous) => ({ ...previous, page: next }) })
-            }
-            summary={t('common.pageSummary', {
-              from: formatNumber((page - 1) * PAGE_SIZE + 1),
-              to: formatNumber((page - 1) * PAGE_SIZE + entries.data.items.length),
-              total: formatNumber(entries.data.total),
-            })}
-            previousLabel={t('common.previous')}
-            nextLabel={t('common.next')}
-          />
-        </div>
-      )}
+      <AuditEntries
+        filters={{
+          entityType: search.entityType,
+          action: search.action,
+          actorId: search.actorId,
+          entityId: search.entityId,
+          from: search.from ? businessDayStart(search.from) : undefined,
+          to: search.to ? businessDayEnd(search.to) : undefined,
+        }}
+        page={page}
+        onPageChange={openPage}
+      />
     </>
+  );
+}
+
+/**
+ * A page of audit entries for the given filters, with loading, error, empty and paging; the
+ * audit page and a record's history tab (F23 department history) share it.
+ */
+export function AuditEntries({
+  filters,
+  page,
+  onPageChange,
+}: {
+  filters: Omit<AuditFilters, 'page' | 'pageSize'>;
+  page: number;
+  /** `replace` when the page fell out of range and is corrected. */
+  onPageChange: (page: number | undefined, replace: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const names = useEntityNames();
+  const entries = useQuery(auditListQuery({ ...filters, page, pageSize: PAGE_SIZE }));
+  usePageInRange(
+    page,
+    entries.data?.total,
+    PAGE_SIZE,
+    useCallback((next: number | undefined) => onPageChange(next, true), [onPageChange]),
+  );
+
+  return entries.isPending ? (
+    <div className="flex flex-col gap-2">
+      {['a', 'b', 'c', 'd', 'e', 'f'].map((row) => (
+        <Skeleton key={row} className="h-14" />
+      ))}
+    </div>
+  ) : entries.isError ? (
+    <LoadError message={t('audit.loadError')} onRetry={() => entries.refetch()} />
+  ) : entries.data.items.length === 0 ? (
+    <EmptyState
+      icon={<HistoryIcon />}
+      title={t('audit.emptyTitle')}
+      description={t('audit.emptyHint')}
+    />
+  ) : (
+    <div className="flex flex-col gap-4">
+      <ol className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface">
+        {entries.data.items.map((entry) => (
+          <AuditRow key={entry.id} entry={entry} names={names} />
+        ))}
+      </ol>
+      <Pagination
+        page={page}
+        pageCount={Math.ceil(entries.data.total / PAGE_SIZE)}
+        onPageChange={(next) => onPageChange(next, false)}
+        summary={t('common.pageSummary', {
+          from: formatNumber((page - 1) * PAGE_SIZE + 1),
+          to: formatNumber((page - 1) * PAGE_SIZE + entries.data.items.length),
+          total: formatNumber(entries.data.total),
+        })}
+        previousLabel={t('common.previous')}
+        nextLabel={t('common.next')}
+      />
+    </div>
   );
 }
 

@@ -72,8 +72,8 @@ import {
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { type ReturnFocus, useReturnFocus } from '../../lib/use-return-focus';
 import { useSearchText } from '../../lib/use-search-text';
+import { DepartmentCodeBadge } from '../departments/department-badge';
 import { useDepartmentItems } from '../departments/department-items';
-import { useDepartmentNames } from '../projects/project-badges';
 import {
   packageListQuery,
   serviceListQuery,
@@ -462,7 +462,6 @@ function ServicesTable({
   returnFocus: ReturnFocus;
 }) {
   const { t } = useTranslation();
-  const nameOf = useDepartmentNames();
   const [archiving, setArchiving] = useState<CatalogService | null>(null);
   const setArchived = useSetServiceArchived();
 
@@ -516,7 +515,9 @@ function ServicesTable({
                   )}
                 </div>
               </TableCell>
-              <TableCell>{nameOf(service.department)}</TableCell>
+              <TableCell>
+                <DepartmentCodeBadge code={service.department} plain />
+              </TableCell>
               <TableCell>
                 <BillingBadge billing={service.billing} />
               </TableCell>

@@ -222,10 +222,10 @@ test('the manager picker starts from the current manager each time', async ({ pa
   await expect(page.getByRole('dialog').getByRole('combobox')).toHaveText('ليان الأحمد');
 });
 
-test('the rename dialog starts from the saved name and gives the focus back', async ({ page }) => {
+test('the edit dialog starts from the saved name and gives the focus back', async ({ page }) => {
   await mockApi(page, { signedIn: true });
   await page.goto(`/departments/${seedIds.design}`);
-  const rename = page.getByRole('button', { name: ar.departments.detail.rename });
+  const rename = page.getByRole('button', { name: ar.common.edit, exact: true });
   await rename.click();
   const name = page.getByRole('dialog').getByLabel(ar.departments.detail.name);
   const saved = await name.inputValue();

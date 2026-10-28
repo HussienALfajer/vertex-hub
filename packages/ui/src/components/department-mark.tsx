@@ -1,4 +1,11 @@
-import type { DepartmentColor, DepartmentIcon } from '@vertex-hub/contracts';
+import { Radio as RadioPrimitive } from '@base-ui/react/radio';
+import { RadioGroup as RadioGroupPrimitive } from '@base-ui/react/radio-group';
+import {
+  DEPARTMENT_COLORS,
+  DEPARTMENT_ICONS,
+  type DepartmentColor,
+  type DepartmentIcon,
+} from '@vertex-hub/contracts';
 import { cva, type VariantProps } from 'class-variance-authority';
 import {
   BriefcaseIcon,
@@ -125,4 +132,95 @@ function DepartmentMark({ color, icon, size, muted, className, ...props }: Depar
   );
 }
 
-export { DepartmentMark, type DepartmentMarkProps, departmentBackground, departmentIcons };
+interface PickerProps<Value> {
+  value: Value;
+  onValueChange: (value: Value) => void;
+  /** The accessible name of each option (the app translates it). */
+  optionLabel: (value: Value) => string;
+  /** The group's accessible name: its label element, or the name itself. */
+  'aria-labelledby'?: string;
+  'aria-label'?: string;
+  id?: string;
+  className?: string;
+}
+
+const optionClass = cn(
+  'flex cursor-pointer items-center justify-center rounded-md border-2 border-transparent outline-none',
+  'transition-colors duration-150 ease-out hover:border-border',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+  'data-checked:border-foreground',
+);
+
+/** The eight department colors as swatches; one is always chosen. */
+function DepartmentColorPicker({
+  value,
+  onValueChange,
+  optionLabel,
+  className,
+  ...props
+}: PickerProps<DepartmentColor>) {
+  return (
+    <RadioGroupPrimitive<DepartmentColor>
+      data-slot="department-color-picker"
+      value={value}
+      onValueChange={(next) => onValueChange(next)}
+      className={cn('flex flex-wrap gap-1.5', className)}
+      {...props}
+    >
+      {DEPARTMENT_COLORS.map((color) => (
+        <RadioPrimitive.Root<DepartmentColor>
+          key={color}
+          value={color}
+          aria-label={optionLabel(color)}
+          className={cn(optionClass, 'size-9 p-0.5')}
+        >
+          <span className={cn('size-full rounded-sm', departmentBackground[color])} />
+        </RadioPrimitive.Root>
+      ))}
+    </RadioGroupPrimitive>
+  );
+}
+
+/** The curated department icons as a grid, each on the chosen color. */
+function DepartmentIconPicker({
+  value,
+  onValueChange,
+  optionLabel,
+  color,
+  className,
+  ...props
+}: PickerProps<DepartmentIcon> & { color: DepartmentColor }) {
+  return (
+    <RadioGroupPrimitive<DepartmentIcon>
+      data-slot="department-icon-picker"
+      value={value}
+      onValueChange={(next) => onValueChange(next)}
+      className={cn('grid grid-cols-6 gap-1.5 sm:grid-cols-10', className)}
+      {...props}
+    >
+      {DEPARTMENT_ICONS.map((icon) => (
+        <RadioPrimitive.Root<DepartmentIcon>
+          key={icon}
+          value={icon}
+          aria-label={optionLabel(icon)}
+          className={cn(optionClass, 'group p-0.5')}
+        >
+          <DepartmentMark
+            color={color}
+            icon={icon}
+            className="opacity-60 transition-opacity duration-150 group-hover:opacity-100 group-data-checked:opacity-100"
+          />
+        </RadioPrimitive.Root>
+      ))}
+    </RadioGroupPrimitive>
+  );
+}
+
+export {
+  DepartmentColorPicker,
+  DepartmentIconPicker,
+  DepartmentMark,
+  type DepartmentMarkProps,
+  departmentBackground,
+  departmentIcons,
+};

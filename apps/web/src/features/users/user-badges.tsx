@@ -1,7 +1,8 @@
-import type { UserDepartment, UserStatus } from '@vertex-hub/contracts';
-import { Badge } from '@vertex-hub/ui';
+import type { DepartmentResponse, UserDepartment, UserStatus } from '@vertex-hub/contracts';
+import { Badge, DepartmentMark } from '@vertex-hub/ui';
 import { ShieldCheckIcon, ShieldOffIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useDepartmentByCode } from '../departments/department-badge';
 
 const statusTone = { active: 'success', invited: 'info', archived: 'neutral' } as const;
 
@@ -32,11 +33,13 @@ export function TwoFactorIndicator({ enabled }: { enabled: boolean }) {
 /** The primary department, then secondary ones as outlined chips, with a marker where they manage. */
 export function DepartmentChips({ departments }: { departments: UserDepartment[] }) {
   const { t } = useTranslation();
+  const departmentOf = useDepartmentByCode();
   if (departments.length === 0) return <Badge tone="warning">{t('users.noDepartment')}</Badge>;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {departments.map((department) => (
         <Badge key={department.id} tone={department.isPrimary ? 'neutral' : 'outline'}>
+          <DepartmentIdentity department={departmentOf(department.code)} />
           {department.isManager && (
             <span aria-hidden="true" className="inline-block h-3 w-0.5 -skew-x-30 bg-accent" />
           )}
@@ -49,4 +52,11 @@ export function DepartmentChips({ departments }: { departments: UserDepartment[]
       ))}
     </div>
   );
+}
+
+/** A department's mark inside a chip that is not a `DepartmentBadge` (it carries the membership). */
+function DepartmentIdentity({ department }: { department: DepartmentResponse | undefined }) {
+  return department ? (
+    <DepartmentMark color={department.color} icon={department.icon} size="sm" className="-ms-1" />
+  ) : null;
 }
