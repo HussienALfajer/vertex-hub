@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
   BOARD_LIMITS,
-  DEPARTMENT_CODES,
   type DepartmentCode,
   type Task,
   type TaskBoard,
@@ -44,11 +43,12 @@ import { LoadError } from '../../components/load-error';
 import { errorMessage } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
-import { flagParam, idParam, listParam } from '../../lib/search-params';
+import { departmentListParam, flagParam, idParam } from '../../lib/search-params';
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { userListQuery } from '../users/users.queries';
 import { NewTaskButtons } from './my-tasks-page';
 import {
@@ -89,7 +89,7 @@ export interface TaskBoardSearch {
 /** Reads the board filters from the URL, dropping anything malformed. */
 export function parseTaskBoardSearch(search: Record<string, unknown>): TaskBoardSearch {
   return {
-    department: listParam(DEPARTMENT_CODES, search.department),
+    department: departmentListParam(search.department),
     assignee: search.assignee === 'me' ? 'me' : idParam(search.assignee),
     clientId: idParam(search.clientId),
     topLevel: flagParam(search.topLevel),
@@ -156,7 +156,10 @@ function BoardFilters({
   const clients = useQuery(
     clientListQuery({ status: ['active', 'paused', 'ended'], pageSize: 100 }),
   );
-  const departmentOptions = (departments.data?.items ?? []).map(({ code, name }) => ({
+  const departmentOptions = pickableDepartments(
+    departments.data?.items ?? [],
+    search.department,
+  ).map(({ code, name }) => ({
     code,
     name,
   }));

@@ -107,7 +107,9 @@ export function HrMonthPage({ month, search }: { month: string; search: HrMonthS
     navigate({ to: '/hr/months/$month', params: { month: next }, search });
   const departmentItems = [
     { value: ALL, label: t('users.allDepartments') },
-    ...(departments.data?.items ?? []).map((d) => ({ value: d.id, label: d.name })),
+    ...(departments.data?.items ?? [])
+      .filter((d) => !d.archivedAt || d.id === search.departmentId)
+      .map((d) => ({ value: d.id, label: d.name })),
   ];
 
   return (

@@ -19,9 +19,9 @@ import {
   CREW_ROLES,
   CYCLE_STATUSES,
   DELIVERABLE_KINDS,
-  DEPARTMENT_CODES,
   type DepartmentCode,
   DISCOUNT_APPROVALS,
+  departmentCodeSchema,
   EXTRA_WORK_BILLING,
   FILE_FINAL_SOURCES,
   FILE_VERSION_KINDS,
@@ -443,7 +443,7 @@ export function AuditValue({
   }
   if (
     (field === 'department' || field === 'addressedDepartment') &&
-    DEPARTMENT_CODES.some((code) => code === value)
+    departmentCodeSchema.safeParse(value).success
   ) {
     return <DepartmentItem code={value as DepartmentCode} />;
   }
@@ -524,7 +524,7 @@ function ListItem({
   names: AuditNames;
 }) {
   const { t } = useTranslation();
-  if (field === 'departments' && DEPARTMENT_CODES.some((code) => code === item)) {
+  if (field === 'departments' && departmentCodeSchema.safeParse(item).success) {
     return <DepartmentItem code={item as DepartmentCode} />;
   }
   if (typeof item === 'number') {

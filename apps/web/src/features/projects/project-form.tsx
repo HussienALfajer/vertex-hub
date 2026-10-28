@@ -37,6 +37,7 @@ import { imageSrc } from '../../lib/images';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { userListQuery } from '../users/users.queries';
 import { projectCreateScope } from './project-access';
 
@@ -277,7 +278,10 @@ export function DepartmentsField({ form }: { form: ProjectFormMethods }) {
   const id = useId();
   const departments = useQuery(departmentListQuery);
   const error = form.formState.errors.departments;
-  const items = (departments.data?.items ?? []).map(({ code, name }) => ({ code, name }));
+  const items = pickableDepartments(
+    departments.data?.items ?? [],
+    form.getValues('departments') ?? [],
+  ).map(({ code, name }) => ({ code, name }));
   const byCode = new Map(items.map((item) => [item.code, item]));
   return (
     <Field invalid={!!error}>

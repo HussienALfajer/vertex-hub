@@ -76,7 +76,9 @@ export function HrTodayPage({ search }: { search: HrTodaySearch }) {
 
   const departmentItems = [
     { value: ALL, label: t('users.allDepartments') },
-    ...(departments.data?.items ?? []).map((d) => ({ value: d.id, label: d.name })),
+    ...(departments.data?.items ?? [])
+      .filter((d) => !d.archivedAt || d.id === search.departmentId)
+      .map((d) => ({ value: d.id, label: d.name })),
   ];
   const rows = board.data?.rows ?? [];
   const groups = GROUPS.map(([key, match]) => ({ key, rows: rows.filter(match) }));

@@ -149,7 +149,9 @@ function Filters({
 
   const departmentItems = [
     { value: ALL, label: t('users.allDepartments') },
-    ...(departments.data?.items ?? []).map((d) => ({ value: d.id, label: d.name })),
+    ...(departments.data?.items ?? [])
+      .filter((d) => !d.archivedAt || d.id === search.departmentId)
+      .map((d) => ({ value: d.id, label: d.name })),
   ];
   const statusItems = EMPLOYEE_STATUSES.map((status) => ({
     value: status,

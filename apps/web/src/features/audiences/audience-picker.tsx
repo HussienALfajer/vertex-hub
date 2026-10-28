@@ -36,6 +36,7 @@ import { formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { useDepartmentNames } from '../projects/project-badges';
 import { projectListQuery } from '../projects/projects.queries';
 import { userListQuery } from '../users/users.queries';
@@ -134,10 +135,13 @@ export function AudiencePicker({
   });
 
   const options: Record<ListSource, Option[]> = {
-    departments: (departments.data?.items ?? []).map(({ code, name }) => ({
-      id: code,
-      label: name,
-    })),
+    // F23 edge case 9: a stored archived department stays listed so the author can remove it.
+    departments: pickableDepartments(departments.data?.items ?? [], value.departments).map(
+      ({ code, name, archivedAt }) => ({
+        id: code,
+        label: archivedAt ? t('departments.archivedName', { name }) : name,
+      }),
+    ),
     roles: ROLES.map((role) => ({ id: role, label: t(`roles.${role}`) })),
     users: (users.data?.items ?? []).map(({ id, name }) => ({ id, label: name })),
     projects: (projects.data?.items ?? []).map(({ id, name, client }) => ({

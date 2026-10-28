@@ -96,7 +96,13 @@ export function UserForm({
   });
 
   const primaryId = watch('primaryDepartmentId');
-  const departmentList = departments.data?.items ?? [];
+  // F23 rule 5: active departments, and the ones the user already belongs to.
+  const departmentList = (departments.data?.items ?? []).filter(
+    (d) =>
+      !d.archivedAt ||
+      d.id === defaultValues.primaryDepartmentId ||
+      defaultValues.secondaryDepartmentIds?.includes(d.id),
+  );
   const departmentItems = departmentList.map((d) => ({ value: d.id, label: d.name }));
   // General Manager and Finance: shown to others only when the user already holds them, locked.
   const roles = ASSIGNABLE_ROLES.filter(

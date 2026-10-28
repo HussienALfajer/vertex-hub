@@ -7,7 +7,6 @@ import {
   type CreateTask,
   createTaskSchema,
   DEFAULT_REVISION_LIMIT,
-  DEPARTMENT_CODES,
   type DepartmentCode,
   keepsBriefFields,
   type ReadinessWarning,
@@ -56,7 +55,7 @@ import { ApiError } from '../../lib/api/client';
 import { useMe } from '../../lib/auth';
 import { errorMessage, SCREEN_ERROR } from '../../lib/errors';
 import { formatNumber } from '../../lib/format';
-import { idParam, oneOfParam } from '../../lib/search-params';
+import { departmentParam, idParam } from '../../lib/search-params';
 import { useDebouncedValue } from '../../lib/use-search-text';
 import { StartFromTemplateDialog } from '../templates/task-template-dialogs';
 import { assigneeLeaves, LeaveWarningDialog } from './leave-warning';
@@ -125,7 +124,7 @@ export interface NewTaskSearch {
 export function parseNewTaskSearch(search: Record<string, unknown>): NewTaskSearch {
   return {
     mode: search.mode === 'request' ? 'request' : undefined,
-    department: oneOfParam(DEPARTMENT_CODES, search.department),
+    department: departmentParam(search.department),
     clientId: idParam(search.clientId),
     projectId: idParam(search.projectId),
     milestoneId: idParam(search.milestoneId),

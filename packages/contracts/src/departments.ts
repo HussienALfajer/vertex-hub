@@ -142,7 +142,10 @@ export type DepartmentResponse = z.infer<typeof departmentResponseSchema>;
 
 export const departmentListResponseSchema = z
   .object({ items: z.array(departmentResponseSchema) })
-  .meta({ id: 'DepartmentList', description: 'Active departments in their order, then archived ones' });
+  .meta({
+    id: 'DepartmentList',
+    description: 'Active departments in their order, then archived ones',
+  });
 
 export type DepartmentListResponse = z.infer<typeof departmentListResponseSchema>;
 

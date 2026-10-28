@@ -59,6 +59,7 @@ import { useDebouncedValue } from '../../lib/use-search-text';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { clientListQuery, clientQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { projectListQuery, projectQuery } from '../projects/projects.queries';
 import { lineName } from '../retainers/retainer-badges';
 import { retainerListQuery } from '../retainers/retainers.queries';
@@ -267,10 +268,13 @@ export function DueFields({ form, allowPast }: { form: TaskFormMethods; allowPas
   );
 }
 
-/** Department names and ids by code, from the API (names are editable, F01). */
-export function useDepartments() {
+/**
+ * The departments a picker offers, from the API (names are editable, F01): the active ones in
+ * their order, and the archived ones among `kept` (F23 rule 5).
+ */
+export function useDepartments(kept: readonly DepartmentCode[] = []) {
   const departments = useQuery(departmentListQuery);
-  return departments.data?.items ?? [];
+  return pickableDepartments(departments.data?.items ?? [], kept);
 }
 
 export function DepartmentField({
@@ -330,7 +334,9 @@ export function useDepartmentMembers(
   department: DepartmentCode | undefined,
   enabled = true,
 ): AssigneeOption[] {
-  const departmentId = useDepartments().find(({ code }) => code === department)?.id;
+  const departmentId = useDepartments(department ? [department] : []).find(
+    ({ code }) => code === department,
+  )?.id;
   const members = useQuery({
     ...userListQuery({ departmentId, pageSize: 100 }),
     enabled: !!departmentId && enabled,

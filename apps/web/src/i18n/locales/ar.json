@@ -294,6 +294,7 @@
     "MANAGER_NOT_MEMBER": "مدير القسم يجب أن يكون عضوًا نشطًا فيه.",
     "MANAGER_MEMBERSHIP_REQUIRED": "لا يمكن إخراج المستخدم من قسم يديره. غيّر مدير القسم أولًا.",
     "DEPARTMENT_NAME_TAKEN": "يوجد قسم آخر بهذا الاسم.",
+    "DEPARTMENT_ARCHIVED": "هذا القسم مؤرشف. اختر قسمًا نشطًا.",
     "LINK_INVALID": "الرابط غير صالح أو انتهت صلاحيته.",
     "CURRENT_SESSION": "لا يمكن تسجيل الخروج من هذا الجهاز من هنا.",
     "CLIENT_NAME_TAKEN": "يوجد عميل آخر بهذا الاسم التجاري.",
@@ -729,7 +730,8 @@
   },
   "departments": {
     "title": "الأقسام",
-    "subtitle": "الأقسام العشرة ومديروها وأعضاؤها.",
+    "subtitle": "أقسام الوكالة ومديروها وأعضاؤها.",
+    "archivedName": "{{name}} (مؤرشف)",
     "manager": "المدير",
     "noManager": "بلا مدير",
     "memberCount_zero": "لا أعضاء",

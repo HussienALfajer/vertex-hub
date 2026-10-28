@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
-  DEPARTMENT_CODES,
   type DepartmentCode,
   OPEN_TASK_STATUSES,
   REVIEW_STAGES,
@@ -68,6 +67,7 @@ import { imageSrc } from '../../lib/images';
 import {
   ALL,
   dayParam,
+  departmentListParam,
   flagParam,
   idParam,
   listParam,
@@ -79,6 +79,7 @@ import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { projectListQuery } from '../projects/projects.queries';
 import { retainerListQuery } from '../retainers/retainers.queries';
 import { userListQuery } from '../users/users.queries';
@@ -150,7 +151,7 @@ export function parseTaskListSearch(search: Record<string, unknown>): TaskListSe
   return {
     search: textParam(search.search, 100),
     status: listParam(TASK_STATUSES, search.status),
-    department: listParam(DEPARTMENT_CODES, search.department),
+    department: departmentListParam(search.department),
     assignee:
       search.assignee === 'me' || search.assignee === 'unassigned'
         ? search.assignee
@@ -392,7 +393,10 @@ function Filters({
     { value: ALL, label: t('tasks.filters.allTypes') },
     ...TASK_TYPES.map((type) => ({ value: type, label: t(`tasks.types.${type}`) })),
   ];
-  const departmentOptions = (departments.data?.items ?? []).map(({ code, name }) => ({
+  const departmentOptions = pickableDepartments(
+    departments.data?.items ?? [],
+    search.department,
+  ).map(({ code, name }) => ({
     code,
     name,
   }));

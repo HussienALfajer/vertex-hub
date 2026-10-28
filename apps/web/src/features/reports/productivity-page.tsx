@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import {
-  DEPARTMENT_CODES,
-  type DepartmentCode,
-  type ProductivityMeasures,
-  type ProductivityReport,
+import type {
+  DepartmentCode,
+  ProductivityMeasures,
+  ProductivityReport,
 } from '@vertex-hub/contracts';
 import {
   Badge,
@@ -27,8 +26,9 @@ import { useTranslation } from 'react-i18next';
 import { LoadError } from '../../components/load-error';
 import { scopesOf, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
-import { listParam } from '../../lib/search-params';
+import { departmentListParam } from '../../lib/search-params';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { managedDepartments } from '../tasks/task-access';
 import {
   BackToReports,
@@ -48,7 +48,7 @@ export interface ProductivitySearch extends PeriodSearch {
 export function parseProductivitySearch(search: Record<string, unknown>): ProductivitySearch {
   return {
     ...parsePeriodSearch(search),
-    department: listParam(DEPARTMENT_CODES, search.department),
+    department: departmentListParam(search.department),
   };
 }
 
@@ -108,11 +108,11 @@ function DepartmentFilter({
   const id = useId();
   const me = useMe();
   const departments = useQuery(departmentListQuery);
-  const inScope = scopesOf(me, 'reports.read').includes('all')
-    ? DEPARTMENT_CODES
-    : managedDepartments(me);
-  const options = (departments.data?.items ?? [])
-    .filter(({ code }) => inScope.includes(code))
+  const all = scopesOf(me, 'reports.read').includes('all');
+  const managed = managedDepartments(me);
+  // F23 rule 6: active departments, and an archived one the filter already names.
+  const options = pickableDepartments(departments.data?.items ?? [], value)
+    .filter(({ code }) => all || managed.includes(code))
     .map(({ code, name }) => ({ code, name }));
   return (
     <Field className="flex-1">

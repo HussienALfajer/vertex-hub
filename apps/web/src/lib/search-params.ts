@@ -1,4 +1,9 @@
-import { calendarDateSchema, reportMonthSchema } from '@vertex-hub/contracts';
+import {
+  calendarDateSchema,
+  type DepartmentCode,
+  departmentCodeSchema,
+  reportMonthSchema,
+} from '@vertex-hub/contracts';
 
 /*
  * Readers for URL search params. Each returns the value when it is well formed, else undefined,
@@ -50,4 +55,16 @@ export function listParam<T extends string>(known: readonly T[], value: unknown)
 export function pageParam(value: unknown): number | undefined {
   const page = Number(value);
   return Number.isInteger(page) && page > 1 ? page : undefined;
+}
+
+/** A department code; the departments come from the API, so any well-formed code (F23 rule 6). */
+export const departmentParam = (value: unknown): DepartmentCode | undefined =>
+  departmentCodeSchema.safeParse(value).success ? (value as DepartmentCode) : undefined;
+
+/** The well-formed department codes of the list, each once; undefined when none. */
+export function departmentListParam(value: unknown): DepartmentCode[] | undefined {
+  const picked = Array.isArray(value)
+    ? [...new Set(value.flatMap((item) => departmentParam(item) ?? []))]
+    : [];
+  return picked.length > 0 ? picked : undefined;
 }
