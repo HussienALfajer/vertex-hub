@@ -1,13 +1,27 @@
-# TASKS — Repository audit and handover between sessions
+# TASKS — F23 Departments management (first package)
 
-Owner request (2026-10-28): check that every branch is merged into `main`, the local checkout matches it and production runs it; make `TASKS.md` and everything else needed to continue a feature available to a cloud session. One PR.
+Spec: `docs/specs/F23-departments-management.md` (Approved 2026-10-28) · ADR 0043 · PR split from the spec (1 records, 2 API, 3 screens).
 
-- Branch: `docs/cloud-handoff`
-- Stopped at: done; PR open with auto-merge
+- Branch: `claude/wizardly-galileo-lr0tiv` (cloud session's designated branch; PR 1)
+- Stopped at: plan written, waiting for the owner's approval; next: PR 1 contracts layer
 
-## PR 1 — Handover rules and audit notes (`docs/cloud-handoff`)
-- [x] Audit: one local branch (`main`) equal to `origin/main`, no remote branches, open PRs, stashes or extra worktrees; production on `11dc9e6`, and later commits change only tests, CI and docs
-- [x] `TASKS.md` as the handover note (branch, "Stopped at"), pushed after the approved plan, after each layer and before a session ends unfinished (`AGENTS.md`, `docs/workflow.md` "Continuing in another session", `/feature-slice`)
-- [x] Facts only in the agent's local memory moved into the repository: release ownership and production data start (`docs/deployment.md`), the paper contract's personal data (F05C spec)
-- [x] `docs/ROADMAP.md`: the 2026-10-28 deploy
-- [x] documentation only, CI runs the checks; PR with auto-merge
+## PR 1 — Departments as records (contracts, db, api, web adjustments; no new screens)
+- [ ] contracts: `departmentCodeSchema` as the pattern `^[a-z][a-z0-9_]{1,39}$`; `SYSTEM_DEPARTMENT_CODES` (today's `DEPARTMENT_CODES`); `DEPARTMENT_CAPABILITIES` and `DEPARTMENT_BRIEF_KINDS` keyed by system codes; `DEPARTMENT_COLORS`, `DEPARTMENT_ICONS`, `DEPARTMENT_SYSTEM_FUNCTIONS`; `departmentResponseSchema` gains `description`, `color`, `icon`, `position`, `archivedAt`; error codes `UNKNOWN_DEPARTMENT`, `DEPARTMENT_ARCHIVED`; unit tests (pattern, system functions cover the capability keys)
+- [ ] db (`/db-migration`): enum columns to `text` with foreign keys to `departments.code` (arrays checked by services), enum dropped; `description`, `color` (enum `department_color`), `icon`, `position` with the seeded values; migration test
+- [ ] api: departments list read from the database wherever `DEPARTMENT_CODES` was used (task views, dashboard, report access); every write that takes a code checks it (`UNKNOWN_DEPARTMENT`, `DEPARTMENT_ARCHIVED` on writes; filters accept archived codes); lists and pickers in department order; system-recipient fallback to the General Managers while a system department is archived (rule 14), unit-tested per function; tests
+- [ ] bridge: `openapi:export`, `api:generate`
+- [ ] web: filters and pickers read the departments query instead of `DEPARTMENT_CODES` (tasks, board, workload, new task, catalog, projects, retainers, productivity, audit values); `ar.json` keys for the new error codes; fixtures adapted
+- [ ] wiring checklist, checks, reviewer, PR with auto-merge
+
+## PR 2 — Departments API
+- [ ] contracts: `departments.manage` (General Manager through `everything`); create, update, order, archive preview, archive, member and overview schemas; error codes (`DEPARTMENT_NAME_TAKEN`, `DEPARTMENT_ORDER_MISMATCH`, `TRANSFER_TARGET_REQUIRED`, `INVALID_TRANSFER_TARGET`, `DEPARTMENT_NOT_ARCHIVED`, `ALREADY_MEMBER`, `MANAGER_MEMBERSHIP_REQUIRED`); audit actions; notification types `department_member_added`, `department_member_removed`, `department_archived` (with `ar.json` and `packages/messages` texts)
+- [ ] api: create, edit identity, order, archive preview and transfer (one transaction, exported services of tasks, catalog, quotes, templates, projects, retainers), restore, members (add, primary, move, remove), overview; audit and notices; `test/departments.test.ts` per endpoint and rule; architecture test
+- [ ] bridge: `openapi:export`, `api:generate`
+- [ ] wiring checklist, checks, reviewer, PR with auto-merge
+
+## PR 3 — Departments screens
+- [ ] ui: `--department-1` … `--department-8` tokens (light and dark) with contrast checks
+- [ ] web: departments list (reorder, archived toggle, new-department dialog), department page tabs (overview, members, what it grants, history), archive wizard, restore; `DepartmentBadge` across the app; `permissions.<name>` labels; loading, empty and error states
+- [ ] e2e: fixtures, `f23.spec.ts`, screenshots in `screens.spec.ts` (light and dark)
+- [ ] `docs/ROADMAP.md`: F23 first package done
+- [ ] wiring checklist, checks, reviewer, PR with auto-merge
