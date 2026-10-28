@@ -50,6 +50,7 @@ New permission `departments.manage`: General Manager only (through `everything`)
 | `position` | integer | new, required; the order of active departments; seeded in id order (1–10); a new or restored department goes last |
 | `manager_id` | uuid → `users.id` | unchanged |
 | `archived_at` | timestamptz | now used: set by archiving, cleared by restoring. An archived department has no members and no manager |
+| `archived_by_id` | uuid → `users.id` | new (PR 2): who archived it (rule 26); cleared by restoring |
 
 ### Department columns on other tables (ADR 0043)
 Each becomes `text` holding a department code with a foreign key to `departments.code`, values unchanged:
@@ -131,7 +132,7 @@ Each becomes `text` holding a department code with a foreign key to `departments
 30. `DEPARTMENT_SYSTEM_FUNCTIONS` names, per system code: `internal_operations` → escalations and follow-ups, user and system management; `medical_consultation` → medical review; `general_communication`, `marketing` → lead ownership and reminders; `content_management` → content management and review; `photography` → shoots. General Management, Public Relations, Design and Development have none.
 
 ## API
-All in `auth` (`departments.controller.ts`). Lists follow ADR 0013.
+All in `auth` (`departments.controller.ts`), except the overview, which `reports` serves (it reads tasks, catalog, engagements and leave, which `auth` cannot import). The archive moves work through `auth`'s `DepartmentTransfers` registry, where each owning module registers its category. Lists follow ADR 0013.
 
 | Method and path | Permission | Request | Response | Error codes |
 |---|---|---|---|---|
