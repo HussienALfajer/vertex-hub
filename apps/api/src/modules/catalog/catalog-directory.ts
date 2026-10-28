@@ -12,7 +12,7 @@ import {
   type Database,
   type Transaction,
 } from '@vertex-hub/db';
-import { asc, inArray, isNull } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 
 export interface CatalogServiceEntry {
@@ -91,6 +91,15 @@ export class CatalogDirectory {
         .orderBy(asc(catalogPackages.name)),
     ]);
     return { services, packages };
+  }
+
+  /** F23 rule 24: the non-archived services the department performs. */
+  async activeServiceCount(department: DepartmentCode): Promise<number> {
+    const [row] = await this.db
+      .select({ value: count() })
+      .from(catalogServices)
+      .where(and(eq(catalogServices.department, department), isNull(catalogServices.archivedAt)));
+    return row?.value ?? 0;
   }
 
   async packages(

@@ -50,6 +50,11 @@ import { type AuditActor, changedFields, recordAudit } from '../audit/index.js';
 import { AccountEmails } from './account-emails.js';
 import { AccountNotices } from './account-notices.js';
 import type { CurrentUserInfo } from './current-user.decorator.js';
+import {
+  departmentsSnapshot,
+  membershipsOf,
+  recordMembershipChanges,
+} from './department-memberships.js';
 import { resetTwoFactor } from './reset-two-factor.js';
 import { ResponsibilityRegistry } from './responsibility-registry.js';
 import { UserDirectory } from './user-directory.js';
@@ -74,12 +79,6 @@ interface LoadedUser {
   twoFactorEnabled: boolean;
   departments: UserDepartment[];
   roles: AssignableRole[];
-}
-
-/** The departments of a user as audit entries show them: names, not only ids. */
-interface DepartmentsSnapshot {
-  primaryDepartment: { id: string; name: string } | null;
-  secondaryDepartments: { id: string; name: string }[];
 }
 
 const actorOf = (user: CurrentUserInfo): AuditActor => ({ id: user.id, name: user.name });
@@ -218,8 +217,15 @@ export class UsersService {
         action: 'user.created',
         entityType: 'user',
         entityId: id,
-        after: { ...profile, roles, ...(await this.departmentsSnapshot(tx, id)) },
+        after: { ...profile, roles, ...(await departmentsSnapshot(tx, id)) },
       });
+      await recordMembershipChanges(
+        tx,
+        actorOf(actor),
+        { id, name: profile.name },
+        new Map(),
+        await membershipsOf(tx, id),
+      );
       return this.issueLink(tx, actor, id, 'activation');
     });
     return { user: await this.detail(actor, id), link };
@@ -687,7 +693,8 @@ export class UsersService {
       );
     }
 
-    const before = await this.departmentsSnapshot(tx, current.id);
+    const before = await departmentsSnapshot(tx, current.id);
+    const membershipsBefore = await membershipsOf(tx, current.id);
     if (removed.length > 0) {
       await tx.delete(departmentMembers).where(
         and(
@@ -725,8 +732,15 @@ export class UsersService {
       entityType: 'user',
       entityId: current.id,
       before: { ...before },
-      after: { ...(await this.departmentsSnapshot(tx, current.id)) },
+      after: { ...(await departmentsSnapshot(tx, current.id)) },
     });
+    await recordMembershipChanges(
+      tx,
+      actorOf(actor),
+      current,
+      membershipsBefore,
+      await membershipsOf(tx, current.id),
+    );
     if (removed.length > 0 || added.length > 0) {
       await this.notifyMoved(tx, actor, current, removed, added);
     }
@@ -798,26 +812,6 @@ export class UsersService {
       .from(departments)
       .where(inArray(departments.id, ids))
       .orderBy(asc(departments.name));
-  }
-
-  private async departmentsSnapshot(tx: Transaction, userId: string): Promise<DepartmentsSnapshot> {
-    const rows = await tx
-      .select({
-        id: departments.id,
-        name: departments.name,
-        isPrimary: departmentMembers.isPrimary,
-      })
-      .from(departmentMembers)
-      .innerJoin(departments, eq(departments.id, departmentMembers.departmentId))
-      .where(eq(departmentMembers.userId, userId))
-      .orderBy(asc(departments.name));
-    const primary = rows.find((row) => row.isPrimary);
-    return {
-      primaryDepartment: primary ? { id: primary.id, name: primary.name } : null,
-      secondaryDepartments: rows
-        .filter((row) => !row.isPrimary)
-        .map(({ id, name }) => ({ id, name })),
-    };
   }
 
   private async issueLink(

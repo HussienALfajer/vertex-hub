@@ -7,6 +7,7 @@ import { CatalogModule } from '../catalog/index.js';
 import { ClientsModule } from '../clients/index.js';
 import { ContentModule } from '../content/index.js';
 import { FilesModule } from '../files/index.js';
+import { HrModule } from '../hr/index.js';
 import { InvoicesModule } from '../invoices/index.js';
 import { LeadsModule } from '../leads/index.js';
 import { NotificationsModule } from '../notifications/index.js';
@@ -19,6 +20,8 @@ import { CycleReportController } from './cycle-report.controller.js';
 import { CycleReportService } from './cycle-report.service.js';
 import { DashboardController } from './dashboard.controller.js';
 import { DashboardService } from './dashboard.service.js';
+import { DepartmentOverviewController } from './department-overview.controller.js';
+import { DepartmentOverviewService } from './department-overview.service.js';
 import { ReportsController } from './reports.controller.js';
 import { ReportsService } from './reports.service.js';
 
@@ -32,7 +35,8 @@ import { ReportsService } from './reports.service.js';
  * serves it through `files`' `GeneratedFiles` and purges it through `FilePurges`, with the
  * company details from `quotes`' `QuoteDirectory`. Owns `retainer_cycle_reports` (F05C R1–R3):
  * prepares a cycle's report when `projects` closes it (`CycleClosedHooks`) and tells the account
- * manager through `notifications`' `NotificationCenter`. Owns no business rules of other modules;
+ * manager through `notifications`' `NotificationCenter`. Serves a department page's overview (F23)
+ * with the members' leave from `hr`'s `LeaveDirectory`. Owns no business rules of other modules;
  * nothing imports it.
  */
 @Module({
@@ -45,6 +49,7 @@ import { ReportsService } from './reports.service.js';
     ClientsModule,
     ContentModule,
     FilesModule,
+    HrModule,
     InvoicesModule,
     LeadsModule,
     NotificationsModule,
@@ -57,7 +62,14 @@ import { ReportsService } from './reports.service.js';
     ReportsController,
     ClientReportController,
     CycleReportController,
+    DepartmentOverviewController,
   ],
-  providers: [DashboardService, ReportsService, ClientReportService, CycleReportService],
+  providers: [
+    DashboardService,
+    ReportsService,
+    ClientReportService,
+    CycleReportService,
+    DepartmentOverviewService,
+  ],
 })
 export class ReportsModule {}

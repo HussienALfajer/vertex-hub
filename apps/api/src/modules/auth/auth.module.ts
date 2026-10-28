@@ -11,6 +11,9 @@ import { AccountArchiver } from './account-archiver.js';
 import { AccountEmails } from './account-emails.js';
 import { AccountNotices } from './account-notices.js';
 import { createAuth } from './auth.config.js';
+import { DepartmentArchiveService } from './department-archive.service.js';
+import { DepartmentMembersService } from './department-members.service.js';
+import { DepartmentTransfers } from './department-transfers.js';
 import { DepartmentsController } from './departments.controller.js';
 import { DepartmentsService } from './departments.service.js';
 import { DevicePushStates } from './device-push-states.js';
@@ -64,6 +67,9 @@ import { UsersService } from './users.service.js';
     UserLinksService,
     AccountEmails,
     DepartmentsService,
+    DepartmentMembersService,
+    DepartmentArchiveService,
+    DepartmentTransfers,
     ResponsibilityRegistry,
     DevicePushStates,
     UserDirectory,
@@ -75,6 +81,7 @@ import { UsersService } from './users.service.js';
   ],
   exports: [
     ResponsibilityRegistry,
+    DepartmentTransfers,
     DevicePushStates,
     UserDirectory,
     AccountNotices,

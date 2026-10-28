@@ -556,9 +556,7 @@ describe('finance, campaigns and people notices (F16 part C)', () => {
   it('tells members and managers about department membership and archives (F23)', () => {
     const textOf = (type: NotificationType, data: unknown) =>
       notificationText(sample(type, { data } as never), departmentName).text;
-    expect(render('department_member_added').text).toBe(
-      'أضافك رنا إلى قسم التصميم عضوًا ثانويًا',
-    );
+    expect(render('department_member_added').text).toBe('أضافك رنا إلى قسم التصميم عضوًا ثانويًا');
     expect(
       textOf('department_member_added', { department: 'design', member: null, primary: true }),
     ).toBe('أضافك رنا إلى قسم التصميم عضوًا أساسيًا');

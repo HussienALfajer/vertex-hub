@@ -1912,7 +1912,8 @@
       "task_linked": "رُبطت به مهمة",
       "retainer_ended": "انتهى العقد الشهري",
       "end_action_changed": "تغيّر ما يحدث عند نهاية المدة",
-      "quote_renewal": "جُدّد بعرض سعر"
+      "quote_renewal": "جُدّد بعرض سعر",
+      "department_archived": "أُرشف القسم ونُقل عمله"
     },
     "amendmentKinds": {
       "change": "تعديل",

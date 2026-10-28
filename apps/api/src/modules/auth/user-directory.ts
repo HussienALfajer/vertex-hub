@@ -349,6 +349,18 @@ export class UserDirectory implements OnModuleInit {
     return [...members.values()];
   }
 
+  /** A department by id, archived or not; null when there is none. */
+  async department(
+    id: string,
+    executor: Database | Transaction = this.db,
+  ): Promise<{ id: string; code: DepartmentCode; archived: boolean } | null> {
+    const [row] = await executor
+      .select({ id: departments.id, code: departments.code, archivedAt: departments.archivedAt })
+      .from(departments)
+      .where(eq(departments.id, id));
+    return row ? { id: row.id, code: row.code, archived: !!row.archivedAt } : null;
+  }
+
   /** The managers of each of the departments, by code; a department without one is left out. */
   async departmentManagers(
     codes: DepartmentCode[],

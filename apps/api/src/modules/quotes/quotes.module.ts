@@ -11,6 +11,7 @@ import { LeadQuotes } from './lead-quotes.js';
 import { QuoteAcceptService } from './quote-accept.service.js';
 import { QuoteAcceptedHooks } from './quote-accepted-hooks.js';
 import { QuoteContractServices } from './quote-contract-services.js';
+import { QuoteDepartmentTransfers } from './quote-department-transfers.js';
 import { QuoteDirectory } from './quote-directory.js';
 import { QuoteEmailsController } from './quote-emails.controller.js';
 import { QuoteEmailsService } from './quote-emails.service.js';
@@ -33,7 +34,8 @@ import { QuotesService } from './quotes.service.js';
  * `EngagementFactory` and `templates`' `TemplateRunner`, and keeps the proof through `files`'
  * `GeneratedFiles`. Exports `QuoteDirectory` (company details, quote numbers) and `QuoteAcceptedHooks` (the
  * A01 deposit draft, F13) to `invoices`, and gives retainer contracts their accepted quote's
- * monthly services through `projects`' `ContractSources` (F05C K7).
+ * monthly services through `projects`' `ContractSources` (F05C K7). Moves the lines of open quotes
+ * of an archived department through `auth`'s `DepartmentTransfers` (F23).
  */
 @Module({
   imports: [
@@ -58,6 +60,7 @@ import { QuotesService } from './quotes.service.js';
     QuoteDirectory,
     QuoteAcceptedHooks,
     QuoteContractServices,
+    QuoteDepartmentTransfers,
     QuoteRecipients,
     QuoteNotices,
     LeadQuotes,

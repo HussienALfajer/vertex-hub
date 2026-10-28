@@ -188,7 +188,6 @@ export const departmentDetailResponseSchema = departmentResponseSchema
 
 export type DepartmentDetailResponse = z.infer<typeof departmentDetailResponseSchema>;
 
-
 export const departmentDescriptionSchema = z.string().trim().max(500);
 
 /** F23 rule 2: a new department starts with no members and no manager, last in the order. */

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/index.js';
 import { TemplatesModule } from '../templates/index.js';
+import { CatalogDepartmentTransfers } from './catalog-department-transfers.js';
 import { CatalogDirectory } from './catalog-directory.js';
 import { CatalogPackagesController } from './catalog-packages.controller.js';
 import { CatalogPackagesService } from './catalog-packages.service.js';
@@ -11,12 +12,19 @@ import { CatalogUsage } from './catalog-usage.js';
 /**
  * Service catalog (F04, ADR 0023): services and packages with their prices. Reads template names
  * and kinds through the `TemplateDirectory` of `templates`; quotes copy items through
- * `CatalogDirectory` and report their use through `CatalogUsage`.
+ * `CatalogDirectory` and report their use through `CatalogUsage`. Moves an archived department's
+ * services through `auth`'s `DepartmentTransfers` (F23).
  */
 @Module({
   imports: [AuthModule, TemplatesModule],
   controllers: [CatalogServicesController, CatalogPackagesController],
-  providers: [CatalogServicesService, CatalogPackagesService, CatalogDirectory, CatalogUsage],
+  providers: [
+    CatalogServicesService,
+    CatalogPackagesService,
+    CatalogDirectory,
+    CatalogUsage,
+    CatalogDepartmentTransfers,
+  ],
   exports: [CatalogDirectory, CatalogUsage],
 })
 export class CatalogModule {}
