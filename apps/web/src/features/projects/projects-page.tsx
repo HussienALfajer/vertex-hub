@@ -1,7 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
-  DEPARTMENT_CODES,
   type DepartmentCode,
   OPEN_PROJECT_STATUSES,
   PROJECT_STATUSES,
@@ -53,10 +52,10 @@ import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
 import {
   ALL,
+  departmentParam,
   flagParam,
   idParam,
   listParam,
-  oneOfParam,
   pageParam,
   textParam,
 } from '../../lib/search-params';
@@ -64,6 +63,7 @@ import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { userListQuery } from '../users/users.queries';
 import { projectCreateScope } from './project-access';
 import {
@@ -98,7 +98,7 @@ export function parseProjectsSearch(search: Record<string, unknown>): ProjectsSe
     status: listParam(PROJECT_STATUSES, search.status),
     clientId: idParam(search.clientId),
     projectManagerId: idParam(search.projectManagerId),
-    department: oneOfParam(DEPARTMENT_CODES, search.department),
+    department: departmentParam(search.department),
     overdue: flagParam(search.overdue),
     archived: flagParam(search.archived),
     page: pageParam(search.page),
@@ -349,9 +349,14 @@ function Filters({
   ];
   const departmentItems = [
     { value: ALL, label: t('projects.filters.allDepartments') },
-    ...(departments.data?.items ?? []).map((department) => ({
+    ...pickableDepartments(
+      departments.data?.items ?? [],
+      search.department ? [search.department] : [],
+    ).map((department) => ({
       value: department.code,
-      label: department.name,
+      label: department.archivedAt
+        ? t('departments.archivedName', { name: department.name })
+        : department.name,
     })),
   ];
 
@@ -413,9 +418,7 @@ function Filters({
           items={departmentItems}
           value={search.department ?? ALL}
           onChange={(value) =>
-            onChange({
-              department: DEPARTMENT_CODES.find((code) => code === value),
-            })
+            onChange({ department: value === ALL ? undefined : departmentParam(value) })
           }
         />
         <div className="flex flex-wrap items-center gap-2 md:ms-auto">

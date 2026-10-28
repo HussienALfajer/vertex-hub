@@ -3,7 +3,6 @@ import {
   businessDate,
   businessInstant,
   type CalendarDate,
-  type DepartmentCode,
   type DigestTask,
   EMAIL_DIGEST_JOB,
   EMAIL_NOTIFICATIONS_JOB,
@@ -378,9 +377,7 @@ export class NotificationEmails implements OnModuleInit {
   }
 
   private async departmentNames(tx: Transaction) {
-    return Object.fromEntries(await this.users.departmentNames(tx)) as Partial<
-      Record<DepartmentCode, string>
-    >;
+    return Object.fromEntries(await this.users.departmentNames(tx));
   }
 }
 

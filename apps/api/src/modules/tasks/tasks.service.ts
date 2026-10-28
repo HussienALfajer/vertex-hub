@@ -195,7 +195,10 @@ export class TasksService {
       inArray(tasks.status, query.status),
     ];
     if (query.search) filters.push(ilike(tasks.title, `%${escapeLike(query.search)}%`));
-    if (query.department) filters.push(inArray(tasks.department, query.department));
+    if (query.department) {
+      await this.users.assertKnownDepartments(query.department);
+      filters.push(inArray(tasks.department, query.department));
+    }
     if (query.assigneeId) {
       filters.push(eq(tasks.assigneeId, query.assigneeId === 'me' ? actor.id : query.assigneeId));
     }
@@ -683,7 +686,10 @@ export class TasksService {
       const departmentGiven = department !== task.department;
       if ((assigneeGiven || departmentGiven) && !rights.assign) throw new ForbiddenException();
       // F11 rule 9: a scheduled shoot keeps its task in Photography.
-      if (departmentGiven) await this.guards.assertFree(tx, [id]);
+      if (departmentGiven) {
+        await this.users.assertActiveDepartments([department], tx);
+        await this.guards.assertFree(tx, [id]);
+      }
       const scopeGiven =
         input.requestScope !== undefined && input.requestScope !== task.requestScope;
       if (scopeGiven && !rights.client) throw new ForbiddenException();

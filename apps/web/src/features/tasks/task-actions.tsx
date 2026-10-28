@@ -815,7 +815,7 @@ function ReassignDialog({
   const { t } = useTranslation();
   const ids = { department: useId(), assignee: useId() };
   const update = useUpdateTask(task.id);
-  const departments = useDepartments();
+  const departments = useDepartments([task.department]);
   const [department, setDepartment] = useState<DepartmentCode>(task.department);
   const [assigneeId, setAssigneeId] = useState<string>(task.assignee?.id ?? UNASSIGNED);
   const [failure, setFailure] = useState<string | null>(null);

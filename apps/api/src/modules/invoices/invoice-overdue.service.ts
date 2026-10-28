@@ -173,7 +173,7 @@ export class InvoiceOverdueService implements OnModuleInit {
     today: CalendarDate,
   ): Promise<Notice> {
     const finance = await this.users.withRole('finance', tx);
-    const managers = await this.users.departmentManagers(['internal_operations'], tx);
+    const managers = await this.users.functionManagers(['internal_operations'], tx);
     return {
       type: 'invoice_overdue',
       recipients: [

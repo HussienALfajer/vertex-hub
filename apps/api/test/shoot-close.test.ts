@@ -163,6 +163,12 @@ describe('closing, cancelling and reopening shoots (F11 rules 10–13)', () => {
       ] as const) {
         await cast.moveOk(shoot.task.id, cookie, { status });
       }
+      // F23 rule 5: an editing task in a department that does not exist is refused.
+      const refused = await action(shoot.id, 'close', cast.gm.cookie, {
+        editingTask: editing({ department: 'd_unknown0' }),
+      });
+      expect(refused.status).toBe(400);
+      expect(((await refused.json()) as { code?: string }).code).toBe('UNKNOWN_DEPARTMENT');
       const before = await cast.auditOf(shoot.task.id);
       const closed = await ok(
         await action(shoot.id, 'close', cast.gm.cookie, { editingTask: null }),

@@ -281,7 +281,7 @@ export class AttendanceReminders implements OnModuleInit {
     for (const kiosk of offline) {
       const lastSeenAt = kiosk.lastSeenAt as Date;
       const done = await this.db.transaction(async (tx) => {
-        const ops = (await this.users.departmentManagers(['internal_operations'], tx)).get(
+        const ops = (await this.users.functionManagers(['internal_operations'], tx)).get(
           'internal_operations',
         );
         return this.timed.remindOnce(

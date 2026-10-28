@@ -22619,18 +22619,7 @@
       },
       "DepartmentCode": {
         "type": "string",
-        "enum": [
-          "general_management",
-          "internal_operations",
-          "public_relations",
-          "marketing",
-          "design",
-          "photography",
-          "content_management",
-          "development",
-          "general_communication",
-          "medical_consultation"
-        ]
+        "pattern": "^[a-z][a-z0-9_]{1,39}$"
       },
       "GrantedPermission": {
         "type": "object",
@@ -23403,7 +23392,7 @@
           "items"
         ],
         "additionalProperties": false,
-        "description": "The ten departments, in seed order"
+        "description": "Active departments in their order, then archived ones"
       },
       "Department": {
         "type": "object",
@@ -23418,6 +23407,27 @@
           },
           "name": {
             "type": "string"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "color": {
+            "$ref": "#/components/schemas/DepartmentColor"
+          },
+          "icon": {
+            "$ref": "#/components/schemas/DepartmentIcon"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "archivedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           },
           "manager": {
             "nullable": true,
@@ -23437,10 +23447,63 @@
           "id",
           "code",
           "name",
+          "description",
+          "color",
+          "icon",
+          "position",
+          "archivedAt",
           "manager",
           "memberCount"
         ],
         "additionalProperties": false
+      },
+      "DepartmentColor": {
+        "type": "string",
+        "enum": [
+          "c1",
+          "c2",
+          "c3",
+          "c4",
+          "c5",
+          "c6",
+          "c7",
+          "c8"
+        ]
+      },
+      "DepartmentIcon": {
+        "type": "string",
+        "enum": [
+          "briefcase",
+          "building",
+          "settings",
+          "megaphone",
+          "chart-line",
+          "target",
+          "palette",
+          "pen-tool",
+          "camera",
+          "film",
+          "clapperboard",
+          "mic",
+          "file-text",
+          "newspaper",
+          "code",
+          "monitor-smartphone",
+          "headset",
+          "message-circle",
+          "stethoscope",
+          "users",
+          "handshake",
+          "globe",
+          "lightbulb",
+          "calendar",
+          "shopping-bag",
+          "printer",
+          "shield-check",
+          "wallet",
+          "graduation-cap",
+          "sparkles"
+        ]
       },
       "DepartmentDetail": {
         "type": "object",
@@ -23455,6 +23518,27 @@
           },
           "name": {
             "type": "string"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "color": {
+            "$ref": "#/components/schemas/DepartmentColor"
+          },
+          "icon": {
+            "$ref": "#/components/schemas/DepartmentIcon"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "archivedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           },
           "manager": {
             "nullable": true,
@@ -23518,6 +23602,11 @@
           "id",
           "code",
           "name",
+          "description",
+          "color",
+          "icon",
+          "position",
+          "archivedAt",
           "manager",
           "memberCount",
           "members"

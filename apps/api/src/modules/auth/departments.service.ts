@@ -3,6 +3,7 @@ import {
   type DepartmentDetailResponse,
   type DepartmentListResponse,
   type DepartmentResponse,
+  departmentIconSchema,
   hasPermission,
   type UpdateDepartment,
 } from '@vertex-hub/contracts';
@@ -19,6 +20,7 @@ import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
 import { AccountNotices } from './account-notices.js';
 import type { CurrentUserInfo } from './current-user.decorator.js';
+import { departmentOrder } from './user-directory.js';
 import { hasPassword, lockAccessChanges } from './user-status.js';
 
 const managers = aliasedTable(users, 'managers');
@@ -33,13 +35,18 @@ const departmentFields = {
   id: departments.id,
   code: departments.code,
   name: departments.name,
+  description: departments.description,
+  color: departments.color,
+  icon: departments.icon,
+  position: departments.position,
+  archivedAt: departments.archivedAt,
   managerId: managers.id,
   managerName: managers.name,
   managerImageId: managers.imageId,
   memberCount,
 };
 
-/** The ten fixed departments (ADR 0014): names and managers are editable. */
+/** Departments (ADR 0014, ADR 0043): names and managers are editable. */
 @Injectable()
 export class DepartmentsService {
   constructor(
@@ -52,8 +59,7 @@ export class DepartmentsService {
       .select(departmentFields)
       .from(departments)
       .leftJoin(managers, eq(managers.id, departments.managerId))
-      // Ids are UUIDv7 literals in seed order.
-      .orderBy(asc(departments.id));
+      .orderBy(...departmentOrder);
     return { items: rows.map(toDepartment) };
   }
 
@@ -101,12 +107,16 @@ export class DepartmentsService {
           name: departments.name,
           managerId: departments.managerId,
           managerName: managers.name,
+          archivedAt: departments.archivedAt,
         })
         .from(departments)
         .leftJoin(managers, eq(managers.id, departments.managerId))
         .where(eq(departments.id, id))
         .for('update', { of: departments });
       if (!current) throw new NotFoundException();
+      if (current.archivedAt) {
+        throw new CodedException(409, 'DEPARTMENT_ARCHIVED', 'The department is archived');
+      }
 
       if (input.name !== undefined && input.name !== current.name) {
         const [taken] = await tx
@@ -221,6 +231,11 @@ function toDepartment(row: {
   id: string;
   code: DepartmentResponse['code'];
   name: string;
+  description: string | null;
+  color: DepartmentResponse['color'];
+  icon: string;
+  position: number;
+  archivedAt: Date | null;
   managerId: string | null;
   managerName: string | null;
   managerImageId: string | null;
@@ -230,6 +245,11 @@ function toDepartment(row: {
     id: row.id,
     code: row.code,
     name: row.name,
+    description: row.description,
+    color: row.color,
+    icon: departmentIconSchema.parse(row.icon),
+    position: row.position,
+    archivedAt: row.archivedAt?.toISOString() ?? null,
     manager: row.managerId
       ? { id: row.managerId, name: row.managerName ?? '', imageId: row.managerImageId }
       : null,

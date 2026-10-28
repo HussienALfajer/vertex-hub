@@ -11,9 +11,9 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { departments } from './auth.js';
 import { archivedAt, id, timestamps } from './columns.js';
 import { deliverableKindEnum } from './deliverables.js';
-import { departmentCodeEnum } from './department-codes.js';
 import { workTemplates } from './templates.js';
 
 /*
@@ -31,7 +31,9 @@ export const catalogServices = pgTable(
     name: text('name').notNull(),
     description: text('description'),
     /** The performing department. */
-    department: departmentCodeEnum('department').notNull(),
+    department: text('department')
+      .notNull()
+      .references(() => departments.code),
     billing: catalogBillingEnum('billing').notNull(),
     /** Per unit, or per unit per month for monthly services. */
     priceUsdMinor: bigint('price_usd_minor', { mode: 'number' }).notNull(),
@@ -50,6 +52,7 @@ export const catalogServices = pgTable(
       .on(sql`lower(${table.name})`)
       .where(sql`${table.archivedAt} is null`),
     index('catalog_services_template_id_idx').on(table.templateId),
+    index('catalog_services_department_idx').on(table.department),
     check('catalog_services_name_check', sql`char_length(${table.name}) between 1 and 120`),
     check('catalog_services_price_usd_check', sql`${table.priceUsdMinor} >= 0`),
     check('catalog_services_price_syp_check', sql`${table.priceSypMinor} >= 0`),

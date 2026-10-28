@@ -193,7 +193,7 @@ export class HrDailyService implements OnModuleInit {
             reminder.type === 'contract_ending' ? file?.contractEndDate : file?.probationEndDate;
           if (!file || file.archivedAt || file.endedOn || endsOn !== reminder.endsOn) return false;
           const [profile] = await this.users.profiles({ ids: [reminder.userId] }, tx);
-          const managers = await this.users.departmentManagers(['internal_operations'], tx);
+          const managers = await this.users.functionManagers(['internal_operations'], tx);
           return this.reminders.remindOnce(
             tx,
             { kind: reminder.kind, subjectId: reminder.userId, occurrence: reminder.endsOn },

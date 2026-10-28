@@ -6,7 +6,6 @@ import {
   type CatalogPackage,
   type CatalogService,
   type Currency,
-  DEPARTMENT_CODES,
   type DepartmentCode,
 } from '@vertex-hub/contracts';
 import {
@@ -62,10 +61,18 @@ import { can, useMe } from '../../lib/auth';
 import { errorMessage } from '../../lib/errors';
 import { formatList, formatNumber } from '../../lib/format';
 import { formatMoney } from '../../lib/money';
-import { ALL, flagParam, oneOfParam, pageParam, textParam } from '../../lib/search-params';
+import {
+  ALL,
+  departmentParam,
+  flagParam,
+  oneOfParam,
+  pageParam,
+  textParam,
+} from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { type ReturnFocus, useReturnFocus } from '../../lib/use-return-focus';
 import { useSearchText } from '../../lib/use-search-text';
+import { useDepartmentItems } from '../departments/department-items';
 import { useDepartmentNames } from '../projects/project-badges';
 import {
   packageListQuery,
@@ -98,7 +105,7 @@ export function parseCatalogSearch(search: Record<string, unknown>): CatalogSear
     tab: CATALOG_TABS.find((tab) => tab !== 'services' && tab === search.tab),
     search: textParam(search.search, 100),
     billing: oneOfParam(CATALOG_BILLINGS, search.billing),
-    department: oneOfParam(DEPARTMENT_CODES, search.department),
+    department: departmentParam(search.department),
     archived: flagParam(search.archived),
     page: pageParam(search.page),
   };
@@ -228,7 +235,7 @@ function Filters({
   onChange: (next: Partial<CatalogSearch>) => void;
 }) {
   const { t } = useTranslation();
-  const nameOf = useDepartmentNames();
+  const departments = useDepartmentItems(search.department ? [search.department] : []);
   const [text, setText] = useSearchText(search.search, onChange);
 
   const billingItems = [
@@ -238,10 +245,7 @@ function Filters({
       label: t(`catalog.billings.${billing}`),
     })),
   ];
-  const departmentItems = [
-    { value: ALL, label: t('catalog.allDepartments') },
-    ...DEPARTMENT_CODES.map((code) => ({ value: code, label: nameOf(code) })),
-  ];
+  const departmentItems = [{ value: ALL, label: t('catalog.allDepartments') }, ...departments];
   const stateItems = [
     { value: 'active', label: t('catalog.activeOnly') },
     { value: 'archived', label: t('catalog.archivedOnly') },

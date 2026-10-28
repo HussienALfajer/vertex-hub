@@ -30,7 +30,6 @@ import { users } from './auth.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { deliverableKindEnum } from './deliverables.js';
-import { departmentCodeEnum } from './department-codes.js';
 import { images } from './images.js';
 import { currencyEnum, projects } from './projects.js';
 import { quotes } from './quotes.js';
@@ -73,7 +72,8 @@ export const retainers = pgTable(
       .notNull()
       .references(() => clients.id),
     name: text('name').notNull(),
-    departments: departmentCodeEnum('departments').array().notNull(),
+    /** Department codes; the service checks each exists (an array has no foreign key). */
+    departments: text('departments').array().notNull(),
     status: retainerStatusEnum('status').notNull().default('active'),
     /** The anchor of its cycles (F05C Y1); editable only while it has no cycle and no charge. */
     startDate: date('start_date', { mode: 'string' }).notNull(),

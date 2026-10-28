@@ -1,9 +1,4 @@
-import {
-  DEPARTMENT_CODES,
-  type DepartmentCode,
-  type Permission,
-  permissionScopes,
-} from '@vertex-hub/contracts';
+import { type DepartmentCode, type Permission, permissionScopes } from '@vertex-hub/contracts';
 import type { CurrentUserInfo } from '../auth/index.js';
 import type { ClientSummary } from '../clients/index.js';
 
@@ -11,18 +6,21 @@ import type { ClientSummary } from '../clients/index.js';
  * Who may read which report (spec F15, "Roles and access", rule 23).
  */
 
-/** The departments the caller manages, in catalog order. */
+/** The departments the caller manages. */
 export const managedDepartments = (actor: CurrentUserInfo): DepartmentCode[] =>
   actor.access.departments.filter((d) => d.isManager).map((d) => d.code);
 
 /**
- * The departments of the caller's `reports.read` scope, in catalog order: every one under `all`,
- * the ones they manage under `department`.
+ * The departments of the caller's `reports.read` scope among `codes` (in the department order):
+ * every one under `all`, the ones they manage under `department`.
  */
-export function reportDepartments(actor: CurrentUserInfo): DepartmentCode[] {
+export function reportDepartments(
+  actor: CurrentUserInfo,
+  codes: readonly DepartmentCode[],
+): DepartmentCode[] {
   const scopes = permissionScopes(actor.access, 'reports.read');
   const managed = managedDepartments(actor);
-  return DEPARTMENT_CODES.filter(
+  return codes.filter(
     (code) => scopes.includes('all') || (scopes.includes('department') && managed.includes(code)),
   );
 }

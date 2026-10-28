@@ -466,7 +466,7 @@ export class LeadsService implements OnModuleInit {
   async notifyLost(tx: Transaction, actor: CurrentUserInfo, row: LeadRow): Promise<void> {
     const [managers, sales] = await Promise.all([
       this.users.withRole('general_manager', tx),
-      this.users.departmentManagers([...OWNER_DEPARTMENTS], tx),
+      this.users.functionManagers([...OWNER_DEPARTMENTS], tx),
     ]);
     await this.center.notify(
       tx,

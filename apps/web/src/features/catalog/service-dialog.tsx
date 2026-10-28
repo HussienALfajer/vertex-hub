@@ -8,7 +8,6 @@ import {
   type CreateCatalogServiceInput,
   createCatalogServiceSchema,
   DELIVERABLE_KINDS,
-  DEPARTMENT_CODES,
   type ErrorCode,
   TEMPLATE_KIND_BY_BILLING,
 } from '@vertex-hub/contracts';
@@ -42,7 +41,7 @@ import { MoneyInput } from '../../components/money-input';
 import { ApiError } from '../../lib/api/client';
 import { errorMessage, errorRole, fieldError, SCREEN_ERROR } from '../../lib/errors';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
-import { useDepartmentNames } from '../projects/project-badges';
+import { useDepartmentItems } from '../departments/department-items';
 import { templateListQuery } from '../templates/templates.queries';
 import { useCreateService, useUpdateService } from './catalog.queries';
 import type { CatalogDialogProps } from './catalog-dialog';
@@ -113,7 +112,6 @@ function ServiceForm({ service, onDone }: { service: CatalogService | null; onDo
     kind: useId(),
     template: useId(),
   };
-  const nameOf = useDepartmentNames();
   const create = useCreateService();
   const update = useUpdateService();
   const [failure, setFailure] = useState<string | null>(null);
@@ -163,7 +161,7 @@ function ServiceForm({ service, onDone }: { service: CatalogService | null; onDo
     }
   });
 
-  const departmentItems = DEPARTMENT_CODES.map((code) => ({ value: code, label: nameOf(code) }));
+  const departmentItems = useDepartmentItems(service ? [service.department] : []);
   const billingItems = CATALOG_BILLINGS.map((value) => ({
     value,
     label: t(`catalog.billings.${value}`),

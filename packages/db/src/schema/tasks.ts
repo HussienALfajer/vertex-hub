@@ -30,11 +30,10 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { approvalItems } from './approvals.js';
-import { users } from './auth.js';
+import { departments, users } from './auth.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, timestamps } from './columns.js';
 import { contentPosts, postClientResponses } from './content.js';
-import { departmentCodeEnum } from './department-codes.js';
 import { projectMilestones, projects } from './projects.js';
 import { extraWorkItems, retainerCycleLines, retainerCycles } from './retainers.js';
 import {
@@ -85,7 +84,9 @@ export const tasks = pgTable(
     /** F06B rule C1: the brief as an ADR 0038 rich-text document; null without a brief. */
     briefDoc: jsonb('brief_doc'),
     type: taskTypeEnum('type').notNull().default('work'),
-    department: departmentCodeEnum('department').notNull(),
+    department: text('department')
+      .notNull()
+      .references(() => departments.code),
     /** Null while the task waits in its department's unassigned queue. */
     assigneeId: uuid('assignee_id').references(() => users.id),
     status: taskStatusEnum('status').notNull().default('new'),
@@ -374,7 +375,7 @@ export const taskComments = pgTable(
     /** Questions: the person asked, or the member a department question was forwarded to. */
     addressedUserId: uuid('addressed_user_id').references(() => users.id),
     /** Questions: set for a department question; kept when it is forwarded. */
-    addressedDepartment: departmentCodeEnum('addressed_department'),
+    addressedDepartment: text('addressed_department').references(() => departments.code),
     questionStatus: questionStatusEnum('question_status'),
     /** Questions: when asked or last reopened; reminders count work hours from it (rule B8). */
     clockStartedAt: timestamp('clock_started_at', { withTimezone: true }),
@@ -393,6 +394,7 @@ export const taskComments = pgTable(
     index('task_comments_addressed_user_id_idx').on(table.addressedUserId),
     index('task_comments_answered_by_id_idx').on(table.answeredById),
     index('task_comments_converted_task_id_idx').on(table.convertedTaskId),
+    index('task_comments_addressed_department_idx').on(table.addressedDepartment),
     // Edge case 23: the minute job reads the open questions only.
     index('task_comments_open_questions_idx')
       .on(table.clockStartedAt)

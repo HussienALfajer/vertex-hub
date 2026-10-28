@@ -175,7 +175,10 @@ export class ProjectsService implements OnModuleInit {
     }
     if (query.clientId) filters.push(eq(projects.clientId, query.clientId));
     if (query.projectManagerId) filters.push(eq(projects.projectManagerId, query.projectManagerId));
-    if (query.department) filters.push(arrayContains(projects.departments, [query.department]));
+    if (query.department) {
+      await this.users.assertKnownDepartments([query.department]);
+      filters.push(arrayContains(projects.departments, [query.department]));
+    }
     if (query.overdue === true) {
       filters.push(and(inArray(projects.status, open), lt(projects.dueDate, today)));
     }
@@ -300,6 +303,7 @@ export class ProjectsService implements OnModuleInit {
     assertDates(input.startDate, input.dueDate);
     const manager = await this.validProjectManager(tx, input.projectManagerId);
     await this.assertNameFree(tx, client.id, input.name);
+    await this.users.assertActiveDepartments(input.departments, tx);
 
     const values = {
       name: input.name,
@@ -373,6 +377,10 @@ export class ProjectsService implements OnModuleInit {
       assertDates(input.startDate ?? current.startDate, input.dueDate ?? current.dueDate);
       if (input.name !== undefined && input.name.toLowerCase() !== current.name.toLowerCase()) {
         await this.assertNameFree(tx, project.clientId, input.name, id);
+      }
+      if (input.departments) {
+        const added = input.departments.filter((code) => !current.departments.includes(code));
+        await this.users.assertActiveDepartments(added, tx);
       }
 
       const basics = changedFields(

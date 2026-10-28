@@ -32,6 +32,7 @@ import { ALL, idParam, oneOfParam, pageParam, textParam } from '../../lib/search
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { departmentListQuery } from '../departments/departments.queries';
+import { departmentLabel } from '../departments/pickable-departments';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { DepartmentChips } from '../users/user-badges';
 import { EmployeeStatusBadge, PasskeyStateBadge } from './employee-badges';
@@ -149,7 +150,9 @@ function Filters({
 
   const departmentItems = [
     { value: ALL, label: t('users.allDepartments') },
-    ...(departments.data?.items ?? []).map((d) => ({ value: d.id, label: d.name })),
+    ...(departments.data?.items ?? [])
+      .filter((d) => !d.archivedAt || d.id === search.departmentId)
+      .map((d) => ({ value: d.id, label: departmentLabel(t, d) })),
   ];
   const statusItems = EMPLOYEE_STATUSES.map((status) => ({
     value: status,

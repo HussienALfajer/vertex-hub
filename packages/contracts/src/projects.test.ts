@@ -40,7 +40,7 @@ describe('createProjectSchema', () => {
     const parsed = createProjectSchema.parse({ ...project, departments: ['design', 'design'] });
     expect(parsed.departments).toEqual(['design']);
     expect(createProjectSchema.safeParse({ ...project, departments: [] }).success).toBe(false);
-    expect(createProjectSchema.safeParse({ ...project, departments: ['nope'] }).success).toBe(
+    expect(createProjectSchema.safeParse({ ...project, departments: ['Not a code'] }).success).toBe(
       false,
     );
   });

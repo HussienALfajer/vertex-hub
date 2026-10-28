@@ -7,7 +7,11 @@
  */
 import { randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
-import { assignableRoleSchema, departmentCodeSchema } from '@vertex-hub/contracts';
+import {
+  assignableRoleSchema,
+  departmentCodeSchema,
+  SYSTEM_DEPARTMENT_CODES,
+} from '@vertex-hub/contracts';
 import { createDatabase, loadRootEnv } from '@vertex-hub/db';
 import { z } from 'zod';
 import { createUser } from '../modules/auth/index.js';
@@ -33,7 +37,7 @@ const { values } = parseArgs({
 const parsed = argsSchema.safeParse(values);
 if (!parsed.success) {
   console.error(`Usage: user:create --email <email> --name <name> --department <code> [--role <role>]...
-Departments: ${departmentCodeSchema.options.join(', ')}
+Departments: a department code, e.g. ${SYSTEM_DEPARTMENT_CODES.join(', ')}
 Roles: ${assignableRoleSchema.options.join(', ')}
 
 ${z.prettifyError(parsed.error)}`);

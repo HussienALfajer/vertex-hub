@@ -9,7 +9,7 @@ import {
 import type { Database, Transaction } from '@vertex-hub/db';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
-import { type CurrentUserInfo, lockAccessChanges } from '../auth/index.js';
+import { type CurrentUserInfo, lockAccessChanges, UserDirectory } from '../auth/index.js';
 import { ClientDirectory } from '../clients/index.js';
 import { FileAttachments } from '../files/index.js';
 import { EngagementDirectory } from '../projects/index.js';
@@ -63,6 +63,7 @@ export class TaskCreation {
     private readonly questions: TaskQuestionsService,
     private readonly attachments: FileAttachments,
     private readonly templates: TaskTemplateHooks,
+    private readonly users: UserDirectory,
   ) {}
 
   async create(actor: CurrentUserInfo, input: CreateTask): Promise<TaskDetail> {
@@ -89,6 +90,10 @@ export class TaskCreation {
       await lockAccessChanges(tx);
     }
     if (subtasks.length > 0) await lockDependencyGraph(tx);
+    await this.users.assertActiveDepartments(
+      [input.department, ...subtasks.map((subtask) => subtask.department)],
+      tx,
+    );
     const id = await this.tasks.createIn(tx, actor, task, {
       checkLeave: true,
       postId: options.postId,

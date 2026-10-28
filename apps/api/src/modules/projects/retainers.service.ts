@@ -179,7 +179,10 @@ export class RetainersService {
     if (query.accountManagerId) {
       filters.push(this.clients.managedBy(retainers.clientId, query.accountManagerId));
     }
-    if (query.department) filters.push(arrayContains(retainers.departments, [query.department]));
+    if (query.department) {
+      await this.users.assertKnownDepartments([query.department]);
+      filters.push(arrayContains(retainers.departments, [query.department]));
+    }
     if (query.renewalDue !== undefined) {
       // R6: due from 30 days before the renewal date, and overdue after it, until ended.
       const due = and(
@@ -399,6 +402,7 @@ export class RetainersService {
       assertStartDate(input.startDate, today);
     }
     await this.assertNameFree(tx, client.id, input.name);
+    await this.users.assertActiveDepartments(input.departments, tx);
 
     const values = {
       name: input.name,
@@ -486,6 +490,10 @@ export class RetainersService {
       if (startChanges && input.startDate) assertStartDate(input.startDate, businessDate());
       if (input.name !== undefined && input.name.toLowerCase() !== current.name.toLowerCase()) {
         await this.assertNameFree(tx, retainer.clientId, input.name, id);
+      }
+      if (input.departments) {
+        const added = input.departments.filter((code) => !current.departments.includes(code));
+        await this.users.assertActiveDepartments(added, tx);
       }
 
       const basics = changedFields(

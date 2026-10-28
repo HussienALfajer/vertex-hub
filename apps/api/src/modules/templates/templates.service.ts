@@ -81,11 +81,10 @@ const stepCount = sql<number>`(
   select count(*)::int from ${workTemplateSteps}
   where ${workTemplateSteps.templateId} = ${templateId})`;
 
-// Cast to text[]: node-postgres returns arrays of enum types unparsed.
+/** The departments of a template's steps; the service puts them in the department order. */
 const stepDepartments = sql<DepartmentCode[]>`array(
   select distinct ${workTemplateSteps.department} from ${workTemplateSteps}
-  where ${workTemplateSteps.templateId} = ${templateId}
-  order by 1)::text[]`;
+  where ${workTemplateSteps.templateId} = ${templateId})`;
 
 /** The fields of a step that make it "changed" in the audit summary. */
 const STEP_FIELDS = [
@@ -154,14 +153,19 @@ export class TemplatesService {
       this.db.select({ value: count() }).from(workTemplates).where(where),
     ]);
     const ids = rows.map((row) => row.id);
-    const [assignees, links] = await Promise.all([
+    const [assignees, links, ordered] = await Promise.all([
       this.assigneeRows(ids),
       this.linkedRetainers(ids),
+      this.users.orderedDepartments(),
     ]);
+    const place = new Map(ordered.map((department, index) => [department.code, index]));
     const valid = await this.validAssignments(assignees);
     return {
       items: rows.map((row) => ({
         ...row,
+        departments: [...row.departments].sort(
+          (a, b) => (place.get(a) ?? place.size) - (place.get(b) ?? place.size),
+        ),
         warningCount: assignees.filter((a) => a.templateId === row.id && !valid(a)).length,
         linkedRetainerCount: links.filter((link) => link.templateId === row.id).length,
         updatedAt: row.updatedAt.toISOString(),
@@ -646,6 +650,10 @@ export class TemplatesService {
     beforeSteps: TemplateStep[],
     beforeStages: { id: string; name: string; position: number }[] = [],
   ): Promise<Record<string, unknown> | null> {
+    const added = doc.steps
+      .map((step) => step.department)
+      .filter((code) => !beforeSteps.some((step) => step.department === code));
+    await this.users.assertActiveDepartments(added, tx);
     const stageIds = new Map(
       doc.stages.map((stage) => [
         stage.key,

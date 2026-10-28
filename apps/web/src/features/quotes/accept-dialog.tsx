@@ -63,6 +63,7 @@ import { focusFirstInvalid } from '../../lib/focus-first-invalid';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { clientQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { type Proof, ProofField } from '../files/proof-field';
 import {
   ConversionFields,
@@ -719,7 +720,10 @@ function DepartmentsPicker({
   const { t } = useTranslation();
   const id = useId();
   const departments = useQuery(departmentListQuery);
-  const items = (departments.data?.items ?? []).map(({ code, name }) => ({ code, name }));
+  const items = pickableDepartments(departments.data?.items ?? [], value).map(({ code, name }) => ({
+    code,
+    name,
+  }));
   const byCode = new Map(items.map((item) => [item.code, item]));
   return (
     <Field invalid={invalid}>

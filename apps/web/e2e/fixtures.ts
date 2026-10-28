@@ -179,7 +179,7 @@ import {
   cyclePeriod,
   DASHBOARD_LIMITS,
   DEFAULT_ESTIMATE_MINUTES,
-  DEPARTMENT_CODES,
+  DEPARTMENT_COLORS,
   type DeliverableKind,
   type DepartmentCode,
   type DepartmentDashboard,
@@ -644,23 +644,34 @@ export const healthy: HealthResponse = {
 
 const id = (n: number) => `01920000-0000-7000-8000-${n.toString().padStart(12, '0')}`;
 
-const dept = (code: DepartmentResponse['code'], name: string, n: number) => ({
+const dept = (
+  code: DepartmentResponse['code'],
+  name: string,
+  n: number,
+  icon: DepartmentResponse['icon'],
+) => ({
   id: id(900 + n),
   code,
   name,
+  description: null as string | null,
+  // The seed's colors: c1 to c8, then again from c1 (F23).
+  color: DEPARTMENT_COLORS[(n - 1) % DEPARTMENT_COLORS.length] as DepartmentResponse['color'],
+  icon,
+  position: n,
+  archivedAt: null as string | null,
 });
 
 export const departmentsSeed = [
-  dept('general_management', 'الإدارة العامة', 1),
-  dept('internal_operations', 'العمليات الداخلية', 2),
-  dept('public_relations', 'العلاقات العامة', 3),
-  dept('marketing', 'التسويق', 4),
-  dept('design', 'التصميم', 5),
-  dept('photography', 'التصوير', 6),
-  dept('content_management', 'إدارة المحتوى', 7),
-  dept('development', 'التطوير', 8),
-  dept('general_communication', 'التواصل العام', 9),
-  dept('medical_consultation', 'الاستشارات الطبية', 10),
+  dept('general_management', 'الإدارة العامة', 1, 'briefcase'),
+  dept('internal_operations', 'العمليات الداخلية', 2, 'settings'),
+  dept('public_relations', 'العلاقات العامة', 3, 'handshake'),
+  dept('marketing', 'التسويق', 4, 'megaphone'),
+  dept('design', 'التصميم', 5, 'palette'),
+  dept('photography', 'التصوير', 6, 'camera'),
+  dept('content_management', 'إدارة المحتوى', 7, 'file-text'),
+  dept('development', 'التطوير', 8, 'code'),
+  dept('general_communication', 'التواصل العام', 9, 'headset'),
+  dept('medical_consultation', 'الاستشارات الطبية', 10, 'stethoscope'),
 ] as const;
 
 type Department = (typeof departmentsSeed)[number];
@@ -17058,7 +17069,7 @@ function reportRoutes({ users, clients, projects, retainers, tasks, tasksApi, me
   /** The departments the caller reads tasks of: all, or the ones they manage. */
   const departmentsInScope = (): DepartmentCode[] =>
     scopes('reports.read').includes('all')
-      ? [...DEPARTMENT_CODES]
+      ? departmentsSeed.map((d) => d.code)
       : scopes('reports.read').includes('department')
         ? me()
             .departments.filter((d) => d.isManager)
@@ -17085,7 +17096,7 @@ function reportRoutes({ users, clients, projects, retainers, tasks, tasksApi, me
         })),
         retainers: retainers.filter((r) => !r.archived && r.status === 'active').length,
       },
-      departments: DEPARTMENT_CODES.map((department) => {
+      departments: departmentsSeed.map(({ code: department }) => {
         const own = open().filter((t) => t.department === department);
         return {
           department,

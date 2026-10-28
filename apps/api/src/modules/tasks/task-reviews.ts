@@ -236,7 +236,7 @@ export class TaskReviews {
     task: NoticeTask,
     actorId: string | null,
   ): Promise<Notice> {
-    const members = await this.users.activeMembers(['medical_consultation'], tx);
+    const members = await this.users.functionMembers(['medical_consultation'], tx);
     return this.notices.notice(
       task,
       'task_medical_review_requested',

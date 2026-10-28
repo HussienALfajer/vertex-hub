@@ -1,7 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
-  DEPARTMENT_CODES,
   type DepartmentCode,
   RETAINER_STATUSES,
   type Retainer,
@@ -53,10 +52,10 @@ import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
 import {
   ALL,
+  departmentParam,
   flagParam,
   idParam,
   listParam,
-  oneOfParam,
   pageParam,
   textParam,
 } from '../../lib/search-params';
@@ -64,6 +63,7 @@ import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { projectCreateScope } from '../projects/project-access';
 import { ArchivedBadge, DepartmentChips, PersonName } from '../projects/project-badges';
 import { userListQuery } from '../users/users.queries';
@@ -106,7 +106,7 @@ export function parseRetainersSearch(search: Record<string, unknown>): Retainers
     status: listParam(RETAINER_STATUSES, search.status),
     clientId: idParam(search.clientId),
     accountManagerId: idParam(search.accountManagerId),
-    department: oneOfParam(DEPARTMENT_CODES, search.department),
+    department: departmentParam(search.department),
     behind: flagParam(search.behind),
     renewalDue: flagParam(search.renewalDue),
     pendingApproval: flagParam(search.pendingApproval),
@@ -383,9 +383,14 @@ function Filters({
   ];
   const departmentItems = [
     { value: ALL, label: t('projects.filters.allDepartments') },
-    ...(departments.data?.items ?? []).map((department) => ({
+    ...pickableDepartments(
+      departments.data?.items ?? [],
+      search.department ? [search.department] : [],
+    ).map((department) => ({
       value: department.code,
-      label: department.name,
+      label: department.archivedAt
+        ? t('departments.archivedName', { name: department.name })
+        : department.name,
     })),
   ];
 
@@ -447,7 +452,7 @@ function Filters({
           items={departmentItems}
           value={search.department ?? ALL}
           onChange={(value) =>
-            onChange({ department: DEPARTMENT_CODES.find((code) => code === value) })
+            onChange({ department: value === ALL ? undefined : departmentParam(value) })
           }
         />
         <div className="flex flex-wrap items-center gap-2 md:ms-auto">

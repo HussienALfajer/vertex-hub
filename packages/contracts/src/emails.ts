@@ -87,7 +87,7 @@ export function isEmailBatchWindow(now: Date): boolean {
 }
 
 /** A department code and its display name, for the texts that name departments. */
-const departmentNamesSchema = z.partialRecord(departmentCodeSchema, z.string());
+const departmentNamesSchema = z.record(departmentCodeSchema, z.string());
 
 /** A list cut to its first items, with how many were left out. */
 const shortListSchema = <Item extends z.ZodType>(item: Item, max: number) =>

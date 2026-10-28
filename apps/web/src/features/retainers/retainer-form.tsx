@@ -51,6 +51,7 @@ import { formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
 import { ClientStatusBadge } from '../clients/client-badges';
 import { departmentListQuery } from '../departments/departments.queries';
+import { pickableDepartments } from '../departments/pickable-departments';
 import { DeliverableIcon, lineName } from './retainer-badges';
 
 export type RetainerFormMethods = UseFormReturn<CreateRetainerInput, unknown, CreateRetainer>;
@@ -193,7 +194,10 @@ export function DepartmentsField({ form }: { form: RetainerFormMethods }) {
   const id = useId();
   const departments = useQuery(departmentListQuery);
   const error = form.formState.errors.departments;
-  const items = (departments.data?.items ?? []).map(({ code, name }) => ({ code, name }));
+  const items = pickableDepartments(
+    departments.data?.items ?? [],
+    form.getValues('departments') ?? [],
+  ).map(({ code, name }) => ({ code, name }));
   const byCode = new Map(items.map((item) => [item.code, item]));
   return (
     <Field invalid={!!error}>

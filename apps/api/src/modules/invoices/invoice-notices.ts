@@ -58,7 +58,7 @@ export class InvoiceNotices implements OnModuleInit {
     description: string,
   ): Promise<void> {
     const finance = await this.users.withRole('finance', tx);
-    const managers = await this.users.departmentManagers(['internal_operations'], tx);
+    const managers = await this.users.functionManagers(['internal_operations'], tx);
     await this.center.notify(tx, {
       type: 'invoice_draft_created',
       recipients: [...finance, ...(managers.get('internal_operations') ?? [])],

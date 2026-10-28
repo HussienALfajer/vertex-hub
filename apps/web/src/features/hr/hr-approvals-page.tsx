@@ -25,6 +25,7 @@ import { formatNumber } from '../../lib/format';
 import { ALL, idParam, oneOfParam, pageParam } from '../../lib/search-params';
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { departmentListQuery } from '../departments/departments.queries';
+import { departmentLabel } from '../departments/pickable-departments';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { hrRequestListQuery } from './hr.queries';
 import { ItemApprovals } from './item-approvals';
@@ -100,7 +101,9 @@ export function HrApprovalsPage({ search }: { search: HrApprovalsSearch }) {
   ];
   const departmentItems = [
     { value: ALL, label: t('users.allDepartments') },
-    ...(departments.data?.items ?? []).map((d) => ({ value: d.id, label: d.name })),
+    ...(departments.data?.items ?? [])
+      .filter((d) => !d.archivedAt || d.id === search.departmentId)
+      .map((d) => ({ value: d.id, label: departmentLabel(t, d) })),
   ];
 
   return (

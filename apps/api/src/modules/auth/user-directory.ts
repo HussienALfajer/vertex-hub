@@ -31,9 +31,21 @@ import {
   sql,
 } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
+import { CodedException } from '../../core/errors/index.js';
 import { AuditActorPhotos } from '../audit/index.js';
 import { resolveAccess } from './resolve-access.js';
 import { hasPassword } from './user-status.js';
+
+/**
+ * The order of departments everywhere (F23 rule 4): active ones by position, then archived ones,
+ * most recently archived first.
+ */
+export const departmentOrder = [
+  sql`${departments.archivedAt} is not null`,
+  desc(departments.archivedAt),
+  asc(departments.position),
+  asc(departments.id),
+] as const;
 
 /** An active user and their address (F14 email: only active users get notification emails). */
 export interface Mailbox {
@@ -353,6 +365,130 @@ export class UserDirectory implements OnModuleInit {
       if (row.managerId) result.set(row.code, [row.managerId]);
     }
     return result;
+  }
+
+  /**
+   * The managers a notice or reminder for a department reaches (F23 rule 14, edge case 17): its
+   * manager, or the General Managers while the department is archived. A department without
+   * either is left out.
+   */
+  async functionManagers(
+    codes: readonly DepartmentCode[],
+    executor: Database | Transaction = this.db,
+  ): Promise<Map<DepartmentCode, string[]>> {
+    const unique = [...new Set(codes)];
+    const result = new Map<DepartmentCode, string[]>();
+    if (unique.length === 0) return result;
+    const rows = await executor
+      .select({
+        code: departments.code,
+        managerId: departments.managerId,
+        archivedAt: departments.archivedAt,
+      })
+      .from(departments)
+      .where(inArray(departments.code, unique));
+    let generalManagers: string[] | undefined;
+    for (const row of rows) {
+      if (row.archivedAt) {
+        generalManagers ??= await this.withRole('general_manager', executor);
+        if (generalManagers.length > 0) result.set(row.code, generalManagers);
+      } else if (row.managerId) {
+        result.set(row.code, [row.managerId]);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * The members a system function reaches (F23 rule 14), as `activeMembers`: while a department
+   * is archived, the General Managers stand in for its members.
+   */
+  async functionMembers(
+    codes: DepartmentCode[],
+    executor: Database | Transaction = this.db,
+  ): Promise<(UserSummary & { departments: DepartmentCode[] })[]> {
+    if (codes.length === 0) return [];
+    const archived = await executor
+      .select({ code: departments.code })
+      .from(departments)
+      .where(and(inArray(departments.code, codes), isNotNull(departments.archivedAt)));
+    const replaced = archived.map((row) => row.code);
+    const members = await this.activeMembers(codes, executor);
+    if (replaced.length === 0) return members;
+    const generalManagers = await executor
+      .select({ id: users.id, name: users.name, imageId: users.imageId })
+      .from(users)
+      .innerJoin(userRoles, eq(userRoles.userId, users.id))
+      .where(and(eq(userRoles.role, 'general_manager'), isNull(users.archivedAt)));
+    const byId = new Map(members.map((member) => [member.id, member]));
+    for (const person of generalManagers) {
+      const member = byId.get(person.id);
+      if (member) member.departments = [...new Set([...member.departments, ...replaced])];
+      else byId.set(person.id, { ...person, archived: false, departments: [...replaced] });
+    }
+    return [...byId.values()].sort(
+      (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+    );
+  }
+
+  /**
+   * F23 rule 5 (ADR 0043): every department a write newly names exists and is active. Callers pass
+   * only the codes the write adds, so a record that keeps an archived department stays editable.
+   */
+  async assertActiveDepartments(
+    codes: readonly DepartmentCode[],
+    executor: Database | Transaction = this.db,
+  ): Promise<void> {
+    const unique = [...new Set(codes)];
+    if (unique.length === 0) return;
+    const rows = await executor
+      .select({ archivedAt: departments.archivedAt })
+      .from(departments)
+      .where(inArray(departments.code, unique));
+    if (rows.length !== unique.length) {
+      throw new CodedException(400, 'UNKNOWN_DEPARTMENT', 'A department does not exist');
+    }
+    if (rows.some((row) => row.archivedAt)) {
+      throw new CodedException(409, 'DEPARTMENT_ARCHIVED', 'A department is archived');
+    }
+  }
+
+  /**
+   * ADR 0043: every department a filter names exists; an archived one is fine (F23 rule 6).
+   * Otherwise `UNKNOWN_DEPARTMENT`.
+   */
+  async assertKnownDepartments(
+    codes: readonly DepartmentCode[],
+    executor: Database | Transaction = this.db,
+  ): Promise<void> {
+    const unique = [...new Set(codes)];
+    if (unique.length === 0) return;
+    const [found] = await executor
+      .select({ value: sql<number>`count(*)::int` })
+      .from(departments)
+      .where(inArray(departments.code, unique));
+    if ((found?.value ?? 0) !== unique.length) {
+      throw new CodedException(400, 'UNKNOWN_DEPARTMENT', 'A department does not exist');
+    }
+  }
+
+  /** Every department's code in their order (F23 rule 4): active ones, then archived ones. */
+  async orderedDepartments(
+    executor: Database | Transaction = this.db,
+  ): Promise<{ code: DepartmentCode; archived: boolean }[]> {
+    const rows = await executor
+      .select({ code: departments.code, archivedAt: departments.archivedAt })
+      .from(departments)
+      .orderBy(...departmentOrder);
+    return rows.map((row) => ({ code: row.code, archived: !!row.archivedAt }));
+  }
+
+  /** The active departments' codes in their order (F23 rules 4 and 6: lists and defaults). */
+  async activeDepartmentCodes(
+    executor: Database | Transaction = this.db,
+  ): Promise<DepartmentCode[]> {
+    const rows = await this.orderedDepartments(executor);
+    return rows.filter((row) => !row.archived).map((row) => row.code);
   }
 
   /** The display name of every department, by code (F15 reports). */

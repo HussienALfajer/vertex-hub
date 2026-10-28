@@ -170,15 +170,14 @@ export class Escalations implements OnModuleInit {
       case 'top': {
         const [managers, ops] = await Promise.all([
           this.users.withRole('general_manager', tx),
-          this.users.departmentManagers(['internal_operations'], tx),
+          this.users.functionManagers(['internal_operations'], tx),
         ]);
         candidates = [...managers, ...(ops.get('internal_operations') ?? [])];
         break;
       }
       case 'department':
         candidates =
-          (await this.users.departmentManagers([target.department], tx)).get(target.department) ??
-          [];
+          (await this.users.functionManagers([target.department], tx)).get(target.department) ?? [];
         break;
       case 'role':
         candidates = await this.users.withRole(target.role, tx);

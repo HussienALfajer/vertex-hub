@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { DepartmentCode } from './departments.js';
+import type { DepartmentCode, SystemDepartmentCode } from './departments.js';
 import { currencySchema, minorAmountSchema } from './money.js';
 import { postPlatformSchema } from './post-values.js';
 import { httpUrlSchema } from './text.js';
@@ -23,14 +23,14 @@ export const BRIEF_FIELD_KINDS = [
 
 export type BriefFieldKind = (typeof BRIEF_FIELD_KINDS)[number];
 
-/** The kind of brief fields of each department that has some. */
+/** The kind of brief fields of each system department that has some (none for added ones). */
 export const DEPARTMENT_BRIEF_KINDS: Partial<Record<DepartmentCode, BriefFieldKind>> = {
   design: 'design',
   photography: 'photography',
   development: 'development',
   content_management: 'content',
   marketing: 'marketing',
-};
+} satisfies Partial<Record<SystemDepartmentCode, BriefFieldKind>>;
 
 export const ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:5', 'other'] as const;
 

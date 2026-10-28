@@ -72,6 +72,9 @@ export class TaskQuestionsService {
         'A question is addressed to another active user or a department',
       );
     }
+    if (input.addressedDepartment) {
+      await this.users.assertActiveDepartments([input.addressedDepartment], tx);
+    }
     const { body, bodyDoc, mentions } = bodyOf(input.bodyDoc);
     await this.comments.assertMentions(tx, mentions);
     const [created] = await tx

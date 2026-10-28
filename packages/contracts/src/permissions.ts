@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { DepartmentCode } from './departments.js';
+import type { DepartmentCode, SystemDepartmentCode } from './departments.js';
 import { type AssignableRole, ROLES, type Role } from './roles.js';
 
 /**
@@ -151,66 +151,68 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
   },
 };
 
+type DepartmentGrants = { member?: Grants; manager?: Grants };
+
 /**
  * Grants by position in a department (ADR 0014). A manager is also a member; primary and
- * secondary memberships count the same.
+ * secondary memberships count the same. Keyed by system codes only: a department the General
+ * Manager adds grants nothing (ADR 0043).
  */
-export const DEPARTMENT_CAPABILITIES: Readonly<
-  Partial<Record<DepartmentCode, { member?: Grants; manager?: Grants }>>
-> = {
-  internal_operations: {
-    manager: {
-      'users.manage': 'all',
-      'clients.manage': 'all',
-      'leads.read': 'all',
-      'catalog.read': 'all',
-      'catalog.manage': 'all',
-      'quotes.read': 'all',
-      'quotes.manage': 'all',
-      'audit.read': 'all',
-      'notifications.policy': 'all',
-      'announcements.manage': 'all',
-      'templates.read': 'all',
-      'templates.manage': 'all',
-      'projects.manage': 'all',
-      'tasks.manage': 'all',
-      'content.manage': 'all',
-      'content.review': 'all',
-      'shoots.manage': 'all',
-      'meetings.manage': 'all',
-      'campaigns.read': 'all',
-      'campaigns.manage': 'all',
-      'campaigns.fund': 'all',
-      'invoices.read': 'all',
-      'invoices.manage': 'all',
-      'invoices.send': 'all',
-      'payments.manage': 'all',
-      'expenses.manage': 'all',
-      'reports.read': 'all',
-      'reports.finance': 'all',
-      // F17: employee files without pay, attendance, leave and the HR rules.
-      'employees.read': 'all',
-      'employees.manage': 'all',
-      'hr.read': 'all',
-      'hr.manage': 'all',
+export const DEPARTMENT_CAPABILITIES: Readonly<Partial<Record<DepartmentCode, DepartmentGrants>>> =
+  {
+    internal_operations: {
+      manager: {
+        'users.manage': 'all',
+        'clients.manage': 'all',
+        'leads.read': 'all',
+        'catalog.read': 'all',
+        'catalog.manage': 'all',
+        'quotes.read': 'all',
+        'quotes.manage': 'all',
+        'audit.read': 'all',
+        'notifications.policy': 'all',
+        'announcements.manage': 'all',
+        'templates.read': 'all',
+        'templates.manage': 'all',
+        'projects.manage': 'all',
+        'tasks.manage': 'all',
+        'content.manage': 'all',
+        'content.review': 'all',
+        'shoots.manage': 'all',
+        'meetings.manage': 'all',
+        'campaigns.read': 'all',
+        'campaigns.manage': 'all',
+        'campaigns.fund': 'all',
+        'invoices.read': 'all',
+        'invoices.manage': 'all',
+        'invoices.send': 'all',
+        'payments.manage': 'all',
+        'expenses.manage': 'all',
+        'reports.read': 'all',
+        'reports.finance': 'all',
+        // F17: employee files without pay, attendance, leave and the HR rules.
+        'employees.read': 'all',
+        'employees.manage': 'all',
+        'hr.read': 'all',
+        'hr.manage': 'all',
+      },
     },
-  },
-  content_management: {
-    member: { 'content.manage': 'all' },
-    manager: { 'content.review': 'all' },
-  },
-  medical_consultation: { member: { 'approvals.review_medical': 'all' } },
-  photography: { member: { 'shoots.manage': 'all' } },
-  general_communication: { member: { 'leads.read': 'all', 'leads.manage': 'all' } },
-  marketing: {
-    member: {
-      'leads.read': 'all',
-      'leads.manage': 'all',
-      'campaigns.read': 'all',
-      'campaigns.manage': 'all',
+    content_management: {
+      member: { 'content.manage': 'all' },
+      manager: { 'content.review': 'all' },
     },
-  },
-};
+    medical_consultation: { member: { 'approvals.review_medical': 'all' } },
+    photography: { member: { 'shoots.manage': 'all' } },
+    general_communication: { member: { 'leads.read': 'all', 'leads.manage': 'all' } },
+    marketing: {
+      member: {
+        'leads.read': 'all',
+        'leads.manage': 'all',
+        'campaigns.read': 'all',
+        'campaigns.manage': 'all',
+      },
+    },
+  } satisfies Partial<Record<SystemDepartmentCode, DepartmentGrants>>;
 
 export type DepartmentPosition = { code: DepartmentCode; isManager: boolean };
 
