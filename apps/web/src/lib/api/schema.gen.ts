@@ -6814,8 +6814,7 @@ export interface components {
             isPrimary: boolean;
             isManager: boolean;
         };
-        /** @enum {string} */
-        DepartmentCode: "general_management" | "internal_operations" | "public_relations" | "marketing" | "design" | "photography" | "content_management" | "development" | "general_communication" | "medical_consultation";
+        DepartmentCode: string;
         GrantedPermission: {
             permission: components["schemas"]["Permission"];
             scopes: components["schemas"]["PermissionScope"][];
@@ -6983,7 +6982,7 @@ export interface components {
         };
         /** @enum {string} */
         ImageStatus: "pending" | "ready" | "failed";
-        /** @description The ten departments, in seed order */
+        /** @description Active departments in their order, then archived ones */
         DepartmentList: {
             items: components["schemas"]["Department"][];
         };
@@ -6992,14 +6991,30 @@ export interface components {
             id: string;
             code: components["schemas"]["DepartmentCode"];
             name: string;
+            description: string | null;
+            color: components["schemas"]["DepartmentColor"];
+            icon: components["schemas"]["DepartmentIcon"];
+            position: number;
+            /** Format: date-time */
+            archivedAt: string | null;
             manager: components["schemas"]["PersonRef"] | null;
             memberCount: number;
         };
+        /** @enum {string} */
+        DepartmentColor: "c1" | "c2" | "c3" | "c4" | "c5" | "c6" | "c7" | "c8";
+        /** @enum {string} */
+        DepartmentIcon: "briefcase" | "building" | "settings" | "megaphone" | "chart-line" | "target" | "palette" | "pen-tool" | "camera" | "film" | "clapperboard" | "mic" | "file-text" | "newspaper" | "code" | "monitor-smartphone" | "headset" | "message-circle" | "stethoscope" | "users" | "handshake" | "globe" | "lightbulb" | "calendar" | "shopping-bag" | "printer" | "shield-check" | "wallet" | "graduation-cap" | "sparkles";
         DepartmentDetail: {
             /** Format: uuid */
             id: string;
             code: components["schemas"]["DepartmentCode"];
             name: string;
+            description: string | null;
+            color: components["schemas"]["DepartmentColor"];
+            icon: components["schemas"]["DepartmentIcon"];
+            position: number;
+            /** Format: date-time */
+            archivedAt: string | null;
             manager: components["schemas"]["PersonRef"] | null;
             memberCount: number;
             members: {
