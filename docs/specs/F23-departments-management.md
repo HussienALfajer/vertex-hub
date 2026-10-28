@@ -27,7 +27,7 @@ New permission `departments.manage`: General Manager only (through `everything`)
 | Action | Permission | Roles and scope |
 |---|---|---|
 | See the departments list and a department page (members, identity, what it grants) | `users.read` | Every active user: all |
-| See archived departments on the list | `users.manage` | General Manager · Operations manager |
+| See archived departments on the list screen (the "Archived" toggle) | `users.manage` | General Manager · Operations manager. The API list returns archived departments to every user, so records that keep one show its name (rule 7; owner, 2026-10-28) |
 | See the overview counts | `users.read` | Every active user (every user already reads all tasks, F06) |
 | See the overview's workload per member and who is on leave today | `reports.read` covering the department | General Manager, Operations manager: all · Department Manager: the departments they manage |
 | See the history tab | `audit.read` | General Manager · Operations manager |
@@ -135,7 +135,7 @@ All in `auth` (`departments.controller.ts`). Lists follow ADR 0013.
 
 | Method and path | Permission | Request | Response | Error codes |
 |---|---|---|---|---|
-| `GET /api/departments` | `users.read` | `departmentListQuerySchema` (`archived`: `false` default, `true`, `all`; anything but `false` needs `users.manage`) | `departmentListResponseSchema` (in order; archived after active) | — |
+| `GET /api/departments` | `users.read` | — | `departmentListResponseSchema` (every department: active in order, then archived; owner, 2026-10-28) | — |
 | `POST /api/departments` | `departments.manage` | `createDepartmentSchema` (name, description, color, icon) | `departmentDetailResponseSchema` | `DEPARTMENT_NAME_TAKEN` |
 | `GET /api/departments/:id` | `users.read` | — | `departmentDetailResponseSchema` (adds `grants` and `systemFunctions`) | 404 |
 | `PATCH /api/departments/:id` | `users.manage` | `updateDepartmentSchema` (name, description, color, icon, managerId; all optional) | `departmentDetailResponseSchema` | `DEPARTMENT_NAME_TAKEN`, `MANAGER_NOT_MEMBER`, `DEPARTMENT_ARCHIVED` |
