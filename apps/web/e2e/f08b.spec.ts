@@ -79,7 +79,11 @@ test('the wizard: an idea, a caption per platform, slides and a task, saved in o
   await caption(page, 'x').fill('أ'.repeat(300));
   await expect(page.getByText(/أطول من حد إكس بـ 20 حرف/)).toBeVisible();
   await tabs.getByRole('tab', { name: /يوتيوب/ }).click();
-  await page.getByRole('button', { name: ar.content.captions.copyFrom }).click();
+  // The panel left behind can stay in the page a moment longer, with its own "Copy from".
+  await page
+    .getByRole('tabpanel', { name: /يوتيوب/ })
+    .getByRole('button', { name: ar.content.captions.copyFrom })
+    .click();
   await page.getByRole('menuitem', { name: ar.content.captionGroups.facebook_instagram }).click();
   await expect(caption(page, 'youtube')).toHaveValue('فطور العائلة كل جمعة من مطبخ الياسمين.');
   await page.getByLabel(ar.content.captions.title).fill('فطور الجمعة في الياسمين');
