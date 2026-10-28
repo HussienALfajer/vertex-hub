@@ -13,9 +13,9 @@ The single source of shapes shared by the API and the web app: Zod schemas, thei
 
 ## Permissions
 - `src/permissions.ts` is the only permission map. A new permission is `<module>.<action>`, added to `PERMISSIONS` and granted per role with a scope.
-- Grants that depend on open question Q13 stay with the General Manager only. Don't guess them.
+- A grant the spec does not settle is an open question for the owner (`docs/open-questions.md`): never guess it.
 - `src/permissions.test.ts` covers the helpers. Add a case when you add a grant with a new scope.
 
 Changing an exported schema changes the API and the web app: run `pnpm typecheck` at the root.
 
-Run: `pnpm --filter @vertex-hub/contracts test`.
+Run: `pnpm verify packages/contracts` (the package's tests) or `pnpm verify <file>` · `pnpm typecheck`.

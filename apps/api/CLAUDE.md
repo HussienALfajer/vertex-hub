@@ -13,7 +13,7 @@ NestJS 12 HTTP API (modular monolith). Conventions and their reasons: ADR 0013. 
 - Controller: parameters validated with `{ schema }` from `@vertex-hub/contracts`, response shaped with `@SerializeOptions({ schema })`, documented with `@Api*Response({ standardSchema })`, then one call to the service.
 - Service: all logic and queries (Drizzle through `@Inject(DATABASE)`). No repository layer.
 - Register the module in `src/app.module.ts` through its `index.ts`.
-- After changing a route or a contract it uses, run `pnpm build` and `pnpm --filter @vertex-hub/api openapi:export`, and commit `apps/web/src/lib/api/openapi.json` (CI fails when it is stale).
+- After changing a route or a contract it uses, run `pnpm build`, `pnpm --filter @vertex-hub/api openapi:export` and `pnpm --filter @vertex-hub/web api:generate`, and commit `apps/web/src/lib/api/openapi.json` and `schema.gen.ts` (CI fails when either is stale).
 - Coded errors: `throw new CodedException(status, 'CODE', message, details?)` from `src/core/errors/`; the code is listed in `ERROR_CODES` in contracts.
 - The signed-in user and their access: `@CurrentUser()` from the `auth` module (set by the guard).
 
@@ -38,4 +38,4 @@ NestJS 12 HTTP API (modular monolith). Conventions and their reasons: ADR 0013. 
 ## Tests
 For each endpoint in `test/<module>.test.ts`: success, 401 without a session, 403 without the permission, and a record outside the caller's scope. Start the app with `startApp()` from `test/start-app.ts`; seed users with `seedUser` and sign in with `api(url).signIn` / `signInWithTwoFactor` from `test/helpers.ts`, and remove them with `removeUsers`, as `test/auth.test.ts` does. Test files run in parallel Vitest workers, each on a database of its own (`packages/db/src/testing.ts`: `TEST_WORKERS`, 4 in CI and up to 12 on a large machine); files in one worker run one after another, since some rows are global (department managers). A worker keeps its modules from one file to the next (`isolate: false`), so a test leaves nothing in module state: only rows with unique values that it seeds and removes (`test/worker-env.ts` puts `process.env` back after each file). Each test app opens at most 4 database connections (`DATABASE_POOL_MAX` in `vitest.config.ts`).
 
-Run: `pnpm verify apps/api/test/<module>.test.ts` (one file; it builds what the api depends on first) · `pnpm --filter @vertex-hub/api test` (the suite; needs `TEST_DATABASE_URL`) · `pnpm --filter @vertex-hub/api typecheck`.
+Run: `pnpm verify apps/api/test/<module>.test.ts` (one file; it builds what the api depends on first) · `pnpm verify apps/api` (the suite; needs `TEST_DATABASE_URL`) · `pnpm typecheck`.

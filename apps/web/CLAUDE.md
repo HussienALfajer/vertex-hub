@@ -16,7 +16,7 @@ React 19 + Vite SPA, Arabic RTL first. Read `brand/identity.md` before visual wo
 - Icon-only buttons get an `aria-label` and a `Tooltip` with the same text, never a `title` attribute.
 - Where an error shows: about one field (invalid value, wrong code, wrong password in a confirmation) it is that field's `FieldError` (`role="alert"` when it comes from the server), the field turns red and gets the focus back; about the whole action (wrong email and password together, too many attempts, network) it is a `FormAlert` above the submit button. `passwordFailure()` in `src/lib/errors.ts` tells the two apart for password confirmations.
 - No hard-coded user-facing text: `t('<feature>.<key>')`, shared strings under `common`. Arabic copy follows `brand/identity.md` §9. Notification texts and links come from `@vertex-hub/messages`, which the emails share (ADR 0028).
-- Numbers and dates only through `src/lib/format.ts` (`ar-u-nu-latn`, `Asia/Damascus`).
+- Numbers and dates only through `src/lib/format.ts` (the `APP_LOCALE` `ar-SY-u-nu-latn` of `@vertex-hub/messages`, `Asia/Damascus`); money amounts and rates through `src/lib/money.ts`.
 - Server state in TanStack Query. Query keys start with the module name. API calls go through `api` and `call()` in `src/lib/api/client.ts`, typed from the OpenAPI document (`schema.gen.ts`, generated: never edit). After an API change: `pnpm --filter @vertex-hub/api openapi:export`, then `pnpm --filter @vertex-hub/web api:generate`. Better Auth calls use `authClient`.
 - Forms validate with the same Zod schema from `@vertex-hub/contracts` that the API uses.
 - Permission checks in the UI only hide things (`me.permissions`); the API enforces them.
@@ -25,6 +25,6 @@ React 19 + Vite SPA, Arabic RTL first. Read `brand/identity.md` before visual wo
 
 ## Tests
 - Unit: `*.test.ts` next to the code (Vitest).
-- E2E (`e2e/`): the API is mocked in `e2e/fixtures.ts` with contract types. Every new screen gets RTL screenshots in both themes in `e2e/screens.spec.ts`. A test that tours many screens sets `test.setTimeout(90_000)`, as the other tours do.
+- E2E (`e2e/`): the API is mocked in `e2e/fixtures.ts` with contract types. Every new screen gets RTL screenshots in both themes in `e2e/screens.spec.ts`. A test that tours many screens sets `test.setTimeout(90_000)`, as the other tours do. Pick from a select with `pickOption` (`e2e/test.ts`).
 
-Run: `pnpm --filter @vertex-hub/web test` · `pnpm verify apps/web/e2e/<file>.spec.ts [--grep "<title>"]` (builds first; the whole E2E suite runs in CI) · `pnpm --filter @vertex-hub/web typecheck`.
+Run: `pnpm verify apps/web/src/<path>.test.ts` (unit) · `pnpm verify apps/web/e2e/<file>.spec.ts [--grep "<title>"]` (builds first; the whole E2E suite runs in CI) · `pnpm typecheck`.

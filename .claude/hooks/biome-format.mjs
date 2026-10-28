@@ -2,7 +2,7 @@
 // Remaining diagnostics are sent back to Claude (exit code 2) so it fixes them in the next step.
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { extname, relative, resolve } from 'node:path';
+import { extname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SUPPORTED = new Set([
@@ -25,7 +25,10 @@ if (!filePath || !SUPPORTED.has(extname(filePath).toLowerCase())) process.exit(0
 
 const target = resolve(filePath);
 const relativePath = relative(projectDir, target);
-if (relativePath.startsWith('..') || !existsSync(target)) process.exit(0);
+// Outside the repository: `..` above it, or an absolute path on another Windows drive.
+if (relativePath.startsWith('..') || isAbsolute(relativePath) || !existsSync(target)) {
+  process.exit(0);
+}
 
 const biome = resolve(projectDir, 'node_modules/@biomejs/biome/bin/biome');
 if (!existsSync(biome)) process.exit(0); // dependencies not installed yet

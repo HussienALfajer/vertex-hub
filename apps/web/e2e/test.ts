@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 import openapi from '../src/lib/api/openapi.json' with { type: 'json' };
 
 /*
@@ -49,3 +49,25 @@ export const test = base.extend({
 });
 
 export { expect };
+
+/**
+ * Opens a select and picks the option whose name starts with `option`. A list opened before may
+ * stay in the page, hidden, so the pick takes the visible one. On loaded CI runners an open list
+ * sometimes stayed "not visible" to the click until the test timed out: the pick then closes the
+ * list and opens it again.
+ */
+export async function pickOption(page: Page, trigger: Locator, option: string): Promise<void> {
+  await expect(async () => {
+    await trigger.click();
+    try {
+      await page
+        .getByRole('option', { name: new RegExp(`^${option}`) })
+        .filter({ visible: true })
+        .first()
+        .click({ timeout: 5_000 });
+    } catch (error) {
+      await page.keyboard.press('Escape');
+      throw error;
+    }
+  }).toPass({ timeout: 30_000 });
+}

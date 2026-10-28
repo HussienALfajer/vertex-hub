@@ -10,11 +10,11 @@ One repository (pnpm workspaces + Turborepo) with separately deployable apps and
 vertex-hub/
 ├── apps/
 │   ├── api/          NestJS HTTP API (Express adapter): src/core (infrastructure), src/modules (one per domain)
-│   ├── worker/       NestJS standalone context: src/core, src/jobs (pg-boss jobs, PDF, email)
+│   ├── worker/       NestJS standalone context: src/core, src/jobs (pg-boss jobs), src/pdf, src/email, src/push
 │   └── web/          React 19 + Vite SPA
 ├── packages/
 │   ├── contracts/    Zod schemas, shared types, permission map
-│   ├── db/           Drizzle schema, migrations, seed
+│   ├── db/           Drizzle schema, migrations (with SQL seed migrations), test database helpers
 │   ├── messages/     Arabic texts shared by web and worker: emails, notification texts (ADR 0028)
 │   ├── ui/           Vertex design system (shadcn/ui on Base UI, Tailwind v4 tokens)
 │   └── config/       Shared TypeScript and Biome configuration
@@ -46,19 +46,19 @@ vertex-hub/
 | Installable app | Web app manifest and service worker (vite-plugin-pwa, `injectManifest`, Workbox precaching; `apps/web/src/service-worker/`), Web Push with VAPID; the query cache kept in IndexedDB for 7 days, financial queries excluded (`apps/web/src/lib/offline-cache.ts`) | 0036 |
 | Design system | shadcn/ui on Base UI, Tailwind CSS v4, RTL | 0004 |
 | Forms | React Hook Form + Zod | 0003 |
-| Calendar views | FullCalendar (MIT core), RTL and Arabic locale | 0003 |
-| Drag and drop | dnd-kit | — |
-| Charts | Recharts | — |
+| Calendar views | The design system's `CalendarGrid` (`packages/ui`), RTL | 0003 |
+| Drag and drop | Native HTML drag and drop (content calendar, ideas, slides) | — |
+| Charts | Design-system pieces (`Meter`, `Progress`, `ChartDot` with the `chart-1..8` tokens); no chart library | — |
 | Rich text | Tiptap (briefs, captions, comments with mentions) | — |
 | i18n | i18next; Intl for dates and numbers | 0003 |
 | Icons | Lucide | — |
 | Tests | Vitest (unit, API integration against a real test database), Playwright (E2E, RTL screenshots) | — |
 | Lint / format | Biome | — |
-| CI | GitHub Actions: typecheck, lint, test, build, gitleaks | — |
+| CI | GitHub Actions: lint, typecheck, build, tests, E2E, migration and OpenAPI drift, gitleaks (`docs/testing.md`) | — |
 
 ## API modules
 
-`auth` · `clients` · `leads` · `catalog` · `quotes` · `projects` · `tasks` · `templates` · `content` · `approvals` · `files` · `calendar` · `campaigns` · `invoices` · `notifications` · `email` · `reports` · `audit` · `audiences` · `announcements` · `hr`
+`auth` · `clients` · `leads` · `catalog` · `quotes` · `projects` · `tasks` · `templates` · `content` · `approvals` · `files` · `calendar` · `campaigns` · `invoices` · `notifications` · `email` · `reports` · `audit` · `audiences` · `announcements` · `hr` · `health` (`GET /api/health` only, no tables)
 
 Rules (module anatomy, naming and the tests that enforce them: ADR 0013):
 - A module owns its tables. Other modules call its exported service; they never query its tables.
@@ -119,5 +119,5 @@ Deployment follows the server's existing conventions (ADR 0009): a dedicated sys
 ## Environments
 
 - **Local (Windows):** PostgreSQL 17 installed natively; `pnpm db:setup-local` creates the role, the `vertex_hub` and `vertex_hub_test` databases and the api suite's worker databases. `pnpm dev` runs api (:3000), worker and web (:5173, proxies `/api`). Checks run through `pnpm verify` (`docs/testing.md`).
-- **CI:** GitHub Actions with a PostgreSQL service container. Lint/typecheck/build, the tests, two api test shards and four Playwright shards run as parallel jobs behind two gate jobs (the checks the `main` ruleset requires); Turborepo's cache is kept between runs (a remote cache once its secrets are set, `docs/testing.md`), and a PR that changes only Markdown outside `brand/` skips the checks.
+- **CI:** GitHub Actions with a PostgreSQL service container. Lint/typecheck/build, the tests, two api test shards and four Playwright shards run as parallel jobs behind two gate jobs; the `main` ruleset requires those two and the secret scan; Turborepo's cache is kept between runs (a remote cache once its secrets are set, `docs/testing.md`), and a PR that changes only Markdown outside `brand/` skips the checks.
 - **Production:** https://hub.vertexmedia.pro on the owner's VPS, atomic releases with automatic rollback (runbook: `docs/deployment.md`). No staging in V1.

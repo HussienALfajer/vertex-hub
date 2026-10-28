@@ -1,5 +1,5 @@
 # 0029 — Retainer terms, charges and amendments
-Status: Accepted · Date: 2026-10-07
+Status: Accepted, months read as cycles by [0030](0030-retainer-anniversary-cycles.md) · Date: 2026-10-07
 
 ## Context
 ADR 0015 made retainers open-ended monthly commitments with one fee, and ADR 0024 drafts each month's invoice from the cycle at the current fee, never changes an issued invoice and keeps no credit balance. Clients sign fixed agreements ("3 months for 1,000 USD, paid 300 / 300 / 400"), ask for extra lines mid-contract with a price, and amounts change after a month is invoiced or paid. Nothing records the agreement or links a change to the invoices, so contracts and invoices drift apart silently. The owner's decisions are in `docs/specs/F05B-retainer-terms.md`.

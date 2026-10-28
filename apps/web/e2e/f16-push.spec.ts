@@ -1,5 +1,5 @@
 import type { PushPayload } from '@vertex-hub/contracts';
-import { mockApi } from './fixtures';
+import { mockApi, notificationsSeed } from './fixtures';
 import { expect, test } from './test';
 
 // F16 rules A8 and A14: the service worker shows pushes and closes those read elsewhere. The
@@ -14,7 +14,12 @@ test('the service worker shows a push and closes what was read elsewhere', async
   context,
 }) => {
   await context.grantPermissions(['notifications'], { origin: ORIGIN });
-  await mockApi(page, { signedIn: true });
+  // The pushes carry notifications the API still lists as unread: the app closes the pushes of
+  // notifications read elsewhere whenever it opens or regains focus (rule A14), and would take
+  // these off the screen while the test reads them.
+  const [assigned, commented] = notificationsSeed();
+  if (!assigned || !commented) throw new Error('The seed has fewer than two notifications');
+  await mockApi(page, { signedIn: true, notifications: [assigned, commented] });
   const cdp = await context.newCDPSession(page);
   const registrations = new Map<string, string>();
   cdp.on('ServiceWorker.workerRegistrationUpdated', ({ registrations: updated }) => {
@@ -49,7 +54,7 @@ test('the service worker shows a push and closes what was read elsewhere', async
   const first: PushPayload = {
     kind: 'notification',
     deliveryId: '0199a000-0000-7000-8000-000000000001',
-    notificationId: '0199a000-0000-7000-8000-000000000002',
+    notificationId: assigned.id,
     title: 'مهمة جديدة',
     body: 'أُسندت إليك «تصاميم منيو الخريف» بواسطة ليان الأحمد',
     link: '/tasks',
@@ -65,7 +70,7 @@ test('the service worker shows a push and closes what was read elsewhere', async
   await push({
     ...first,
     deliveryId: '0199a000-0000-7000-8000-000000000003',
-    notificationId: '0199a000-0000-7000-8000-000000000004',
+    notificationId: commented.id,
     title: 'تعليق جديد',
     tag: 'task:t2:task_commented',
     close: [first.tag],

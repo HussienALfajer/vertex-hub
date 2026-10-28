@@ -319,9 +319,9 @@ What roles see differently: account managers see their clients' quotes only; Fin
 
 ## Open questions
 - None blocks F04. Related, not blocking:
-  - Q11: the PDF uses the fallback Arabic font until the Madani Arabic license and files arrive; the license must cover server-side PDF embedding before launch.
-  - Q7: swap on the server is the safety margin for Chromium PDF rendering; required before the Phase 3 deploy.
-  - Q5: sending quotes by email waits for the email provider (Phase 4).
+  - Q11: the PDF uses the fallback Arabic font until the Madani Arabic license and files arrive; the license must cover server-side PDF embedding before launch. *Resolved 2026-10-19: dropped; Noto Kufi Arabic (ADR 0033).*
+  - Q7: swap on the server is the safety margin for Chromium PDF rendering; required before the Phase 3 deploy. *Resolved 2026-10-19: 4 GB swap (`docs/deployment.md`).*
+  - Q5: sending quotes by email waits for the email provider (Phase 4). *Resolved 2026-10-04: Hostinger Email SMTP (ADR 0028).*
 
 ## Acceptance
 - Owner check in the browser:

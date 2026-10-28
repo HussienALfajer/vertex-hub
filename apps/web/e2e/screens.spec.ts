@@ -35,7 +35,7 @@ import {
   seedIds,
   VALID_LINK_TOKEN,
 } from './fixtures';
-import { expect, test } from './test';
+import { expect, pickOption, test } from './test';
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
@@ -1156,13 +1156,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.goto(`/tasks/new?clientId=${seedIds.jasmine}`);
       const form = page.locator('form');
       const choose = async (scope: typeof form, label: string, option: string) => {
-        await scope.getByRole('combobox', { name: label, exact: true }).click();
-        await page
-          .getByRole('option', { name: new RegExp(`^${option}`) })
-          // A list opened before may stay in the page, hidden: pick from the open one.
-          .filter({ visible: true })
-          .first()
-          .click();
+        await pickOption(page, scope.getByRole('combobox', { name: label, exact: true }), option);
         // Wait for the list to close, so the next pick cannot catch an option of this one.
         await expect(page.getByRole('option').filter({ visible: true })).toHaveCount(0);
       };

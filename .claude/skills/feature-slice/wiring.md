@@ -23,7 +23,7 @@ Everything a new module, permission, error or screen must be connected to. Tests
 - [ ] `modules/<module>/` with `<module>.module.ts`, `<module>.controller.ts`, `<module>.service.ts`, `index.ts` (exports the Nest module and only the services other modules call).
 - [ ] The module is imported in `app.module.ts` through its `index.ts`.
 - [ ] Every route has `@RequirePermissions(...)` or `@RequireSession()` **(test)**; imports from other modules go through their `index.ts` **(test)**; only the module's own tables **(test)**.
-- [ ] `@CurrentUser()` and `CurrentUserInfo` come from `modules/auth/index.js`. They are not exported there yet: the first module outside `auth` that needs them adds the export.
+- [ ] `@CurrentUser()` and `CurrentUserInfo` come from `modules/auth/index.js`.
 - [ ] Reads and lists filter by `permissionScopes(actor.access, permission)` from `@vertex-hub/contracts`; a direct read outside the scope answers the status the spec's API table gives (ask if it gives none).
 - [ ] Every state change writes `recordAudit(tx, …)` with `changedFields(...)` in the same `db.transaction`.
 - [ ] Archive and restore set and clear `archivedAt`; no `DELETE` of business rows.

@@ -244,6 +244,11 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Playwright's image carries Chromium and its system libraries: `playwright install --with-deps`
+    # took 20 s on most runners but 3-10 min on one shard of most runs (apt). Keep the tag on the
+    # version of @playwright/test; the install step below fetches a newer browser if they drift.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     env:
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
       TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -270,7 +275,8 @@ jobs:
           path: .turbo/cache
           key: turbo-${{ github.job }}-${{ matrix.shard }}-${{ github.sha }}
           restore-keys: turbo-${{ github.job }}-${{ matrix.shard }}-
-      - run: pnpm --filter @vertex-hub/web exec playwright install --with-deps chromium
+      # A no-op while the image matches @playwright/test.
+      - run: pnpm --filter @vertex-hub/web exec playwright install chromium
       - run: pnpm turbo run test:e2e -- --shard=${{ matrix.shard }}/4
       # The report and the RTL screenshots (light and dark) are the review evidence of each run.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -1,6 +1,6 @@
 ---
 name: feature-slice
-description: Implement an approved feature spec end to end, layer by layer (contracts → db → api → OpenAPI → web → E2E), with a check gate after each layer, the reviewer, and the owner's acceptance steps. Then opens the PR with auto-merge. The implement step of the feature cycle, after /spec.
+description: Implement an approved feature spec end to end, layer by layer (contracts → db → api → OpenAPI → web → E2E), with a check gate after each layer and the reviewer, then open the PR with auto-merge and give the owner's acceptance steps. The implement step of the feature cycle, after /spec.
 argument-hint: <feature id or spec path, e.g. F02>
 disable-model-invocation: true
 effort: medium
@@ -17,7 +17,7 @@ Implement **$ARGUMENTS**. This skill orders the work and names the gates; the ru
 - Read only: the spec, the ADRs it lists, `wiring.md`, and the `CLAUDE.md` of each folder you will touch. Open reference files by range, when you write the layer that needs them.
 - If `TASKS.md` already holds this feature, continue from its first open PR instead of planning again. Check that the earlier PRs are merged into `main`.
 - Split the feature into PRs. Default: PR 1 is contracts, db and api with their tests; PR 2 is web and E2E. Use a single PR when the whole feature is small (about one table and one screen). A PR never leaves `main` broken or half-wired.
-- Write `TASKS.md` for this feature (replace the previous feature's file): a heading per PR, one item per layer below, the wiring items from `wiring.md` that apply, and "checks, reviewer, acceptance, PR with auto-merge" at the end of each PR.
+- Write `TASKS.md` for this feature (replace the previous feature's file): a heading per PR, one item per layer below, the wiring items from `wiring.md` that apply, and "checks, reviewer, PR with auto-merge" at the end of each PR (ticked in the commit that opens it).
 - Show the owner the PR split and the task list in a few lines, in Arabic, then **stop and wait for approval**.
 
 ## 2. Build, one layer at a time
@@ -38,17 +38,18 @@ Layers a PR does not include are skipped. Helpers that ADR 0013 says arrive with
 1. Walk the wiring checklist in `wiring.md` against the diff (`git diff main...HEAD --stat`).
 2. Run `pnpm verify` once (lint, typecheck, test, build, the changed E2E specs, drift), through the `checker` to keep its output out of the context, and the `reviewer` (next step) at the same time. Edit nothing until both are done.
 3. Run the `reviewer` subagent with the spec path. Fix every blocking finding and every failure of step 2 together, then run `pnpm verify` once more: Turborepo replays what the fixes did not touch.
-4. Owner acceptance, in Arabic:
-   - PR with screens: turn the spec's "Acceptance" section into numbered browser steps for the owner (`pnpm dev`, which roles to sign in as, what to click, what they should see). Ask before `pnpm db:migrate` on the dev database.
+4. Tick the PR's items in `TASKS.md` and finish the PR in the same turn, without asking: follow "Finishing a task" in `AGENTS.md` (docs, and `docs/ROADMAP.md` on the feature's last PR; secrets check; checks; commit; push; `gh pr create`; `gh pr merge <number> --auto --merge`; Auto-fix).
+5. The report (Arabic) gives the owner's acceptance steps under "Needs from you", to try once the PR has merged:
+   - PR with screens: turn the spec's "Acceptance" section into numbered browser steps (once the cleanup line below has run: `pnpm db:migrate` and `pnpm dev`; then which roles to sign in as, what to click, what they should see).
    - PR without screens: summarize the endpoints and their rules; the owner may try them at `http://127.0.0.1:3000/api/docs`.
-   Fix what the owner reports in the same session, then repeat steps 2–3 for what changed.
-5. Tick the PR's items in `TASKS.md`, then, as soon as the owner accepts, finish the PR in the same turn: follow "Finishing a task" in `AGENTS.md` (docs and `docs/ROADMAP.md`, secrets check, checks, commit, push, `gh pr create`, `gh pr merge <number> --auto --merge`, report with the cleanup line and the next session's first message).
+   What the owner reports is fixed with steps 2–3 for what changed: while the PR is still open, commit and push to its branch; after the merge, in a new `fix/<id>-<topic>` PR (from this session if it is still open, otherwise a new one). When the owner confirms the acceptance passed, the next PR records "owner acceptance passed" on the feature's `docs/ROADMAP.md` line.
 
 ## Stop and ask when
 - The spec is ambiguous in a way that changes the result, or the work needs an answer from `docs/open-questions.md`.
 - The migration review in `/db-migration` finds a destructive or non-backward-compatible change.
-- A command changes the owner's data (`pnpm db:migrate`) or leaves the machine (`git push`, `ssh`).
 - The work would go beyond the spec. Record the idea as a follow-up instead.
+
+Nothing else stops the work: commands, `pnpm db:migrate` on the dev database, pushing, the PR and its auto-merge need no approval (`AGENTS.md`, "How to work").
 
 ## Keep this skill true
 If a step here or in `wiring.md` was missing, wrong or out of date, fix the file in the same PR and say so in the report under "Found".

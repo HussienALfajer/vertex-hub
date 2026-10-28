@@ -6,7 +6,7 @@ Arabic-first (RTL) web application.
 
 ## Status
 
-Early development — Phase 0 (foundation). See [docs/ROADMAP.md](docs/ROADMAP.md).
+V1 is complete and in production; V2 features are being added. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Getting started
 
@@ -27,10 +27,12 @@ All commands are listed in [AGENTS.md](AGENTS.md#commands).
 
 ## Documentation
 
-- [V1 scope](docs/product/v1-scope.md)
+- [V1 scope](docs/product/v1-scope.md) and [V2 scope](docs/product/v2-scope.md)
+- [Roadmap](docs/ROADMAP.md)
 - [Architecture](docs/architecture.md)
 - [Decision records](docs/decisions/README.md)
-- [Working method](docs/workflow.md)
+- [Working method](docs/workflow.md) and [testing](docs/testing.md)
+- [Deployment](docs/deployment.md)
 - [Open questions](docs/open-questions.md)
 
 ## Stack
