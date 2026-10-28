@@ -38,6 +38,18 @@ describe('AuditValue', () => {
     expect(shown('user', 'roles', ['finance'])).toBe(i18n.t('roles.finance'));
   });
 
+  it('reads department entries in Arabic (F23 rule 29)', () => {
+    expect(shown('department', 'color', 'c3')).toBe(i18n.t('departments.colors.c3'));
+    expect(shown('department', 'icon', 'film')).toBe(i18n.t('departments.icons.film'));
+    expect(shown('department', 'kind', 'secondary')).toBe(i18n.t('departments.detail.secondary'));
+    expect(shown('department', 'targets', { members: { id: USER, name: 'التسويق' } })).toBe(
+      `${i18n.t('departments.archive.categories.members')}: التسويق`,
+    );
+    expect(shown('department', 'moved', { tasks: 3 })).toBe(
+      `${i18n.t('departments.archive.categories.tasks')}: 3`,
+    );
+  });
+
   it('shows a signed-out device’s location as a place', () => {
     expect(shown('user', 'location', { countryCode: 'SY', city: 'Damascus' })).toBe(
       'Damascus، سوريا',

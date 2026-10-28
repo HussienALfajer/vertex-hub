@@ -14,6 +14,7 @@ import { formatList, formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
 import { DepartmentBadge, useDepartmentByCode } from '../departments/department-badge';
 import { departmentListQuery } from '../departments/departments.queries';
+import { departmentLabel } from '../departments/pickable-departments';
 
 /** Running work in the workflow colors; completed takes Vertex Green, like delivered work (§2). */
 const statusTone = {
@@ -84,10 +85,16 @@ export function PersonName({
   );
 }
 
-/** Department names by code; names are editable (F01), so they come from the API. */
+/**
+ * Department names by code; names are editable (F01), so they come from the API. An archived
+ * department carries its mark (F23 rule 7).
+ */
 export function useDepartmentNames(): (code: DepartmentCode) => string {
+  const { t } = useTranslation();
   const departments = useQuery(departmentListQuery);
-  const names = new Map(departments.data?.items.map(({ code, name }) => [code, name]));
+  const names = new Map(
+    departments.data?.items.map((department) => [department.code, departmentLabel(t, department)]),
+  );
   return (code) => names.get(code) ?? '';
 }
 

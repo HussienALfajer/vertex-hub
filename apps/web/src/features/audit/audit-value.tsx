@@ -19,6 +19,9 @@ import {
   CREW_ROLES,
   CYCLE_STATUSES,
   DELIVERABLE_KINDS,
+  DEPARTMENT_COLORS,
+  DEPARTMENT_ICONS,
+  DEPARTMENT_TRANSFER_CATEGORIES,
   type DepartmentCode,
   DISCOUNT_APPROVALS,
   departmentCodeSchema,
@@ -175,6 +178,15 @@ function enumLabel(
     value === NATIONAL_ID_AUDIT_MASK
   ) {
     return t('audit.nationalIdChanged');
+  }
+  // F23: a department's identity and the kind of a membership.
+  if (entityType === 'department') {
+    const color = field === 'color' ? find(DEPARTMENT_COLORS) : undefined;
+    if (color) return t(`departments.colors.${color}`);
+    const icon = field === 'icon' ? find(DEPARTMENT_ICONS) : undefined;
+    if (icon) return t(`departments.icons.${icon}`);
+    if (field === 'kind' && value === 'primary') return t('departments.detail.primary');
+    if (field === 'kind' && value === 'secondary') return t('departments.detail.secondary');
   }
   if (field === 'status') {
     const client = entityType === 'client' ? find(CLIENT_STATUSES) : undefined;
@@ -424,6 +436,28 @@ export function AuditValue({
     );
   }
   if (isItem(value) && text(value, 'name')) return <span>{text(value, 'name')}</span>;
+  // F23: an archive's target per category, and what moved per category.
+  if (entityType === 'department' && (field === 'targets' || field === 'moved') && isItem(value)) {
+    return (
+      <span className="flex flex-col gap-0.5">
+        {DEPARTMENT_TRANSFER_CATEGORIES.flatMap((category) => {
+          const entry = value[category];
+          const shown = isItem(entry)
+            ? text(entry, 'name')
+            : typeof entry === 'number'
+              ? formatNumber(entry)
+              : undefined;
+          return shown === undefined
+            ? []
+            : [
+                <span key={category}>
+                  {t(`departments.archive.categories.${category}`)}: {shown}
+                </span>,
+              ];
+        })}
+      </span>
+    );
+  }
   // Where a signed-out device signed in from (F01B): a country and city, or the local network.
   if (field === 'location' && isIpLocation(value)) return <span>{placeText(t, value)}</span>;
   // An approval link's email (F14): its recipients.

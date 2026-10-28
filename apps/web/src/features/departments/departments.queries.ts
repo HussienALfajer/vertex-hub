@@ -99,6 +99,8 @@ export function useArchiveDepartment(id: string) {
       call(api.POST('/api/departments/{id}/archive', { params: { path: { id } }, body: input })),
     onSuccess: (department) => {
       queryClient.setQueryData(departmentsKeys.detail(id), department);
+      // The preview of an archived department is refused from now on: drop it, not refetch it.
+      queryClient.removeQueries({ queryKey: departmentsKeys.archivePreview(id) });
       return queryClient.invalidateQueries();
     },
     onError: () => queryClient.invalidateQueries({ queryKey: departmentsKeys.all }),

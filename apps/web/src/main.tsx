@@ -24,6 +24,10 @@ import './styles.css';
  */
 function onApiError(error: Error) {
   if (!(error instanceof ApiError)) return;
+  // F23 edge case 2: a department archived while a form offered it; every picker reloads them.
+  if (error.code === 'DEPARTMENT_ARCHIVED') {
+    void queryClient.invalidateQueries({ queryKey: ['departments'] });
+  }
   if (error.status === 403 && error.code === 'TWO_FACTOR_REQUIRED') {
     void router.navigate({ to: '/setup-two-factor' });
   } else if (error.status === 403) {

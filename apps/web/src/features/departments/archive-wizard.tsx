@@ -82,9 +82,13 @@ function Wizard({
   const choices = (departments.data?.items ?? []).filter(
     (other) => !other.archivedAt && other.id !== department.id,
   );
+  // Edge case 3: a target archived meanwhile leaves the choices and must be picked again.
+  const offered: Targets = Object.fromEntries(
+    Object.entries(targets).filter(([, id]) => choices.some((other) => other.id === id)),
+  );
   const nameOf = (id: string | undefined) => choices.find((other) => other.id === id)?.name ?? '';
   const filled = (preview.data?.categories ?? []).filter(({ count }) => count > 0);
-  const complete = filled.every(({ category }) => targets[category]);
+  const complete = filled.every(({ category }) => offered[category]);
 
   function next(event: FormEvent) {
     event.preventDefault();
@@ -96,7 +100,7 @@ function Wizard({
   async function confirm() {
     setFailure(null);
     const input: ArchiveDepartment = {
-      targets: Object.fromEntries(filled.map(({ category }) => [category, targets[category]])),
+      targets: Object.fromEntries(filled.map(({ category }) => [category, offered[category]])),
     };
     try {
       await archive.mutateAsync(input);
@@ -109,6 +113,7 @@ function Wizard({
       setFailure(errorMessage(t, error));
       setStep('moves');
       void preview.refetch();
+      void departments.refetch();
     }
   }
 
@@ -140,7 +145,7 @@ function Wizard({
         <MovesStep
           preview={preview.data}
           choices={choices}
-          targets={targets}
+          targets={offered}
           missing={missing}
           failure={failure}
           onTargets={(next) => {
@@ -160,7 +165,7 @@ function Wizard({
                   {t('departments.archive.moves', {
                     category: t(`departments.archive.categories.${category}`),
                     n: formatNumber(count),
-                    target: nameOf(targets[category]),
+                    target: nameOf(offered[category]),
                   })}
                 </li>
               ))}
