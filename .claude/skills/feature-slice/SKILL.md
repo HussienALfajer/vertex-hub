@@ -15,13 +15,14 @@ Implement **$ARGUMENTS**. This skill orders the work and names the gates; the ru
 
 ## 1. Plan (no code)
 - Read only: the spec, the ADRs it lists, `wiring.md`, and the `CLAUDE.md` of each folder you will touch. Open reference files by range, when you write the layer that needs them.
-- If `TASKS.md` already holds this feature, continue from its first open PR instead of planning again. Check that the earlier PRs are merged into `main`.
+- Run `git fetch --prune` and look for this feature's branch and open PR (`git branch -r`, `gh pr list`; in the cloud, the session's PR tools). If one exists, switch to it: its `TASKS.md` is newer than `main`'s, and its "Stopped at" line says where to continue. Otherwise, if `main`'s `TASKS.md` already holds this feature, continue from its first open PR instead of planning again. Check that the earlier PRs are merged into `main`.
 - Split the feature into PRs. Default: PR 1 is contracts, db and api with their tests; PR 2 is web and E2E. Use a single PR when the whole feature is small (about one table and one screen). A PR never leaves `main` broken or half-wired.
 - Write `TASKS.md` for this feature (replace the previous feature's file): a heading per PR, one item per layer below, the wiring items from `wiring.md` that apply, and "checks, reviewer, PR with auto-merge" at the end of each PR (ticked in the commit that opens it).
-- Show the owner the PR split and the task list in a few lines, in Arabic, then **stop and wait for approval**.
+  Its header names the feature, the spec, the branch of the PR in progress and a "Stopped at" line (last finished step, next step), kept current as the work moves (`docs/workflow.md`, "Continuing in another session").
+- Show the owner the PR split and the task list in a few lines, in Arabic, then **stop and wait for approval**. Once approved, create the first PR's branch, commit `TASKS.md` (`chore: plan <id>`) and push it, so another session, local or cloud, can take over.
 
 ## 2. Build, one layer at a time
-Finish a layer, run its gate, fix root causes, tick the item in `TASKS.md`, then start the next layer. Never start a layer while the previous gate fails. A gate runs the layer's own tests with `pnpm verify <files>` (paths from the root) and typechecks with `pnpm typecheck` (Turborepo replays untouched packages); when one fails, fix it and rerun only the files its summary names. Never run the whole suite at a gate.
+Finish a layer, run its gate, fix root causes, tick the item in `TASKS.md`, update its "Stopped at" line, commit and push, then start the next layer. Before the session ends with a layer unfinished, commit and push it too (`wip:` if its gate does not pass yet, said in "Stopped at"). Never start a layer while the previous gate fails. A gate runs the layer's own tests with `pnpm verify <files>` (paths from the root) and typechecks with `pnpm typecheck` (Turborepo replays untouched packages); when one fails, fix it and rerun only the files its summary names. Never run the whole suite at a gate.
 
 | # | Layer | Build | Gate |
 |---|---|---|---|

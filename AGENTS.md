@@ -87,7 +87,8 @@ API docs (non-production): `http://127.0.0.1:3000/api/docs`. Health: `GET /api/h
 - Committing, pushing, opening the PR, enabling auto-merge and turning on Auto-fix are never questions: every finished task does them at once ("Finishing a task", owner, 2026-10-28).
 - A task is done only when `pnpm verify` passes on its final state and CI is green (auto-merge waits for green, and a failing run comes back to the session to fix); for UI changes, a Playwright screenshot in RTL. Show the evidence (the verify summary) instead of asserting success.
 - Fix root causes. Never silence a failing test, type error, or lint rule to make a check pass.
-- For multi-step work keep a checklist in `TASKS.md`: mark items done and add work you discover.
+- For multi-step work keep a checklist in `TASKS.md`: mark items done and add work you discover. `TASKS.md` is committed: it holds the branch, the plan and where the work stopped, so any session, local or cloud, can continue.
+- Work leaves the machine as it happens: commit and push the branch after each finished step (an approved plan, a layer whose gate passed) and before a session ends with work unfinished. A new session first runs `git fetch --prune` and looks for the task's open branch or PR (`git branch -r`, `gh pr list`) before starting anything (`docs/workflow.md`, "Continuing in another session").
 - Mark anything you could not confirm and say where you looked.
 - Match the surrounding code: copy the pattern named in the folder's `CLAUDE.md` rather than inventing a new one. Write no speculative code: helpers, options and abstractions arrive with their first real use.
 
