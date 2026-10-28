@@ -177,6 +177,16 @@
   --chart-6: var(--color-danger-500);
   --chart-7: var(--color-neutral-500);
   --chart-8: var(--color-green-400);
+  /* Department colors (F23): a stripe, dot or icon tile; icons on them use the foreground. */
+  --department-1: var(--color-green-700);
+  --department-2: var(--color-gold-600);
+  --department-3: var(--color-info-600);
+  --department-4: var(--color-success-600);
+  --department-5: var(--color-warning-600);
+  --department-6: var(--color-danger-600);
+  --department-7: var(--color-neutral-600);
+  --department-8: var(--color-green-500);
+  --department-foreground: var(--color-white);
 
   color-scheme: light;
 }
@@ -237,6 +247,15 @@
   --chart-6: var(--color-danger-500);
   --chart-7: var(--color-neutral-400);
   --chart-8: var(--color-green-200);
+  --department-1: var(--color-green-400);
+  --department-2: var(--color-gold-400);
+  --department-3: var(--color-info-500);
+  --department-4: var(--color-success-500);
+  --department-5: var(--color-warning-500);
+  --department-6: var(--color-danger-500);
+  --department-7: var(--color-neutral-400);
+  --department-8: var(--color-green-200);
+  --department-foreground: var(--color-green-950);
 
   color-scheme: dark;
 }
@@ -284,6 +303,15 @@
   --color-chart-6: var(--chart-6);
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
+  --color-department-1: var(--department-1);
+  --color-department-2: var(--department-2);
+  --color-department-3: var(--department-3);
+  --color-department-4: var(--department-4);
+  --color-department-5: var(--department-5);
+  --color-department-6: var(--department-6);
+  --color-department-7: var(--department-7);
+  --color-department-8: var(--department-8);
+  --color-department-foreground: var(--department-foreground);
   --color-status-neutral: var(--status-neutral);
   --color-status-neutral-foreground: var(--status-neutral-foreground);
   --color-status-info: var(--status-info);

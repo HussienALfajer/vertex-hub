@@ -105,6 +105,21 @@ About 60% neutral surfaces, 30% green, 10% sand. Sand is precious: if everything
 | Approved | success |
 | Delivered / published | Vertex Green |
 
+### Department colors
+
+Each department picks one of eight colors (F23), shown as a stripe, a dot or an icon tile beside its name; it never carries text. All come from the scales above: tokens `--department-1` … `--department-8`, with the icon in `--department-foreground` (white in light, green-950 in dark). Each passes 3:1 against the surface and for its icon (`packages/ui/src/tokens.test.ts`).
+
+| Token | Light | Dark |
+|---|---|---|
+| 1 | green-700 | green-400 |
+| 2 | gold-600 | gold-400 |
+| 3 | info-600 | info-500 |
+| 4 | success-600 | success-500 |
+| 5 | warning-600 | warning-500 |
+| 6 | danger-600 | danger-500 |
+| 7 | neutral-600 | neutral-400 |
+| 8 | green-500 | green-200 |
+
 ## 3. Typography
 
 | Script | Typeface | Source and license |

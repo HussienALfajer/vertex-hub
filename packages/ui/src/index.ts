@@ -14,6 +14,7 @@ export * from './components/chart-dot';
 export * from './components/checkbox';
 export * from './components/collapsible';
 export * from './components/color-swatch';
+export * from './components/department-mark';
 export * from './components/dialog';
 export * from './components/dropdown-menu';
 export * from './components/empty-state';
