@@ -399,6 +399,7 @@ export class RetainersService {
       assertStartDate(input.startDate, today);
     }
     await this.assertNameFree(tx, client.id, input.name);
+    await this.users.assertActiveDepartments(input.departments, tx);
 
     const values = {
       name: input.name,
@@ -486,6 +487,10 @@ export class RetainersService {
       if (startChanges && input.startDate) assertStartDate(input.startDate, businessDate());
       if (input.name !== undefined && input.name.toLowerCase() !== current.name.toLowerCase()) {
         await this.assertNameFree(tx, retainer.clientId, input.name, id);
+      }
+      if (input.departments) {
+        const added = input.departments.filter((code) => !current.departments.includes(code));
+        await this.users.assertActiveDepartments(added, tx);
       }
 
       const basics = changedFields(

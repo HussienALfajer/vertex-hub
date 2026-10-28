@@ -247,7 +247,7 @@ export class EmployeesService {
         after,
       });
       const [profile] = await this.users.profiles({ ids: [userId] }, tx);
-      const managers = await this.users.departmentManagers(
+      const managers = await this.users.functionManagers(
         [
           'internal_operations',
           ...(profile?.departments.map((department) => department.code) ?? []),

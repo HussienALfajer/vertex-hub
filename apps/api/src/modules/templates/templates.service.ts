@@ -646,6 +646,10 @@ export class TemplatesService {
     beforeSteps: TemplateStep[],
     beforeStages: { id: string; name: string; position: number }[] = [],
   ): Promise<Record<string, unknown> | null> {
+    const added = doc.steps
+      .map((step) => step.department)
+      .filter((code) => !beforeSteps.some((step) => step.department === code));
+    await this.users.assertActiveDepartments(added, tx);
     const stageIds = new Map(
       doc.stages.map((stage) => [
         stage.key,

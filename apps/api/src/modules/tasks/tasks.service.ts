@@ -683,7 +683,10 @@ export class TasksService {
       const departmentGiven = department !== task.department;
       if ((assigneeGiven || departmentGiven) && !rights.assign) throw new ForbiddenException();
       // F11 rule 9: a scheduled shoot keeps its task in Photography.
-      if (departmentGiven) await this.guards.assertFree(tx, [id]);
+      if (departmentGiven) {
+        await this.users.assertActiveDepartments([department], tx);
+        await this.guards.assertFree(tx, [id]);
+      }
       const scopeGiven =
         input.requestScope !== undefined && input.requestScope !== task.requestScope;
       if (scopeGiven && !rights.client) throw new ForbiddenException();

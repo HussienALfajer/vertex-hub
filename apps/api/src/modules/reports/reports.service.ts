@@ -46,10 +46,16 @@ export class ReportsService {
     actor: CurrentUserInfo,
     query: ProductivityQuery,
   ): Promise<ProductivityReport> {
-    const inScope = reportDepartments(actor);
+    // F23 rule 6: a filter may name an archived department; the default is the active ones.
+    const ordered = await this.users.orderedDepartments();
+    const inScope = reportDepartments(
+      actor,
+      ordered.map((row) => row.code),
+    );
+    const active = new Set(ordered.filter((row) => !row.archived).map((row) => row.code));
     const departments = query.department
       ? inScope.filter((code) => query.department?.includes(code))
-      : inScope;
+      : inScope.filter((code) => active.has(code));
     if (departments.length === 0 || query.department?.some((code) => !inScope.includes(code))) {
       throw new ForbiddenException();
     }

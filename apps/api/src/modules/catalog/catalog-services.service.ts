@@ -20,7 +20,7 @@ import { and, asc, count, eq, ilike, isNotNull, isNull, ne, sql } from 'drizzle-
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
-import type { CurrentUserInfo } from '../auth/index.js';
+import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { TemplateDirectory } from '../templates/index.js';
 import {
   assertNoIssues,
@@ -55,6 +55,7 @@ export class CatalogServicesService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly templates: TemplateDirectory,
     private readonly usage: CatalogUsage,
+    private readonly users: UserDirectory,
   ) {}
 
   async list(actor: CurrentUserInfo, query: CatalogServiceListQuery): Promise<CatalogServicePage> {
@@ -89,6 +90,7 @@ export class CatalogServicesService {
     const id = newId();
     const row = await this.db.transaction(async (tx) => {
       await this.assertNameFree(tx, input.name, null);
+      await this.users.assertActiveDepartments([input.department], tx);
       await assertTemplate(this.templates, tx, input.templateId, input.billing);
       const [created] = await tx
         .insert(catalogServices)
@@ -122,6 +124,9 @@ export class CatalogServicesService {
       assertNoIssues(serviceIssues(merged));
       if (merged.name.toLocaleLowerCase('ar') !== current.name.toLocaleLowerCase('ar')) {
         await this.assertNameFree(tx, merged.name, id);
+      }
+      if (merged.department !== current.department) {
+        await this.users.assertActiveDepartments([merged.department], tx);
       }
       if (
         merged.billing !== current.billing &&

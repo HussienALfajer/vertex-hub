@@ -3,7 +3,6 @@ import {
   businessDate,
   type CompanyDashboard,
   conversionRate,
-  DEPARTMENT_CODES,
   type DepartmentCode,
   type DepartmentDashboard,
   type FinanceDashboard,
@@ -15,7 +14,7 @@ import {
   weekOf,
 } from '@vertex-hub/contracts';
 import { ApprovalReports } from '../approvals/index.js';
-import type { CurrentUserInfo } from '../auth/index.js';
+import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { CampaignReports } from '../campaigns/index.js';
 import { ClientDirectory, clientRef } from '../clients/index.js';
 import { InvoiceReports } from '../invoices/index.js';
@@ -44,6 +43,7 @@ export class DashboardService {
     private readonly leads: LeadReports,
     private readonly campaigns: CampaignReports,
     private readonly approvals: ApprovalReports,
+    private readonly users: UserDirectory,
   ) {}
 
   /** Rule 1: `reports.read` under `all`. */
@@ -51,13 +51,14 @@ export class DashboardService {
     if (!permissionScopes(actor.access, 'reports.read').includes('all')) {
       throw new ForbiddenException();
     }
+    const codes = await this.users.activeDepartmentCodes();
     const now = new Date();
     const today = businessDate(now);
     const months = reportMonths(today);
     const [active, departments, progress, waiting, lowWallets, thisMonth, lastMonth] =
       await Promise.all([
         this.engagements.activeCounts(),
-        this.tasks.departmentCounts(DEPARTMENT_CODES, now),
+        this.tasks.departmentCounts(codes, now),
         this.engagements.retainerProgress('all', today),
         this.approvals.waiting(now),
         this.campaigns.lowWallets('all'),
@@ -137,10 +138,18 @@ export class DashboardService {
     requested: DepartmentCode | undefined,
   ): Promise<DepartmentDashboard> {
     const managed = managedDepartments(actor);
-    const departments = reportDepartments(actor);
+    // F23 rule 6: the picker lists active departments; a link may still name an archived one.
+    const ordered = await this.users.orderedDepartments();
+    const inScope = reportDepartments(
+      actor,
+      ordered.map((row) => row.code),
+    );
+    const departments = inScope.filter((code) =>
+      ordered.some((row) => row.code === code && !row.archived),
+    );
     const department =
       requested ?? departments.find((code) => managed.includes(code)) ?? departments[0];
-    if (!department || !departments.includes(department)) throw new ForbiddenException();
+    if (!department || !inScope.includes(department)) throw new ForbiddenException();
     const now = new Date();
     return {
       departments,

@@ -3,7 +3,6 @@ import {
   BOARD_LIMITS,
   BOARD_STATUSES,
   businessDate,
-  DEPARTMENT_CODES,
   type DepartmentCode,
   hasPermission,
   type MyTaskSummary,
@@ -48,7 +47,8 @@ export class TaskViewsService {
 
   /** Columns by status; `delivered` holds the last 14 days, `cancelled` is not shown. */
   async board(actor: CurrentUserInfo, query: TaskBoardQuery): Promise<TaskBoard> {
-    const departments = query.department ?? defaultDepartments(actor);
+    const departments =
+      query.department ?? defaultDepartments(actor, await this.users.activeDepartmentCodes());
     const now = new Date();
     const filters: (SQL | undefined)[] = [
       this.tasks.visibleSql(),
@@ -100,7 +100,8 @@ export class TaskViewsService {
    * hours against the capacity of their schedule (F06B rule C8); unassigned per department.
    */
   async workload(actor: CurrentUserInfo, query: TaskWorkloadQuery): Promise<TaskWorkload> {
-    const departments = query.department ?? defaultDepartments(actor);
+    const departments =
+      query.department ?? defaultDepartments(actor, await this.users.activeDepartmentCodes());
     const week = weekOf(query.week ?? businessDate());
     const now = new Date();
     const people = await this.users.activeMembers(departments);
@@ -256,11 +257,11 @@ export class TaskViewsService {
  * departments (General Manager, Operations: scope all; account managers: their clients' work);
  * else their own departments, else all of them.
  */
-function defaultDepartments(actor: CurrentUserInfo): DepartmentCode[] {
+function defaultDepartments(actor: CurrentUserInfo, active: DepartmentCode[]): DepartmentCode[] {
   const managed = actor.access.departments.filter((d) => d.isManager).map((d) => d.code);
   if (managed.length > 0) return managed;
   const scopes = permissionScopes(actor.access, 'tasks.manage');
-  if (scopes.includes('all') || scopes.includes('own_clients')) return [...DEPARTMENT_CODES];
+  if (scopes.includes('all') || scopes.includes('own_clients')) return active;
   const own = actor.access.departments.map((d) => d.code);
-  return own.length > 0 ? own : [...DEPARTMENT_CODES];
+  return own.length > 0 ? own : active;
 }

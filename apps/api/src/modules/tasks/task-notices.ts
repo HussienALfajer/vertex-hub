@@ -144,9 +144,12 @@ export class TaskNotices {
     } as Notice;
   }
 
-  /** The current managers of the department (rule 14); none when it has no manager. */
+  /**
+   * The current managers of the department (rule 14); the General Managers while it is archived
+   * (F23 rule 14); none when it has no manager.
+   */
   async managers(executor: Executor, department: DepartmentCode): Promise<string[]> {
-    return (await this.users.departmentManagers([department], executor)).get(department) ?? [];
+    return (await this.users.functionManagers([department], executor)).get(department) ?? [];
   }
 
   /** The assignee, or the department's managers when the task is unassigned. */

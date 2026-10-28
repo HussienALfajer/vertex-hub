@@ -101,7 +101,7 @@ export class ContentIdeasService {
         after: this.auditable(created),
       });
       // F08B Part D: Content Management hears of it, merged per day.
-      const members = await this.users.activeMembers(['content_management'], tx);
+      const members = await this.users.functionMembers(['content_management'], tx);
       await this.notices.send(tx, [
         {
           type: 'content_idea_added',

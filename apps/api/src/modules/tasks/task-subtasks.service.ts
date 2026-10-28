@@ -110,6 +110,7 @@ export class TaskSubtasksService {
             .where(eq(tasks.id, subtask.id));
         }
       }
+      await this.users.assertActiveDepartments([input.department], tx);
       const created = await this.tasks.createIn(
         tx,
         actor,

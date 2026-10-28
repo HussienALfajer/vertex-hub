@@ -66,7 +66,7 @@ export class LeadReminders implements OnModuleInit {
             'lead_follow_up_overdue',
             [lte(leads.nextFollowUpOn, bounds.overdueOnOrBefore)],
             async (lead, tx) => {
-              const managers = await this.users.departmentManagers([...SALES_DEPARTMENTS], tx);
+              const managers = await this.users.functionManagers([...SALES_DEPARTMENTS], tx);
               const owner = (await this.users.summaries([lead.ownerId], tx)).get(lead.ownerId);
               return {
                 type: 'lead_follow_up_overdue',

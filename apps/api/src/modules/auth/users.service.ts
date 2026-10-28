@@ -194,7 +194,7 @@ export class UsersService {
       await lockAccessChanges(tx);
       await this.assertEmailFree(tx, input.email);
       const secondary = input.secondaryDepartmentIds ?? [];
-      await this.assertDepartmentsExist(tx, [input.primaryDepartmentId, ...secondary]);
+      await this.assertDepartmentsActive(tx, [input.primaryDepartmentId, ...secondary]);
       const profile = {
         name: input.name,
         email: input.email,
@@ -676,7 +676,7 @@ export class UsersService {
     const added = wanted.filter((id) => !currentIds.includes(id));
     if (primary === currentPrimary && removed.length === 0 && added.length === 0) return;
 
-    await this.assertDepartmentsExist(tx, added);
+    await this.assertDepartmentsActive(tx, added);
     const managed = removed.filter((d) => d.isManager);
     if (managed.length > 0) {
       throw new CodedException(
@@ -898,14 +898,18 @@ export class UsersService {
     if (taken) throw new CodedException(409, 'EMAIL_TAKEN', 'Another user has this email');
   }
 
-  private async assertDepartmentsExist(tx: Transaction, ids: string[]): Promise<void> {
+  /** The departments a user joins exist and are active (F23 rule 5). */
+  private async assertDepartmentsActive(tx: Transaction, ids: string[]): Promise<void> {
     if (ids.length === 0) return;
-    const [found] = await tx
-      .select({ value: count() })
+    const rows = await tx
+      .select({ archivedAt: departments.archivedAt })
       .from(departments)
       .where(inArray(departments.id, ids));
-    if ((found?.value ?? 0) !== new Set(ids).size) {
+    if (rows.length !== new Set(ids).size) {
       throw new CodedException(400, 'UNKNOWN_DEPARTMENT', 'A department does not exist');
+    }
+    if (rows.some((row) => row.archivedAt)) {
+      throw new CodedException(409, 'DEPARTMENT_ARCHIVED', 'A department is archived');
     }
   }
 

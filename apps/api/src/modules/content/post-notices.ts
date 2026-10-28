@@ -91,7 +91,7 @@ export class PostNotices {
    * and the client's account manager.
    */
   async reviewers(executor: Executor, post: NoticePost): Promise<string[]> {
-    const managers = await this.users.departmentManagers(
+    const managers = await this.users.functionManagers(
       ['content_management', 'internal_operations'],
       executor,
     );
@@ -100,7 +100,7 @@ export class PostNotices {
 
   /** Rule 13 (A13): the Medical Consultation members hear about a post entering their stage. */
   async medicalRequested(tx: Transaction, post: NoticePost, actorId: string | null) {
-    const members = await this.users.activeMembers(['medical_consultation'], tx);
+    const members = await this.users.functionMembers(['medical_consultation'], tx);
     return this.notice(
       post,
       'post_medical_review_requested',

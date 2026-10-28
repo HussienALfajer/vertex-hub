@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/index.js';
 import { TemplatesModule } from '../templates/index.js';
 import { CatalogDirectory } from './catalog-directory.js';
 import { CatalogPackagesController } from './catalog-packages.controller.js';
@@ -13,7 +14,7 @@ import { CatalogUsage } from './catalog-usage.js';
  * `CatalogDirectory` and report their use through `CatalogUsage`.
  */
 @Module({
-  imports: [TemplatesModule],
+  imports: [AuthModule, TemplatesModule],
   controllers: [CatalogServicesController, CatalogPackagesController],
   providers: [CatalogServicesService, CatalogPackagesService, CatalogDirectory, CatalogUsage],
   exports: [CatalogDirectory, CatalogUsage],

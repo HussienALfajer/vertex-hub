@@ -78,7 +78,7 @@ export class RetainerBehindAlerts implements OnModuleInit {
           // Rule 4: the badge's rule; rule 6: only the lines that are behind, by position.
           const behind = cycle.lines.filter((line) => line.behind);
           if (behind.length === 0) return false;
-          const managers = await this.users.departmentManagers(['internal_operations'], tx);
+          const managers = await this.users.functionManagers(['internal_operations'], tx);
           return this.reminders.remindOnce(
             tx,
             {

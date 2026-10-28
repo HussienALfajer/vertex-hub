@@ -201,7 +201,7 @@ export class PostReminders implements OnModuleInit {
    */
   private async weekCheck(today: CalendarDate, holidays: readonly HolidayRange[]): Promise<number> {
     if (nthWorkDay(weekOf(today).from, 1, holidays) !== today) return 0;
-    const members = await this.users.activeMembers(['content_management']);
+    const members = await this.users.functionMembers(['content_management']);
     const notice = await this.planner.weekCheck(
       today,
       members.map((member) => member.id),

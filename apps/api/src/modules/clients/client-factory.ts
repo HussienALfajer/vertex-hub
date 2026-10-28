@@ -290,7 +290,7 @@ export class ClientFactory {
     const [managers, finance, ops] = await Promise.all([
       this.users.withRole('general_manager', tx),
       this.users.withRole('finance', tx),
-      this.users.departmentManagers(['internal_operations'], tx),
+      this.users.functionManagers(['internal_operations'], tx),
     ]);
     await this.notifications.notify(tx, {
       type: 'client_status_changed',
@@ -316,8 +316,8 @@ export class ClientFactory {
     client: { id: string; tradeName: string; healthcare: boolean },
   ): Promise<void> {
     const [members, managers] = await Promise.all([
-      this.users.activeMembers(['medical_consultation'], tx),
-      this.users.departmentManagers(['content_management'], tx),
+      this.users.functionMembers(['medical_consultation'], tx),
+      this.users.functionManagers(['content_management'], tx),
     ]);
     await this.notifications.notify(tx, {
       type: 'client_healthcare_changed',

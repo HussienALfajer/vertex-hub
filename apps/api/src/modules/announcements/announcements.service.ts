@@ -117,6 +117,7 @@ export class AnnouncementsService {
       this.polls.assertCloseTime(input.poll?.closesAt ?? null, scheduledAt ?? now, now);
     }
     const id = await this.db.transaction(async (tx) => {
+      await this.users.assertActiveDepartments(input.audience.departments ?? [], tx);
       const [row] = await tx
         .insert(announcements)
         .values({
@@ -173,6 +174,14 @@ export class AnnouncementsService {
         throw new BadRequestException('Only a scheduled announcement takes a new time');
       }
       if (input.pinnedUntil !== undefined) this.assertPin(input.pinnedUntil, now);
+      // F23 edge case 9: a stored archived department may stay; a newly added one must be active.
+      if (input.audience?.departments) {
+        const stored = storedAudience(row.audience).departments ?? [];
+        await this.users.assertActiveDepartments(
+          input.audience.departments.filter((code) => !stored.includes(code)),
+          tx,
+        );
+      }
       const { notifyAgain, scheduledAt, poll, ...fields } = input;
       // Rule D10: a sent announcement's existing poll changes only while nobody has voted.
       if (sent && poll !== undefined) {
