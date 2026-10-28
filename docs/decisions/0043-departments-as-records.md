@@ -1,0 +1,19 @@
+# 0043 — Departments as records: a stable text code, archiving with a transfer, system functions falling back to the General Manager
+
+Status: Accepted · Date: 2026-10-28
+
+## Context
+ADR 0014 made the ten departments fixed configuration: seeded with codes from the `department_code` enum, renamed and given managers, never added or archived. The agency now wants the General Manager to add departments and archive the ones it no longer runs (F23, `docs/specs/F23-departments-management.md`, owner 2026-10-28). Ten columns in seven tables store a department as the enum (tasks, task questions, template steps and default assignees, catalog services, quote lines and their items, projects and retainers), about seventy files pass the code around as the `DepartmentCode` type, and the code itself names behavior: the capability map of ADR 0014, brief fields by department (F06B), and the recipients of escalations, medical reviews and lead reminders. The owner also chose that no department is protected from archiving, and that what a system department did falls to the General Manager while it is archived.
+
+## Decision
+- **The code stays the key, as text.** Every enum column becomes `text` with a foreign key to `departments.code` (the two array columns of projects and retainers, which cannot carry a foreign key, are checked by their services). The enum `department_code` is dropped. The ten seeded departments keep their codes; a new department gets a generated code `d_` plus eight lowercase base-32 characters, never shown and never changed. Every reference, URL filter and stored audience keeps working unchanged.
+- **Two kinds of code in contracts.** `departmentCodeSchema` accepts any code of the pattern `^[a-z][a-z0-9_]{1,39}$`; `SYSTEM_DEPARTMENT_CODES` lists the ten seeded ones. Behavior keyed by department (the capability map, brief kinds, system recipients) stays keyed by system codes; a new department has none of it. The list of departments comes from the database, never from a constant.
+- **Archiving moves open work first.** A department is archived only with a transfer plan: a target department per category (members, open tasks, open questions, services and open quotes, templates, open projects and retainers), all moved in the archiving transaction. Closed and historical records keep the archived code and show its name with an "archived" mark. An archived department holds no members and no manager, appears in no picker, and grants nothing.
+- **System functions fall back to the General Manager.** While a system department is archived, every notice or reminder addressed to its members or managers (the Internal Operations manager's escalations and follow-ups, the medical review requests, the lead reminders of the sales departments, the content and photography routing) goes to the General Managers instead. The General Manager already holds every permission, so no work becomes impossible. Restoring the department restores its function.
+- **Creating, archiving and restoring belong to the General Manager** through a new permission `departments.manage`; renaming, identity, order, the manager and memberships stay with `users.manage` (ADR 0014).
+
+## Consequences
+- ADR 0014's "departments are fixed configuration" and "adding a department is a code change" are superseded; its effective roles, capability map and scopes stay valid.
+- One migration changes ten column types in place (enum to text, the same values) and adds the foreign keys; it is backward-compatible for reads, so it ships with the code that stops using the enum.
+- Screens and services that listed `DEPARTMENT_CODES` read the departments list instead; filters accept any code and show an archived department by name.
+- Giving a new department capabilities or a system function is still a code change, until F23's second package (system functions that move between departments).

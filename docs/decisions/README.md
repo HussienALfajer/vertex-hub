@@ -17,7 +17,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0011](0011-brand-identity-and-fonts.md) | Brand identity from the logo; Madani Arabic + Montserrat | Accepted; fonts superseded by 0033 |
 | [0012](0012-nestjs-12-native-standard-schema.md) | NestJS 12 with native Standard Schema validation instead of nestjs-zod | Accepted |
 | [0013](0013-engineering-conventions.md) | Engineering conventions: layout, module anatomy, data, errors, tests | Accepted |
-| [0014](0014-permissions-roles-and-departments.md) | Permissions from roles and department capabilities | Accepted |
+| [0014](0014-permissions-roles-and-departments.md) | Permissions from roles and department capabilities | Accepted (fixed departments superseded by 0043) |
 | [0015](0015-retainer-cycles-and-deliverables.md) | Retainer monthly cycles and the deliverables counter | Accepted (calendar-month cycle superseded by 0030) |
 | [0016](0016-task-workflow-and-revisions.md) | Task workflow, requests between departments and revision counting | Accepted |
 | [0017](0017-work-templates.md) | Work templates in work days; automatic tasks for each retainer cycle | Accepted |
@@ -46,6 +46,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0040](0040-profile-images.md) | Profile images: one current image per record, cropped in the browser, served by immutable id | Accepted |
 | [0041](0041-subtasks-and-task-questions.md) | Subtasks as tasks under a parent, run modes through dependencies, questions in the task thread | Accepted |
 | [0042](0042-content-captions-per-platform-and-planning.md) | Content: captions per platform group, a media layout on the post, and planning data owned by content | Accepted |
+| [0043](0043-departments-as-records.md) | Departments as records: a stable text code, archiving with a transfer, system functions falling back to the General Manager | Accepted |
 
 Template:
 

@@ -37,6 +37,7 @@ Two tracks run in parallel: the Hub (this repository) and Vertex Mizan (its own 
 | 3 | F01C Profile photos and logos | F10 storage |
 | 4 | F06B Tasks 2.0: subtasks, questions, attachments and smart creation | F06, F07, F10, F16 |
 | 5 | F08B Content 2.0: per-platform captions, media and tasks at creation, calendar | F08, F06B, F10, F16 |
+| 5b | F23 Departments management: create, archive with transfer, identity, members, overview | F01, F16 |
 | 6 | F18 Accounting through Vertex Mizan: integration, purchases for clients, profitability | Mizan's posting API, chart of accounts and cash boxes stable (ADR 0035) |
 | 7 | F19 HR: payroll, commissions and profit shares | F17, F18; Q15 and Q16 |
 | 8 | F20 Client portal (with client conversations) | F16 |
@@ -46,6 +47,8 @@ Two tracks run in parallel: the Hub (this repository) and Vertex Mizan (its own 
 HR is split around accounting because payroll shares need trusted revenue and profit figures (owner, 2026-10-20).
 
 F01C, F06B and F08B were added on 2026-10-25 (owner): they improve the daily work of every department, F18 waits on Mizan, and F08B builds on F06B's subtasks. F01C comes first because it is small, independent and every later screen shows its images.
+
+F23 was added on 2026-10-28 (owner): the General Manager adds and archives departments instead of a code change; it is independent of Mizan, so it runs before F18.
 
 ## 4. Features
 
@@ -189,6 +192,15 @@ Approved by the owner in full (2026-10-25).
   - the gap check is sent once a week for the next two weeks.
 
   Spec: `docs/specs/F08B-content-2.md`, ADR 0042.
+
+### F23 — Departments management
+Added by the owner on 2026-10-28. ADR 0043 supersedes the fixed departments of ADR 0014.
+- **First package (decided):** create a department; archive one through a wizard that moves its members and open work to target departments, and restore it; a description, color, icon and order shown across the Hub; members added, made primary, moved and removed from the department page; what a department grants, read-only; an overview on its page (counts for everyone, workload and absences for its managers); its history from the audit log; notices to the member and the manager when a member joins or leaves.
+- **Decided:** only the General Manager creates, archives and restores; no department is protected, and a system department's function goes to the General Manager while it is archived.
+- **Second package (approved in principle, own spec):** a deputy manager acting during the manager's leave; system functions moved between departments; intake settings for department requests.
+- **Deferred:** capabilities edited from the UI, a brief-fields builder per department, department goals.
+
+  Spec: `docs/specs/F23-departments-management.md`, ADR 0043.
 
 ### Later (approved in principle by the owner, 2026-10-25; not scheduled)
 - An AI assistant: per-platform captions drafted from one caption, hashtag suggestions, brief summaries.

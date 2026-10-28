@@ -1,6 +1,6 @@
 # 0014 — Permissions from roles and department capabilities
 
-Status: Accepted · Date: 2026-09-28
+Status: Accepted (fixed departments superseded by 0043) · Date: 2026-09-28
 
 ## Context
 ADR 0007 defined five roles and one permission map keyed by role. The owner's answers to Q13 (F01 spec, `docs/specs/F01-users-roles.md`) tie several permissions to a person's place in a department rather than to a role: the Internal Operations manager manages users, templates and the audit log; members of Medical Consultation perform the medical review; members of General Communication and Marketing work leads. Staff can belong to a primary department and secondary ones, and one person can manage several departments. Some roles are also facts about the organization (a department manager manages a department; every staff member is an employee) and would drift if set by hand.
