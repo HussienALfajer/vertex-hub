@@ -79,7 +79,7 @@ import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
-import { pickableDepartments } from '../departments/pickable-departments';
+import { departmentLabel, pickableDepartments } from '../departments/pickable-departments';
 import { projectListQuery } from '../projects/projects.queries';
 import { retainerListQuery } from '../retainers/retainers.queries';
 import { userListQuery } from '../users/users.queries';
@@ -396,10 +396,7 @@ function Filters({
   const departmentOptions = pickableDepartments(
     departments.data?.items ?? [],
     search.department,
-  ).map(({ code, name }) => ({
-    code,
-    name,
-  }));
+  ).map((department) => ({ code: department.code, name: departmentLabel(t, department) }));
   const toggles = [
     { key: 'overdue', icon: CalendarClockIcon, label: t('tasks.filters.overdue') },
     { key: 'blocked', icon: HourglassIcon, label: t('tasks.filters.blocked') },

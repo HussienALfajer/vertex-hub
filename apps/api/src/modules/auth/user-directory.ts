@@ -453,6 +453,25 @@ export class UserDirectory implements OnModuleInit {
     }
   }
 
+  /**
+   * ADR 0043: every department a filter names exists; an archived one is fine (F23 rule 6).
+   * Otherwise `UNKNOWN_DEPARTMENT`.
+   */
+  async assertKnownDepartments(
+    codes: readonly DepartmentCode[],
+    executor: Database | Transaction = this.db,
+  ): Promise<void> {
+    const unique = [...new Set(codes)];
+    if (unique.length === 0) return;
+    const [found] = await executor
+      .select({ value: sql<number>`count(*)::int` })
+      .from(departments)
+      .where(inArray(departments.code, unique));
+    if ((found?.value ?? 0) !== unique.length) {
+      throw new CodedException(400, 'UNKNOWN_DEPARTMENT', 'A department does not exist');
+    }
+  }
+
   /** Every department's code in their order (F23 rule 4): active ones, then archived ones. */
   async orderedDepartments(
     executor: Database | Transaction = this.db,

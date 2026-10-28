@@ -139,6 +139,7 @@ export class DashboardService {
   ): Promise<DepartmentDashboard> {
     const managed = managedDepartments(actor);
     // F23 rule 6: the picker lists active departments; a link may still name an archived one.
+    if (requested) await this.users.assertKnownDepartments([requested]);
     const ordered = await this.users.orderedDepartments();
     const inScope = reportDepartments(
       actor,

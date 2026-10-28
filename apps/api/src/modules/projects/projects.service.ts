@@ -175,7 +175,10 @@ export class ProjectsService implements OnModuleInit {
     }
     if (query.clientId) filters.push(eq(projects.clientId, query.clientId));
     if (query.projectManagerId) filters.push(eq(projects.projectManagerId, query.projectManagerId));
-    if (query.department) filters.push(arrayContains(projects.departments, [query.department]));
+    if (query.department) {
+      await this.users.assertKnownDepartments([query.department]);
+      filters.push(arrayContains(projects.departments, [query.department]));
+    }
     if (query.overdue === true) {
       filters.push(and(inArray(projects.status, open), lt(projects.dueDate, today)));
     }

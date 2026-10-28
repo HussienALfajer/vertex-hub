@@ -195,7 +195,10 @@ export class TasksService {
       inArray(tasks.status, query.status),
     ];
     if (query.search) filters.push(ilike(tasks.title, `%${escapeLike(query.search)}%`));
-    if (query.department) filters.push(inArray(tasks.department, query.department));
+    if (query.department) {
+      await this.users.assertKnownDepartments(query.department);
+      filters.push(inArray(tasks.department, query.department));
+    }
     if (query.assigneeId) {
       filters.push(eq(tasks.assigneeId, query.assigneeId === 'me' ? actor.id : query.assigneeId));
     }

@@ -59,6 +59,7 @@ import {
 } from '../../lib/format';
 import { ALL, idParam } from '../../lib/search-params';
 import { departmentListQuery } from '../departments/departments.queries';
+import { departmentLabel } from '../departments/pickable-departments';
 import { ChoiceSelect } from '../quotes/choice-select';
 import { FormDialog } from '../quotes/quote-dialogs';
 import { ExportButton } from '../reports/report-parts';
@@ -109,7 +110,7 @@ export function HrMonthPage({ month, search }: { month: string; search: HrMonthS
     { value: ALL, label: t('users.allDepartments') },
     ...(departments.data?.items ?? [])
       .filter((d) => !d.archivedAt || d.id === search.departmentId)
-      .map((d) => ({ value: d.id, label: d.name })),
+      .map((d) => ({ value: d.id, label: departmentLabel(t, d) })),
   ];
 
   return (

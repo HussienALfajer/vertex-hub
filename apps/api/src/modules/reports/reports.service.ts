@@ -47,6 +47,7 @@ export class ReportsService {
     query: ProductivityQuery,
   ): Promise<ProductivityReport> {
     // F23 rule 6: a filter may name an archived department; the default is the active ones.
+    if (query.department) await this.users.assertKnownDepartments(query.department);
     const ordered = await this.users.orderedDepartments();
     const inScope = reportDepartments(
       actor,

@@ -436,6 +436,13 @@ describe('tasks linked to posts (F08 rules 5–10, 12, 16, 18, 19)', () => {
         'INVALID_DATES',
       );
 
+      // F23 rule 5: a department that does not exist is refused, not a server error.
+      await expectError(
+        await requestTask(post.id, cast.writer.cookie, { department: 'd_unknown0' }),
+        400,
+        'UNKNOWN_DEPARTMENT',
+      );
+
       const response = await requestTask(post.id, cast.writer.cookie, { department: 'design' });
       expect(response.status, await response.clone().text()).toBe(201);
       const requested = postDetailSchema.parse(await response.json());

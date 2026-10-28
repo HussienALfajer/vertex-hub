@@ -28,7 +28,7 @@ import { scopesOf, useMe } from '../../lib/auth';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { departmentListParam } from '../../lib/search-params';
 import { departmentListQuery } from '../departments/departments.queries';
-import { pickableDepartments } from '../departments/pickable-departments';
+import { departmentLabel, pickableDepartments } from '../departments/pickable-departments';
 import { managedDepartments } from '../tasks/task-access';
 import {
   BackToReports,
@@ -113,7 +113,7 @@ function DepartmentFilter({
   // F23 rule 6: active departments, and an archived one the filter already names.
   const options = pickableDepartments(departments.data?.items ?? [], value)
     .filter(({ code }) => all || managed.includes(code))
-    .map(({ code, name }) => ({ code, name }));
+    .map((department) => ({ code: department.code, name: departmentLabel(t, department) }));
   return (
     <Field className="flex-1">
       <FieldLabel htmlFor={id}>{t('reports.productivity.departments')}</FieldLabel>

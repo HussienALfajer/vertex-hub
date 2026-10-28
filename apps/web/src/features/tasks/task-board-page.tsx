@@ -48,7 +48,7 @@ import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientListQuery } from '../clients/clients.queries';
 import { departmentListQuery } from '../departments/departments.queries';
-import { pickableDepartments } from '../departments/pickable-departments';
+import { departmentLabel, pickableDepartments } from '../departments/pickable-departments';
 import { userListQuery } from '../users/users.queries';
 import { NewTaskButtons } from './my-tasks-page';
 import {
@@ -159,10 +159,7 @@ function BoardFilters({
   const departmentOptions = pickableDepartments(
     departments.data?.items ?? [],
     search.department,
-  ).map(({ code, name }) => ({
-    code,
-    name,
-  }));
+  ).map((department) => ({ code: department.code, name: departmentLabel(t, department) }));
   // The API's default departments show as chosen until the user picks their own.
   const chosen = search.department ?? shown ?? [];
   const assigneeItems = [

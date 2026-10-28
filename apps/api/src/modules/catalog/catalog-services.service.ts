@@ -62,6 +62,7 @@ export class CatalogServicesService {
     if (query.archived && !hasPermission(actor.access, 'catalog.manage')) {
       throw new ForbiddenException();
     }
+    if (query.department) await this.users.assertKnownDepartments([query.department]);
     const where = and(
       query.archived ? isNotNull(catalogServices.archivedAt) : isNull(catalogServices.archivedAt),
       query.billing ? eq(catalogServices.billing, query.billing) : undefined,

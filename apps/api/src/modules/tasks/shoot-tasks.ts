@@ -11,7 +11,7 @@ import { type Database, type Transaction, taskDependencies, tasks } from '@verte
 import { and, count, eq, inArray, isNull, ne, notInArray } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import type { CurrentUserInfo } from '../auth/index.js';
+import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { ClientReviewHooks } from './client-review-hooks.js';
 import { actorOf } from './task-access.js';
 import { cancelledColumns, TaskHooksService } from './task-hooks.service.js';
@@ -99,6 +99,7 @@ export class ShootTasks {
     private readonly notices: TaskNotices,
     private readonly hooks: TaskHooksService,
     private readonly reviewHooks: ClientReviewHooks,
+    private readonly users: UserDirectory,
   ) {}
 
   /** The tasks by id, archived ones included. */
@@ -279,6 +280,7 @@ export class ShootTasks {
     shootTask: ShootTask,
     draft: EditingTaskDraft,
   ): Promise<ShootTask> {
+    await this.users.assertActiveDepartments([draft.department], tx);
     const id = await this.tasks.createIn(
       tx,
       actor,

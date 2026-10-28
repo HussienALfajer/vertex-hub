@@ -153,7 +153,7 @@ describe('createTaskSchema', () => {
       { links: [{ url: 'ftp://files.example.com' }] },
       { links: [{ url: 'https://drive.example.com', label: 'x'.repeat(121) }] },
       { priority: 'critical' },
-      { department: 'nope' },
+      { department: 'Not a code' },
     ];
     for (const change of fails) {
       expect(

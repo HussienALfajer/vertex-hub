@@ -47,6 +47,7 @@ export class TaskViewsService {
 
   /** Columns by status; `delivered` holds the last 14 days, `cancelled` is not shown. */
   async board(actor: CurrentUserInfo, query: TaskBoardQuery): Promise<TaskBoard> {
+    if (query.department) await this.users.assertKnownDepartments(query.department);
     const departments =
       query.department ?? defaultDepartments(actor, await this.users.activeDepartmentCodes());
     const now = new Date();
@@ -100,6 +101,7 @@ export class TaskViewsService {
    * hours against the capacity of their schedule (F06B rule C8); unassigned per department.
    */
   async workload(actor: CurrentUserInfo, query: TaskWorkloadQuery): Promise<TaskWorkload> {
+    if (query.department) await this.users.assertKnownDepartments(query.department);
     const departments =
       query.department ?? defaultDepartments(actor, await this.users.activeDepartmentCodes());
     const week = weekOf(query.week ?? businessDate());

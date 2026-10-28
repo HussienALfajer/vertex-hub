@@ -36,6 +36,7 @@ import { ALL, idParam, oneOfParam, pageParam, textParam } from '../../lib/search
 import { usePageInRange } from '../../lib/use-page-in-range';
 import { useSearchText } from '../../lib/use-search-text';
 import { departmentListQuery } from '../departments/departments.queries';
+import { departmentLabel } from '../departments/pickable-departments';
 import { DepartmentChips, TwoFactorIndicator, UserStatusBadge } from './user-badges';
 import { skillsQuery, userListQuery } from './users.queries';
 
@@ -169,7 +170,7 @@ function Filters({
     { value: ALL, label: t('users.allDepartments') },
     ...(departments.data?.items ?? [])
       .filter((d) => !d.archivedAt || d.id === search.departmentId)
-      .map((d) => ({ value: d.id, label: d.name })),
+      .map((d) => ({ value: d.id, label: departmentLabel(t, d) })),
   ];
   const skillItems = [
     { value: ALL, label: t('users.allSkills') },

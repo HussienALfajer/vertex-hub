@@ -179,7 +179,10 @@ export class RetainersService {
     if (query.accountManagerId) {
       filters.push(this.clients.managedBy(retainers.clientId, query.accountManagerId));
     }
-    if (query.department) filters.push(arrayContains(retainers.departments, [query.department]));
+    if (query.department) {
+      await this.users.assertKnownDepartments([query.department]);
+      filters.push(arrayContains(retainers.departments, [query.department]));
+    }
     if (query.renewalDue !== undefined) {
       // R6: due from 30 days before the renewal date, and overdue after it, until ended.
       const due = and(

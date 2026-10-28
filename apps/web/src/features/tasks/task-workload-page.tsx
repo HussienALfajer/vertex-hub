@@ -34,7 +34,7 @@ import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
 import { dayParam, departmentListParam } from '../../lib/search-params';
 import { departmentListQuery } from '../departments/departments.queries';
-import { pickableDepartments } from '../departments/pickable-departments';
+import { departmentLabel, pickableDepartments } from '../departments/pickable-departments';
 import { useDepartmentNames } from '../projects/project-badges';
 import type { TaskListSearch } from './task-list-page';
 import { taskWorkloadQuery } from './tasks.queries';
@@ -179,9 +179,10 @@ function DepartmentFilter({
   const { t } = useTranslation();
   const id = useId();
   const departments = useQuery(departmentListQuery);
-  const options = pickableDepartments(departments.data?.items ?? [], value).map(
-    ({ code, name }) => ({ code, name }),
-  );
+  const options = pickableDepartments(departments.data?.items ?? [], value).map((department) => ({
+    code: department.code,
+    name: departmentLabel(t, department),
+  }));
   return (
     <Field className="flex-1">
       <FieldLabel htmlFor={id} className="sr-only">

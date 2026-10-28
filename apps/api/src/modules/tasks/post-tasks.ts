@@ -18,7 +18,7 @@ import { and, asc, count, eq, ilike, inArray, isNull, ne, notInArray, or } from 
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { type AuditActor, recordAudit } from '../audit/index.js';
-import type { CurrentUserInfo } from '../auth/index.js';
+import { type CurrentUserInfo, UserDirectory } from '../auth/index.js';
 import { EngagementDirectory } from '../projects/index.js';
 import { clearPostLink } from './post-task-hooks.js';
 import { accessColumns, actorOf } from './task-access.js';
@@ -107,6 +107,7 @@ export class PostTasks {
     private readonly reviews: TaskReviews,
     private readonly engagements: EngagementDirectory,
     private readonly creation: TaskCreation,
+    private readonly users: UserDirectory,
   ) {}
 
   /** The tasks linked to each post, by link time. */
@@ -278,6 +279,7 @@ export class PostTasks {
     actor: CurrentUserInfo,
   ): Promise<LinkedTask> {
     await this.assertRoom(tx, post.id);
+    await this.users.assertActiveDepartments([draft.department], tx);
     let retainerCycleId: string | null = null;
     if (draft.cycleLineId) {
       if (post.cycleLineId) throw countedTwice();
