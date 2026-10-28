@@ -47,6 +47,7 @@ import { departmentListParam, flagParam, idParam } from '../../lib/search-params
 import { useFocusAfterChange } from '../../lib/use-focus-after-change';
 import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { clientListQuery } from '../clients/clients.queries';
+import { DepartmentCodeBadge, DepartmentDot } from '../departments/department-badge';
 import { departmentListQuery } from '../departments/departments.queries';
 import { departmentLabel, pickableDepartments } from '../departments/pickable-departments';
 import { userListQuery } from '../users/users.queries';
@@ -159,7 +160,11 @@ function BoardFilters({
   const departmentOptions = pickableDepartments(
     departments.data?.items ?? [],
     search.department,
-  ).map((department) => ({ code: department.code, name: departmentLabel(t, department) }));
+  ).map((department) => ({
+    code: department.code,
+    name: departmentLabel(t, department),
+    department,
+  }));
   // The API's default departments show as chosen until the user picks their own.
   const chosen = search.department ?? shown ?? [];
   const assigneeItems = [
@@ -192,6 +197,7 @@ function BoardFilters({
           }
           itemToLabel={(item) => item.name}
           itemToKey={(item) => item.code}
+          itemDecoration={(item) => <DepartmentDot department={item.department} />}
           placeholder={t('tasks.board.defaultDepartments')}
           emptyLabel={t('common.noMatches')}
           removeLabel={(label) => t('common.remove', { label })}
@@ -461,6 +467,7 @@ function BoardCard({
         <MoveMenu task={task} onMove={onMove} />
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
+        <DepartmentCodeBadge code={task.department} />
         <PriorityBadge priority={task.priority} />
         {task.reviewStage === 'medical' && <MedicalBadge />}
         {task.blocked && <BlockedBadge />}

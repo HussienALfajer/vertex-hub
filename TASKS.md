@@ -2,8 +2,8 @@
 
 Spec: `docs/specs/F23-departments-management.md` (Approved 2026-10-28) · ADR 0043 · PR split from the spec (1 records, 2 API, 3 screens).
 
-- Branch: `claude/clever-ride-6p9y8q` (cloud session's designated branch; PR 2). PR 1 merged (#192).
-- Stopped at: PR 2 open with auto-merge (`pnpm verify` passed, reviewer's finding fixed: `assertActiveDepartments` takes a share lock); next: once it merges, PR 3 (Departments screens) from `main`
+- Branch: `claude/intelligent-hawking-bzkswc` (cloud session's designated branch; PR 3). PR 1 merged (#192), PR 2 merged (#193).
+- Stopped at: PR 3 open with auto-merge (`pnpm verify` passed; reviewer's findings fixed: department audit values, archive wizard targets after a refusal, archived mark on department names, departments reload on `DEPARTMENT_ARCHIVED`); next: owner acceptance of F23
 
 ## PR 1 — Departments as records (contracts, db, api, web adjustments; no new screens)
 - [x] contracts: `departmentCodeSchema` as the pattern `^[a-z][a-z0-9_]{1,39}$`; `SYSTEM_DEPARTMENT_CODES` (today's `DEPARTMENT_CODES`); `DEPARTMENT_CAPABILITIES` and `DEPARTMENT_BRIEF_KINDS` keyed by system codes; `DEPARTMENT_COLORS`, `DEPARTMENT_ICONS`, `DEPARTMENT_SYSTEM_FUNCTIONS`; `departmentResponseSchema` gains `description`, `color`, `icon`, `position`, `archivedAt`; error code `DEPARTMENT_ARCHIVED` (`UNKNOWN_DEPARTMENT` exists); unit tests (pattern, system functions cover the capability keys)
@@ -22,8 +22,8 @@ Spec: `docs/specs/F23-departments-management.md` (Approved 2026-10-28) · ADR 00
 - [x] wiring checklist, checks, reviewer, PR with auto-merge
 
 ## PR 3 — Departments screens
-- [ ] ui: `--department-1` … `--department-8` tokens (light and dark) with contrast checks
-- [ ] web: departments list (reorder, archived toggle, new-department dialog), department page tabs (overview, members, what it grants, history), archive wizard, restore; `DepartmentBadge` across the app; `permissions.<name>` labels; loading, empty and error states
-- [ ] e2e: fixtures, `f23.spec.ts`, screenshots in `screens.spec.ts` (light and dark)
-- [ ] `docs/ROADMAP.md`: F23 first package done
-- [ ] wiring checklist, checks, reviewer, PR with auto-merge
+- [x] ui: `--department-1` … `--department-8` tokens (light and dark) with contrast checks and `DepartmentMark` (icon on color, dot) in `packages/ui`; colors documented in `brand/identity.md`
+- [x] web: departments list (reorder, archived toggle, new-department dialog), department page tabs (overview, members, what it grants, history), archive wizard, restore; `DepartmentBadge` across the app; `permissions.<name>` labels; loading, empty and error states
+- [x] e2e: fixtures, `f23.spec.ts`, screenshots in `screens.spec.ts` (light and dark)
+- [x] `docs/ROADMAP.md`: F23 first package done
+- [x] wiring checklist, checks, reviewer, PR with auto-merge

@@ -4,6 +4,10 @@ import {
   CLIENT_PLATFORMS,
   CLIENT_STATUSES,
   type ClientStatus,
+  DEPARTMENT_COLORS,
+  DEPARTMENT_ICONS,
+  type DepartmentColor,
+  type DepartmentIcon,
   EMPHASIS_MARK,
   PILLAR_COLORS,
   WORKFLOW_STATUSES,
@@ -38,6 +42,9 @@ import {
   ColorInput,
   ColorStrip,
   ColorSwatch,
+  DepartmentColorPicker,
+  DepartmentIconPicker,
+  DepartmentMark,
   Dialog,
   DialogClose,
   DialogContent,
@@ -340,6 +347,8 @@ function DesignSystemPage() {
           ))}
         </ul>
       </Section>
+
+      <DepartmentIdentitySection />
 
       <Section title={t('designSystem.statuses')}>
         <div className="flex flex-wrap gap-2">
@@ -909,6 +918,45 @@ function ClientKitSection() {
             </div>
           </div>
         </div>
+      </div>
+    </Section>
+  );
+}
+
+/** F23: department colors and icons, as marks, dots and the identity pickers. */
+function DepartmentIdentitySection() {
+  const { t } = useTranslation();
+  const [color, setColor] = useState<DepartmentColor>('c1');
+  const [icon, setIcon] = useState<DepartmentIcon>('palette');
+  return (
+    <Section title={t('designSystem.departmentIdentity')}>
+      <div className="flex flex-col gap-4">
+        <ul className="flex flex-wrap items-center gap-3">
+          {DEPARTMENT_COLORS.map((one, index) => (
+            <li key={one} className="flex items-center gap-2 text-sm">
+              <DepartmentMark color={one} icon={DEPARTMENT_ICONS[index] ?? 'briefcase'} />
+              <DepartmentMark color={one} icon="briefcase" size="dot" />
+              {t(`departments.colors.${one}`)}
+            </li>
+          ))}
+          <li className="flex items-center gap-2 text-sm text-muted-foreground">
+            <DepartmentMark color="c3" icon="code" muted />
+            {t('departments.archivedBadge')}
+          </li>
+        </ul>
+        <DepartmentColorPicker
+          aria-label={t('departments.detail.color')}
+          value={color}
+          onValueChange={setColor}
+          optionLabel={(one) => t(`departments.colors.${one}`)}
+        />
+        <DepartmentIconPicker
+          aria-label={t('departments.detail.icon')}
+          color={color}
+          value={icon}
+          onValueChange={setIcon}
+          optionLabel={(one) => t(`departments.icons.${one}`)}
+        />
       </div>
     </Section>
   );

@@ -186,6 +186,69 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `department-${colorScheme}`);
     });
 
+    test('departments management (F23)', async ({ page }, testInfo) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await mockApi(page, { signedIn: true });
+      await page.goto('/departments');
+      await page.getByRole('button', { name: ar.departments.reorder.start }).click();
+      await expect(page.getByRole('button', { name: ar.departments.reorder.save })).toBeVisible();
+      await screenshot(page, testInfo, `departments-reorder-${colorScheme}`);
+      await page.getByRole('button', { name: ar.common.cancel }).click();
+
+      await page.getByRole('button', { name: ar.departments.create.open }).click();
+      const create = page.getByRole('dialog');
+      await create.getByLabel(ar.departments.detail.name).fill('إنتاج الفيديو');
+      await create.getByRole('radio', { name: ar.departments.colors.c3 }).click();
+      await create.getByRole('radio', { name: ar.departments.icons.film }).click();
+      await screenshot(page, testInfo, `department-new-${colorScheme}`);
+      await page.keyboard.press('Escape');
+
+      await page.goto(`/departments/${seedIds.design}?tab=members`);
+      await expect(page.getByText('ليان الأحمد').first()).toBeVisible();
+      await screenshot(page, testInfo, `department-members-${colorScheme}`);
+      await page.getByRole('tab', { name: ar.departments.detail.tabs.grants }).click();
+      await screenshot(page, testInfo, `department-grants-${colorScheme}`);
+      await page.getByRole('tab', { name: ar.departments.detail.tabs.history }).click();
+      await screenshot(page, testInfo, `department-history-${colorScheme}`);
+
+      await page.getByRole('button', { name: ar.departments.archive.open }).click();
+      const wizard = page.getByRole('dialog');
+      await pickOption(page, wizard.getByLabel(ar.departments.archive.everything), 'التسويق');
+      await screenshot(page, testInfo, `department-archive-moves-${colorScheme}`);
+      await wizard.getByRole('button', { name: ar.common.next }).click();
+      await expect(
+        wizard.getByRole('button', { name: ar.departments.archive.submit }),
+      ).toBeVisible();
+      await screenshot(page, testInfo, `department-archive-confirm-${colorScheme}`);
+      await wizard.getByRole('button', { name: ar.departments.archive.submit }).click();
+      await expect(page.getByRole('heading', { level: 1 })).toContainText(
+        ar.departments.archivedBadge,
+      );
+      await page.getByText(ar.departments.archive.done.replace('{{name}}', 'التصميم')).waitFor();
+      await screenshot(page, testInfo, `department-archived-${colorScheme}`);
+      await page.getByRole('main').getByRole('link', { name: ar.departments.detail.back }).click();
+      await page.getByRole('button', { name: ar.departments.archived }).click();
+      await expect(page.getByRole('main').getByRole('heading', { level: 2 })).toHaveCount(1);
+      await screenshot(page, testInfo, `departments-archived-${colorScheme}`);
+    });
+
+    test('a department as its manager (F23)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await mockApi(page, { signedIn: true, me: departmentManagerMe });
+      await page.goto(`/departments/${seedIds.design}`);
+      await expect(page.getByText(ar.departments.overview.workload)).toBeVisible();
+      await screenshot(page, testInfo, `department-overview-manager-${colorScheme}`);
+    });
+
+    test('a department as an employee (F23)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await mockApi(page, { signedIn: true, me: employeeMe });
+      await page.goto(`/departments/${seedIds.design}`);
+      await expect(page.getByText(ar.departments.overview.overdue)).toBeVisible();
+      await screenshot(page, testInfo, `department-overview-employee-${colorScheme}`);
+    });
+
     test('my account', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 1100 });
       await mockApi(page, { signedIn: true });

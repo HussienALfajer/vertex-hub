@@ -3,7 +3,7 @@ import type { Task } from '@vertex-hub/contracts';
 import { Avatar, cn } from '@vertex-hub/ui';
 import { useTranslation } from 'react-i18next';
 import { imageSrc } from '../../lib/images';
-import { useDepartmentNames } from '../projects/project-badges';
+import { DepartmentCodeBadge } from '../departments/department-badge';
 import {
   BlockedBadge,
   ChecklistCount,
@@ -35,7 +35,6 @@ export function TaskRows({
 }) {
   const { t } = useTranslation();
   const engagementOf = useEngagementLabel();
-  const departmentName = useDepartmentNames();
   return (
     <ul className="flex flex-col divide-y divide-border">
       {tasks.map((task) => {
@@ -56,14 +55,16 @@ export function TaskRows({
               >
                 {task.title}
               </Link>
-              <span className="truncate text-xs text-muted-foreground">
-                {[
-                  !inEngagement && (task.client?.name ?? t('tasks.internal')),
-                  !inEngagement && engagement,
-                  departmentName(task.department),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                {!inEngagement && (
+                  <span className="truncate">
+                    {[task.client?.name ?? t('tasks.internal'), engagement]
+                      .filter(Boolean)
+                      .join(' · ')}
+                    {' · '}
+                  </span>
+                )}
+                <DepartmentCodeBadge code={task.department} plain className="shrink-0" />
               </span>
               {task.parent && (
                 <span className="flex">

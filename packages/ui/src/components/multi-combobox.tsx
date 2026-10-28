@@ -1,6 +1,6 @@
 import { Combobox as ComboboxPrimitive } from '@base-ui/react/combobox';
 import { CheckIcon, PlusIcon, XIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { cn } from '../lib/cn';
 import { popupMotion } from '../lib/motion';
 
@@ -11,6 +11,8 @@ interface MultiComboboxProps<Item> {
   onValueChange: (value: Item[]) => void;
   itemToLabel: (item: Item) => string;
   itemToKey: (item: Item) => string;
+  /** A decorative mark before an item's label, in the list and on its chip (a department's color). */
+  itemDecoration?: (item: Item) => ReactNode;
   placeholder?: string;
   /** Shown when nothing matches the typed text. */
   emptyLabel: string;
@@ -38,6 +40,7 @@ function MultiCombobox<Item>({
   onValueChange,
   itemToLabel,
   itemToKey,
+  itemDecoration,
   placeholder,
   emptyLabel,
   removeLabel,
@@ -107,6 +110,7 @@ function MultiCombobox<Item>({
                 'focus-within:bg-secondary-hover data-highlighted:bg-secondary-hover',
               )}
             >
+              {itemDecoration?.(item)}
               <span className="truncate">{itemToLabel(item)}</span>
               <ComboboxPrimitive.ChipRemove
                 aria-label={removeLabel(itemToLabel(item))}
@@ -158,7 +162,10 @@ function MultiCombobox<Item>({
                         {create.label(text)}
                       </>
                     ) : (
-                      itemToLabel(item)
+                      <>
+                        {itemDecoration?.(item)}
+                        {itemToLabel(item)}
+                      </>
                     )}
                     <ComboboxPrimitive.ItemIndicator className="absolute end-2 flex text-foreground">
                       <CheckIcon className="size-4" />

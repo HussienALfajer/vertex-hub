@@ -33,9 +33,9 @@ import { LoadError } from '../../components/load-error';
 import { formatCalendarDate, formatNumber } from '../../lib/format';
 import { imageSrc } from '../../lib/images';
 import { dayParam, departmentListParam } from '../../lib/search-params';
+import { DepartmentCodeBadge } from '../departments/department-badge';
 import { departmentListQuery } from '../departments/departments.queries';
 import { departmentLabel, pickableDepartments } from '../departments/pickable-departments';
-import { useDepartmentNames } from '../projects/project-badges';
 import type { TaskListSearch } from './task-list-page';
 import { taskWorkloadQuery } from './tasks.queries';
 
@@ -208,7 +208,6 @@ function DepartmentFilter({
 /** Open requests nobody holds yet, per department: the managers' queue. */
 function UnassignedTiles({ workload }: { workload: TaskWorkload }) {
   const { t } = useTranslation();
-  const departmentName = useDepartmentNames();
   const headingId = useId();
   if (workload.unassigned.length === 0) return null;
   return (
@@ -221,7 +220,7 @@ function UnassignedTiles({ workload }: { workload: TaskWorkload }) {
           const content = (
             <>
               <InboxIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-              {departmentName(department)}
+              <DepartmentCodeBadge code={department} plain />
               <span className="font-bold tabular-nums">{formatNumber(count)}</span>
             </>
           );
@@ -250,7 +249,6 @@ function UnassignedTiles({ workload }: { workload: TaskWorkload }) {
 
 function PeopleTable({ workload }: { workload: TaskWorkload }) {
   const { t } = useTranslation();
-  const departmentName = useDepartmentNames();
   const { from, to } = workload.week;
 
   return (
@@ -275,8 +273,10 @@ function PeopleTable({ workload }: { workload: TaskWorkload }) {
                     <Avatar name={user.name} src={imageSrc(user.imageId, 'sm')} size="sm" />
                     <div className="flex min-w-0 flex-col">
                       <span className="font-medium">{user.name}</span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {departments.map(departmentName).join(' · ')}
+                      <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                        {departments.map((code) => (
+                          <DepartmentCodeBadge key={code} code={code} plain />
+                        ))}
                       </span>
                     </div>
                   </div>

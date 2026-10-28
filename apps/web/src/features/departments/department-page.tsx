@@ -1,14 +1,11 @@
-import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
-import { type DepartmentDetailResponse, updateDepartmentSchema } from '@vertex-hub/contracts';
+import { Link, useNavigate } from '@tanstack/react-router';
+import type { DepartmentDetailResponse } from '@vertex-hub/contracts';
 import {
-  Avatar,
   Badge,
   Button,
-  Card,
-  CardHeader,
-  CardTitle,
+  Callout,
+  DepartmentMark,
   Dialog,
   DialogClose,
   DialogContent,
@@ -17,11 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  EmptyState,
   Field,
   FieldError,
   FieldLabel,
-  Input,
   PageHeader,
   Select,
   SelectContent,
@@ -29,23 +24,64 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   toast,
 } from '@vertex-hub/ui';
-import { ArrowRightIcon, PencilIcon, UserCogIcon, UsersIcon } from 'lucide-react';
-import { type FormEvent, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
+  ArrowRightIcon,
+  GaugeIcon,
+  HistoryIcon,
+  KeyRoundIcon,
+  PencilIcon,
+  UserCogIcon,
+  UsersIcon,
+} from 'lucide-react';
+import { type FormEvent, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../../components/confirm-dialog';
 import { FormAlert } from '../../components/form-alert';
 import { isMissing, LoadError } from '../../components/load-error';
 import { ApiError } from '../../lib/api/client';
 import { can, useMe } from '../../lib/auth';
-import { errorMessage, errorRole, type Failure, fieldError, SCREEN_ERROR } from '../../lib/errors';
-import { formatNumber } from '../../lib/format';
-import { imageSrc } from '../../lib/images';
+import { errorMessage, type Failure } from '../../lib/errors';
+import { formatDate } from '../../lib/format';
+import { oneOfParam, pageParam } from '../../lib/search-params';
+import { AuditEntries } from '../audit/audit-page';
+import { ArchiveWizard } from './archive-wizard';
 import { capabilityKey } from './capabilities';
-import { departmentQuery, useUpdateDepartment } from './departments.queries';
+import { DepartmentGrants } from './department-grants';
+import { DepartmentIdentityForm } from './department-identity-form';
+import { DepartmentMembers } from './department-members';
+import { DepartmentOverview } from './department-overview';
+import { departmentQuery, useRestoreDepartment, useUpdateDepartment } from './departments.queries';
 
-export function DepartmentPage({ departmentId }: { departmentId: string }) {
+const DEPARTMENT_TABS = ['overview', 'members', 'grants', 'history'] as const;
+
+type DepartmentTab = (typeof DEPARTMENT_TABS)[number];
+
+export interface DepartmentPageSearch {
+  /** Unset means the first tab the department shows. */
+  tab?: DepartmentTab;
+  /** The history tab's page. */
+  page?: number;
+}
+
+export function parseDepartmentPageSearch(search: Record<string, unknown>): DepartmentPageSearch {
+  return { tab: oneOfParam(DEPARTMENT_TABS, search.tab), page: pageParam(search.page) };
+}
+
+export function DepartmentPage({
+  departmentId,
+  search,
+}: {
+  departmentId: string;
+  search: DepartmentPageSearch;
+}) {
   const { t } = useTranslation();
   const department = useQuery(departmentQuery(departmentId));
   return (
@@ -58,10 +94,13 @@ export function DepartmentPage({ departmentId }: { departmentId: string }) {
       </div>
       {department.isPending ? (
         <div className="flex flex-col gap-6">
-          <Skeleton className="h-10 w-72" />
-          <div className="grid gap-6 lg:grid-cols-3">
-            <Skeleton className="h-56" />
-            <Skeleton className="h-56 lg:col-span-2" />
+          <Skeleton className="h-12 w-72" />
+          <Skeleton className="h-10 w-96 max-w-full" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
           </div>
         </div>
       ) : department.isError ? (
@@ -75,102 +114,138 @@ export function DepartmentPage({ departmentId }: { departmentId: string }) {
           error={department.error}
         />
       ) : (
-        <Department department={department.data} />
+        <Department department={department.data} search={search} />
       )}
     </>
   );
 }
 
-function Department({ department }: { department: DepartmentDetailResponse }) {
+function Department({
+  department,
+  search,
+}: {
+  department: DepartmentDetailResponse;
+  search: DepartmentPageSearch;
+}) {
   const { t } = useTranslation();
-  const canManage = can(useMe(), 'users.manage');
+  const me = useMe();
+  const navigate = useNavigate({ from: '/departments/$departmentId' });
+  const canManage = can(me, 'users.manage');
+  const canArchive = can(me, 'departments.manage');
+  const canAudit = can(me, 'audit.read');
+  const archived = !!department.archivedAt;
   const capability = capabilityKey(department.code);
+  // Rule 26: an archived department shows no overview; history only with `audit.read`.
+  const tabs = DEPARTMENT_TABS.filter(
+    (tab) => !(tab === 'overview' && archived) && !(tab === 'history' && !canAudit),
+  );
+  const first = tabs[0] ?? 'members';
+  const tab = search.tab && tabs.includes(search.tab) ? search.tab : first;
+  const openTab = (next: DepartmentTab) =>
+    navigate({ search: { tab: next === first ? undefined : next } });
+  const openHistoryPage = useCallback(
+    (page: number | undefined, replace: boolean) =>
+      navigate({ search: (previous) => ({ ...previous, page }), replace }),
+    [navigate],
+  );
 
   return (
     <>
       <PageHeader
-        title={department.name}
-        description={capability ? t(capability) : undefined}
-        actions={canManage && <RenameDialog department={department} />}
-      />
-      <div className="grid items-start gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t('departments.detail.managerCard')}</CardTitle>
-          </CardHeader>
-          {department.manager ? (
-            <Link
-              to="/team/$userId"
-              params={{ userId: department.manager.id }}
-              className="group flex min-w-0 items-center gap-3"
-            >
-              <Avatar
-                name={department.manager.name}
-                src={imageSrc(department.manager.imageId, 'lg')}
-                size="lg"
-              />
-              <span className="min-w-0 text-lg font-bold wrap-anywhere group-hover:underline">
-                {department.manager.name}
-              </span>
-            </Link>
-          ) : (
-            <p className="text-muted-foreground">
-              {canManage ? t('departments.detail.noManagerHint') : t('departments.noManager')}
-            </p>
-          )}
-          {canManage && <ManagerDialog department={department} />}
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-lg">{t('departments.detail.members')}</CardTitle>
-            <Badge tone="neutral" className="tabular-nums">
-              {formatNumber(department.members.length)}
-            </Badge>
-          </CardHeader>
-          {department.members.length === 0 ? (
-            <EmptyState
-              icon={<UsersIcon />}
-              title={t('departments.detail.noMembers')}
-              description={canManage ? t('departments.detail.noMembersHint') : undefined}
-              className="py-8"
+        title={
+          <span className="flex min-w-0 items-center gap-3">
+            <DepartmentMark
+              color={department.color}
+              icon={department.icon}
+              size="lg"
+              muted={archived}
             />
+            <span className="min-w-0 wrap-anywhere">{department.name}</span>
+            {archived && (
+              <Badge tone="neutral">
+                <ArchiveIcon />
+                {t('departments.archivedBadge')}
+              </Badge>
+            )}
+          </span>
+        }
+        description={
+          department.description ?? (capability && !archived ? t(capability) : undefined)
+        }
+        actions={
+          archived ? (
+            canArchive && <RestoreButton department={department} />
           ) : (
-            <ul className="flex flex-col divide-y divide-border">
-              {department.members.map((member) => (
-                <li key={member.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  <Avatar name={member.name} src={imageSrc(member.imageId, 'md')} size="md" />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <Link
-                      to="/team/$userId"
-                      params={{ userId: member.id }}
-                      className="truncate font-medium hover:underline"
-                    >
-                      {member.name}
-                    </Link>
-                    <span className="truncate text-sm text-muted-foreground">
-                      {member.title ?? t('common.none')}
-                    </span>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                    {member.id === department.manager?.id && (
-                      <Badge tone="gold">{t('users.managerBadge')}</Badge>
-                    )}
-                    {member.status === 'invited' && (
-                      <Badge tone="info">{t('users.statuses.invited')}</Badge>
-                    )}
-                    <Badge tone={member.isPrimary ? 'neutral' : 'outline'}>
-                      {member.isPrimary
-                        ? t('departments.detail.primary')
-                        : t('departments.detail.secondary')}
-                    </Badge>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <>
+              {canManage && <EditDialog department={department} />}
+              {canManage && <ManagerDialog department={department} />}
+              {canArchive && <ArchiveWizard department={department} />}
+            </>
+          )
+        }
+      />
+      {archived && department.archivedAt && (
+        <Callout
+          icon={<ArchiveIcon />}
+          title={
+            department.archivedBy
+              ? t('departments.detail.archivedBy', {
+                  date: formatDate(department.archivedAt),
+                  name: department.archivedBy.name,
+                })
+              : t('departments.archivedOn', { date: formatDate(department.archivedAt) })
+          }
+          description={t('departments.detail.archivedHint')}
+        />
+      )}
+      <Tabs value={tab} onValueChange={(value: DepartmentTab) => openTab(value)}>
+        <TabsList aria-label={department.name}>
+          {tabs.includes('overview') && (
+            <TabsTrigger value="overview">
+              <GaugeIcon />
+              {t('departments.detail.tabs.overview')}
+            </TabsTrigger>
           )}
-        </Card>
-      </div>
+          <TabsTrigger value="members">
+            <UsersIcon />
+            {t('departments.detail.tabs.members')}
+          </TabsTrigger>
+          <TabsTrigger value="grants">
+            <KeyRoundIcon />
+            {t('departments.detail.tabs.grants')}
+          </TabsTrigger>
+          {tabs.includes('history') && (
+            <TabsTrigger value="history">
+              <HistoryIcon />
+              {t('departments.detail.tabs.history')}
+            </TabsTrigger>
+          )}
+        </TabsList>
+        {tab === 'overview' && (
+          <TabsContent value="overview">
+            <DepartmentOverview department={department} onAddMembers={() => openTab('members')} />
+          </TabsContent>
+        )}
+        {tab === 'members' && (
+          <TabsContent value="members">
+            <DepartmentMembers department={department} />
+          </TabsContent>
+        )}
+        {tab === 'grants' && (
+          <TabsContent value="grants">
+            <DepartmentGrants department={department} />
+          </TabsContent>
+        )}
+        {tab === 'history' && (
+          <TabsContent value="history">
+            <AuditEntries
+              filters={{ entityType: 'department', entityId: department.id }}
+              page={search.page ?? 1}
+              onPageChange={openHistoryPage}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
     </>
   );
 }
@@ -178,85 +253,46 @@ function Department({ department }: { department: DepartmentDetailResponse }) {
 // Each dialog owns its trigger, so closing it puts the focus back on the button that opened it,
 // and its form mounts on every opening, so it starts from the saved department.
 
-function RenameDialog({ department }: { department: DepartmentDetailResponse }) {
+function EditDialog({ department }: { department: DepartmentDetailResponse }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" />}>
         <PencilIcon />
-        {t('departments.detail.rename')}
+        {t('common.edit')}
       </DialogTrigger>
-      <DialogContent closeLabel={t('common.close')}>
-        <RenameForm department={department} onDone={() => setOpen(false)} />
+      <DialogContent closeLabel={t('common.close')} className="max-w-xl">
+        <DepartmentIdentityForm department={department} onDone={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );
 }
 
-const renameSchema = updateDepartmentSchema.pick({ name: true }).required();
-
-function RenameForm({
-  department,
-  onDone,
-}: {
-  department: DepartmentDetailResponse;
-  onDone: () => void;
-}) {
+/** Rule 16: the department comes back empty, last in the order. */
+function RestoreButton({ department }: { department: DepartmentDetailResponse }) {
   const { t } = useTranslation();
-  const update = useUpdateDepartment(department.id);
-  const [failure, setFailure] = useState<string | null>(null);
-  const {
-    register,
-    handleSubmit,
-    setError,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    resolver: standardSchemaResolver(renameSchema),
-    defaultValues: { name: department.name },
-  });
-
-  const submit = handleSubmit(async ({ name }) => {
-    setFailure(null);
-    if (name === department.name) return onDone();
-    try {
-      await update.mutateAsync({ name });
-      toast.add({ title: t('departments.detail.saved'), type: 'success' });
-      onDone();
-    } catch (error) {
-      // A taken name belongs to the field: mark it and put the cursor back there.
-      if (error instanceof ApiError && error.code === 'DEPARTMENT_NAME_TAKEN') {
-        setError(
-          'name',
-          { type: SCREEN_ERROR, message: errorMessage(t, error) },
-          { shouldFocus: true },
-        );
-      } else setFailure(errorMessage(t, error));
-    }
-  });
-
+  const restore = useRestoreDepartment(department.id);
+  const [open, setOpen] = useState(false);
   return (
-    <form className="grid gap-4" onSubmit={submit} noValidate>
-      <DialogHeader>
-        <DialogTitle>{t('departments.detail.renameTitle')}</DialogTitle>
-      </DialogHeader>
-      <Field invalid={!!errors.name}>
-        <FieldLabel>{t('departments.detail.name')}</FieldLabel>
-        <Input autoFocus autoComplete="off" {...register('name')} />
-        <FieldError match={!!errors.name} role={errorRole(errors.name)}>
-          {fieldError(errors.name, t('departments.detail.nameError'))}
-        </FieldError>
-      </Field>
-      {failure && <FormAlert>{failure}</FormAlert>}
-      <DialogFooter>
-        <DialogClose render={<Button variant="outline" type="button" />}>
-          {t('common.cancel')}
-        </DialogClose>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? t('common.saving') : t('common.save')}
-        </Button>
-      </DialogFooter>
-    </form>
+    <>
+      <Button onClick={() => setOpen(true)}>
+        <ArchiveRestoreIcon />
+        {t('departments.restore.open')}
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={t('departments.restore.title', { name: department.name })}
+        body={t('departments.restore.body')}
+        action={t('departments.restore.confirm')}
+        pending={restore.isPending}
+        onConfirm={async () => {
+          await restore.mutateAsync();
+          toast.add({ title: t('departments.restore.done'), type: 'success' });
+        }}
+      />
+    </>
   );
 }
 
@@ -265,7 +301,7 @@ function ManagerDialog({ department }: { department: DepartmentDetailResponse })
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="secondary" className="self-start" />}>
+      <DialogTrigger render={<Button variant="outline" />}>
         <UserCogIcon />
         {t('departments.detail.changeManager')}
       </DialogTrigger>

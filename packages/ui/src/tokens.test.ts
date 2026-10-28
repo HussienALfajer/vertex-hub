@@ -82,6 +82,39 @@ describe('design tokens', () => {
   });
 });
 
+/** The department colors (F23) of one theme block, as palette names: `{ 1: 'green-700', … }`. */
+function departmentColors(block: string): string[] {
+  return [...block.matchAll(/--department-\d:\s*var\(--color-([a-z]+-\d+)\);/g)].map(
+    ([, name]) => name as string,
+  );
+}
+
+describe('department colors', () => {
+  const light = theme.slice(theme.indexOf(':root {'), theme.indexOf('.dark {'));
+  const dark = theme.slice(theme.indexOf('.dark {'), theme.indexOf('@theme inline'));
+  const c = (a: string, b: string) => contrast(themeColors[a] ?? a, themeColors[b] ?? b);
+
+  it('are eight distinct palette colors in each theme', () => {
+    for (const block of [light, dark]) {
+      const colors = departmentColors(block);
+      expect(colors).toHaveLength(8);
+      expect(new Set(colors).size).toBe(8);
+      for (const color of colors) expect(themeColors[color], color).toBeDefined();
+    }
+  });
+
+  // A stripe, a dot or an icon tile is a graphic: 3:1 against the surface and for its icon.
+  it('stand out on the surface and carry their icon (3:1)', () => {
+    for (const color of departmentColors(light)) {
+      expect(c(color, '#ffffff'), color).toBeGreaterThanOrEqual(3); // surface and icon, light
+    }
+    for (const color of departmentColors(dark)) {
+      expect(c(color, 'green-900'), color).toBeGreaterThanOrEqual(3); // surface, dark
+      expect(c(color, 'green-950'), color).toBeGreaterThanOrEqual(3); // icon, dark
+    }
+  });
+});
+
 describe('generated utilities', async () => {
   const compiler = await compile('@import "tailwindcss";\n@import "./styles/index.css";', {
     base: srcDir,
@@ -90,7 +123,14 @@ describe('generated utilities', async () => {
   const build = (candidate: string) => compiler.build([candidate]);
 
   it('exist for brand tokens', () => {
-    for (const candidate of ['bg-primary', 'bg-green-800', 'text-accent-text', 'shadow-float']) {
+    for (const candidate of [
+      'bg-primary',
+      'bg-green-800',
+      'text-accent-text',
+      'shadow-float',
+      'bg-department-1',
+      'text-department-foreground',
+    ]) {
       expect(build(candidate), candidate).toContain(`.${candidate}`);
     }
   });

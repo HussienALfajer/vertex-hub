@@ -24,8 +24,9 @@ import { useShownWhileClosing } from '../../lib/use-shown-while-closing';
 import { ClientApprovalSection } from '../approvals/task-approval-panel';
 import { TaskShootSection } from '../calendar/task-shoot-section';
 import { TaskPostSection } from '../content/task-post-section';
+import { DepartmentCodeBadge } from '../departments/department-badge';
 import { FollowButton } from '../notifications/follow-button';
-import { PersonName, useDepartmentNames } from '../projects/project-badges';
+import { PersonName } from '../projects/project-badges';
 import { lineName } from '../retainers/retainer-badges';
 import { TaskTemplateOrigin } from '../templates/template-runs';
 import { focusTarget, TaskActions, type TaskFocus, targetsOf } from './task-actions';
@@ -160,7 +161,6 @@ function TaskHero({
   onArchive: () => void;
 }) {
   const { t } = useTranslation();
-  const departmentName = useDepartmentNames();
   const archived = task.archivedAt !== null;
   return (
     <section className="flex flex-col gap-5 rounded-lg border border-border bg-surface p-6">
@@ -257,7 +257,9 @@ function TaskHero({
             <span className="text-muted-foreground">{t('tasks.unassigned')}</span>
           )}
         </Fact>
-        <Fact label={t('tasks.page.department')}>{departmentName(task.department)}</Fact>
+        <Fact label={t('tasks.page.department')}>
+          <DepartmentCodeBadge code={task.department} plain />
+        </Fact>
         <Fact label={t('tasks.page.due')}>
           <span className="tabular-nums">{formatDue(task)}</span>
         </Fact>

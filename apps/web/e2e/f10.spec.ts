@@ -96,9 +96,13 @@ test('references and deliverables: upload, link, new version, preview, remove a 
     'title',
     'دليل الهوية',
   );
-  await page.keyboard.press('ArrowLeft');
   dialog = page.getByRole('dialog', { name: 'صور الأطباق' });
-  await expect(dialog.getByRole('img', { name: 'صور الأطباق' })).toBeVisible();
+  // The viewer takes the key once it holds the focus: press while the first file still shows.
+  const identity = page.getByRole('dialog', { name: 'دليل الهوية' });
+  await expect(async () => {
+    if (await identity.isVisible()) await page.keyboard.press('ArrowLeft');
+    await expect(dialog.getByRole('img', { name: 'صور الأطباق' })).toBeVisible({ timeout: 1_000 });
+  }).toPass();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });
