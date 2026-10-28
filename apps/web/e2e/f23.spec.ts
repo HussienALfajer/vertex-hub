@@ -87,10 +87,17 @@ test('the General Manager creates a department and manages its members', async (
     'true',
   );
   await expect(page.getByText(ar.departments.members.primaryLocked)).toBeVisible();
-  await page.keyboard.press('Escape');
+  // The menu takes the Escape once it holds the focus: press until it is gone.
+  await expect(async () => {
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0, { timeout: 1_000 });
+  }).toPass();
 
   await page.getByRole('button', { name: 'إجراءات نور السيد' }).click();
-  await page.getByRole('menuitem', { name: ar.departments.members.remove }).click();
+  await page
+    .getByRole('menu', { name: 'إجراءات نور السيد' })
+    .getByRole('menuitem', { name: ar.departments.members.remove })
+    .click();
   await page
     .getByRole('alertdialog')
     .getByRole('button', { name: ar.departments.members.remove })
