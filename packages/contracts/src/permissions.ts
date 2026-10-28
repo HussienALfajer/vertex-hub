@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { DepartmentCode } from './departments.js';
+import type { DepartmentCode, SystemDepartmentCode } from './departments.js';
 import { type AssignableRole, ROLES, type Role } from './roles.js';
 
 /**
@@ -151,13 +151,14 @@ export const PERMISSION_MAP: Readonly<Record<Role, Grants>> = {
   },
 };
 
+type DepartmentGrants = { member?: Grants; manager?: Grants };
+
 /**
  * Grants by position in a department (ADR 0014). A manager is also a member; primary and
- * secondary memberships count the same.
+ * secondary memberships count the same. Keyed by system codes only: a department the General
+ * Manager adds grants nothing (ADR 0043).
  */
-export const DEPARTMENT_CAPABILITIES: Readonly<
-  Partial<Record<DepartmentCode, { member?: Grants; manager?: Grants }>>
-> = {
+export const DEPARTMENT_CAPABILITIES: Readonly<Partial<Record<DepartmentCode, DepartmentGrants>>> = {
   internal_operations: {
     manager: {
       'users.manage': 'all',
@@ -210,7 +211,7 @@ export const DEPARTMENT_CAPABILITIES: Readonly<
       'campaigns.manage': 'all',
     },
   },
-};
+} satisfies Partial<Record<SystemDepartmentCode, DepartmentGrants>>;
 
 export type DepartmentPosition = { code: DepartmentCode; isManager: boolean };
 

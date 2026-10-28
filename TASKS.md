@@ -3,10 +3,10 @@
 Spec: `docs/specs/F23-departments-management.md` (Approved 2026-10-28) · ADR 0043 · PR split from the spec (1 records, 2 API, 3 screens).
 
 - Branch: `claude/wizardly-galileo-lr0tiv` (cloud session's designated branch; PR 1)
-- Stopped at: plan written, waiting for the owner's approval; next: PR 1 contracts layer
+- Stopped at: PR 1 contracts done (contracts typecheck and tests pass; db, api and web still use `DEPARTMENT_CODES` until their layers); next: PR 1 db layer
 
 ## PR 1 — Departments as records (contracts, db, api, web adjustments; no new screens)
-- [ ] contracts: `departmentCodeSchema` as the pattern `^[a-z][a-z0-9_]{1,39}$`; `SYSTEM_DEPARTMENT_CODES` (today's `DEPARTMENT_CODES`); `DEPARTMENT_CAPABILITIES` and `DEPARTMENT_BRIEF_KINDS` keyed by system codes; `DEPARTMENT_COLORS`, `DEPARTMENT_ICONS`, `DEPARTMENT_SYSTEM_FUNCTIONS`; `departmentResponseSchema` gains `description`, `color`, `icon`, `position`, `archivedAt`; error codes `UNKNOWN_DEPARTMENT`, `DEPARTMENT_ARCHIVED`; unit tests (pattern, system functions cover the capability keys)
+- [x] contracts: `departmentCodeSchema` as the pattern `^[a-z][a-z0-9_]{1,39}$`; `SYSTEM_DEPARTMENT_CODES` (today's `DEPARTMENT_CODES`); `DEPARTMENT_CAPABILITIES` and `DEPARTMENT_BRIEF_KINDS` keyed by system codes; `DEPARTMENT_COLORS`, `DEPARTMENT_ICONS`, `DEPARTMENT_SYSTEM_FUNCTIONS`; `departmentResponseSchema` gains `description`, `color`, `icon`, `position`, `archivedAt`; error code `DEPARTMENT_ARCHIVED` (`UNKNOWN_DEPARTMENT` exists); unit tests (pattern, system functions cover the capability keys)
 - [ ] db (`/db-migration`): enum columns to `text` with foreign keys to `departments.code` (arrays checked by services), enum dropped; `description`, `color` (enum `department_color`), `icon`, `position` with the seeded values; migration test
 - [ ] api: departments list read from the database wherever `DEPARTMENT_CODES` was used (task views, dashboard, report access); every write that takes a code checks it (`UNKNOWN_DEPARTMENT`, `DEPARTMENT_ARCHIVED` on writes; filters accept archived codes); lists and pickers in department order; system-recipient fallback to the General Managers while a system department is archived (rule 14), unit-tested per function; tests
 - [ ] bridge: `openapi:export`, `api:generate`
