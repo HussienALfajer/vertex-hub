@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  archiveDepartmentSchema,
+  createDepartmentSchema,
   DEPARTMENT_SYSTEM_FUNCTIONS,
   departmentCodeSchema,
   departmentSystemFunctions,
@@ -47,5 +49,24 @@ describe('DEPARTMENT_SYSTEM_FUNCTIONS', () => {
     expect(Object.keys(DEPARTMENT_SYSTEM_FUNCTIONS).every(isSystemDepartmentCode)).toBe(true);
     expect(departmentSystemFunctions('d_abcd2345')).toEqual([]);
     expect(departmentSystemFunctions('design')).toEqual([]);
+  });
+});
+
+describe('department inputs (F23)', () => {
+  it('takes a target for any category and refuses others', () => {
+    const id = '0192a5a0-0000-7000-8000-000000000001';
+    expect(archiveDepartmentSchema.safeParse({ targets: {} }).success).toBe(true);
+    expect(archiveDepartmentSchema.safeParse({ targets: { tasks: id } }).success).toBe(true);
+    expect(archiveDepartmentSchema.safeParse({ targets: { clients: id } }).success).toBe(false);
+  });
+
+  it('needs a palette color and a curated icon', () => {
+    const base = { name: 'Video', color: 'c3', icon: 'film' };
+    expect(createDepartmentSchema.safeParse(base).success).toBe(true);
+    expect(createDepartmentSchema.safeParse({ ...base, color: 'red' }).success).toBe(false);
+    expect(createDepartmentSchema.safeParse({ ...base, icon: 'rocket' }).success).toBe(false);
+    expect(
+      createDepartmentSchema.safeParse({ ...base, description: 'x'.repeat(501) }).success,
+    ).toBe(false);
   });
 });

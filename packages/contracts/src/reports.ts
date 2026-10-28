@@ -218,6 +218,48 @@ export const departmentDashboardSchema = z
 
 export type DepartmentDashboard = z.infer<typeof departmentDashboardSchema>;
 
+/**
+ * F23 rules 24 and 25: a department's page overview. The counts are for everyone; `members` and
+ * `onLeave` only for `reports.read` covering the department.
+ */
+export const departmentOverviewSchema = z
+  .object({
+    /** This week, Saturday to Friday. */
+    week: reportPeriodSchema,
+    /** Open tasks of the department per open status. */
+    byStatus: z.array(z.object({ status: taskStatusSchema, count: countSchema })),
+    overdue: countSchema,
+    dueThisWeek: countSchema,
+    /** Open tasks in the department's queue (nobody assigned). */
+    unassigned: countSchema,
+    /** Catalog services it performs, not archived. */
+    services: countSchema,
+    /** Open projects listing it. */
+    projects: countSchema,
+    /** Active or paused retainers listing it. */
+    retainers: countSchema,
+    /** As F06 Workload: each non-archived member, counts over all of their open tasks. */
+    members: z
+      .array(
+        z.object({
+          user: personSchema,
+          overdue: countSchema,
+          dueThisWeek: countSchema,
+          open: countSchema,
+        }),
+      )
+      .optional(),
+    /** Members on approved leave today: name and dates, never the leave type (F17). */
+    onLeave: z
+      .array(
+        z.object({ user: personSchema, startsOn: calendarDateSchema, endsOn: calendarDateSchema }),
+      )
+      .optional(),
+  })
+  .meta({ id: 'DepartmentOverview' });
+
+export type DepartmentOverview = z.infer<typeof departmentOverviewSchema>;
+
 // My clients section (rule 4)
 
 export const myClientsDashboardSchema = z

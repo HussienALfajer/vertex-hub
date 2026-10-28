@@ -9,6 +9,8 @@ import { type AssignableRole, ROLES, type Role } from './roles.js';
 export const PERMISSIONS = [
   'users.read',
   'users.manage',
+  /** F23: create, archive and restore departments (General Manager only). */
+  'departments.manage',
   'clients.read',
   'clients.manage',
   'clients.log',

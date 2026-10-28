@@ -142,6 +142,10 @@ export const NOTIFICATION_TYPES = [
   'department_manager_assigned',
   'member_moved',
   'member_archived_open_work',
+  // F23.
+  'department_member_added',
+  'department_member_removed',
+  'department_archived',
   'security_new_device',
   'security_notice',
   'push_device_lost',
@@ -403,6 +407,10 @@ const CATALOG: Record<
   /** Opens the member's profile. */
   member_moved: { category: 'account', subject: 'user', mutable: true },
   member_archived_open_work: { category: 'account', subject: 'user', mutable: false },
+  /** F23: open the department (for an archive, the department the recipient's share moved to). */
+  department_member_added: { category: 'account', subject: 'department', mutable: true },
+  department_member_removed: { category: 'account', subject: 'department', mutable: true },
+  department_archived: { category: 'account', subject: 'department', mutable: true },
   /** Part C rule 5: copies of the account emails, which are never switched off. */
   security_new_device: { category: 'account', subject: 'user', mutable: false },
   security_notice: { category: 'account', subject: 'user', mutable: false },
@@ -641,6 +649,9 @@ const CHANNELS: Record<NotificationType, Channels> = {
   department_manager_assigned: important(),
   member_moved: normal(),
   member_archived_open_work: important(),
+  department_member_added: informational,
+  department_member_removed: informational,
+  department_archived: informational,
   /** Part C rule 5: the account email is required and sent on its own (`emailSent`). */
   security_new_device: important('required'),
   security_notice: { ...informational, email: 'required' },
@@ -909,6 +920,9 @@ const ENGINE: Record<NotificationType, Engine> = {
   department_manager_assigned: opened,
   member_moved: info,
   member_archived_open_work: chain,
+  department_member_added: info,
+  department_member_removed: info,
+  department_archived: info,
   security_new_device: info,
   security_notice: info,
   /** "Needs you" when it requires an acknowledgement (`notificationBox`). */
@@ -1490,6 +1504,25 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   }),
   /** An archived member still owns `count` open items (campaigns: F01 rule 9 blocks the rest). */
   member_archived_open_work: z.object({ member: nameSchema, count: z.number().int().min(1) }),
+  /** F23: `member` is null in the member's own notice ("you"); `primary` is the kind they joined as. */
+  department_member_added: z.object({
+    department: departmentCodeSchema,
+    member: nameSchema.nullable(),
+    primary: z.boolean(),
+  }),
+  department_member_removed: z.object({
+    department: departmentCodeSchema,
+    member: nameSchema.nullable(),
+  }),
+  /**
+   * F23 rule 10: `department` was archived and moved to `target`. `received` is null in a moved
+   * member's notice, else the number of records the target's manager received.
+   */
+  department_archived: z.object({
+    department: departmentCodeSchema,
+    target: departmentCodeSchema,
+    received: z.number().int().min(1).nullable(),
+  }),
   /** Part C rule 5: F14 email rule 15, a sign-in from a new device. */
   security_new_device: z.object({ device: nameSchema, at: z.iso.datetime() }),
   /** F14 email rule 14: `by` is the user manager who made the change; null for the user. */

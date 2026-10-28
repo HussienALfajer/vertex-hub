@@ -237,6 +237,9 @@ const SAMPLES: Record<NotificationType, unknown> = {
   department_manager_assigned: { department: 'design' },
   member_moved: { member: 'سامر', left: ['design'], joined: ['photography'] },
   member_archived_open_work: { member: 'سامر', count: 3 },
+  department_member_added: { department: 'design', member: null, primary: false },
+  department_member_removed: { department: 'design', member: 'سامر' },
+  department_archived: { department: 'design', target: 'design', received: 3 },
   security_new_device: { device: 'Chrome على Windows', at: '2026-10-05T07:00:00.000Z' },
   security_notice: { change: 'roles_changed', by: 'رنا' },
   announcement: {
@@ -550,6 +553,31 @@ describe('finance, campaigns and people notices (F16 part C)', () => {
     expect(render('member_archived_open_work').text).toBe('أُرشف سامر وما زالت لديه 3 أعمال مفتوحة');
   });
 
+  it('tells members and managers about department membership and archives (F23)', () => {
+    const textOf = (type: NotificationType, data: unknown) =>
+      notificationText(sample(type, { data } as never), departmentName).text;
+    expect(render('department_member_added').text).toBe(
+      'أضافك رنا إلى قسم التصميم عضوًا ثانويًا',
+    );
+    expect(
+      textOf('department_member_added', { department: 'design', member: null, primary: true }),
+    ).toBe('أضافك رنا إلى قسم التصميم عضوًا أساسيًا');
+    expect(
+      textOf('department_member_added', { department: 'design', member: 'سامر', primary: true }),
+    ).toBe('انضم سامر إلى قسم التصميم');
+    expect(render('department_member_removed').text).toBe('غادر سامر قسم التصميم');
+    expect(textOf('department_member_removed', { department: 'design', member: null })).toBe(
+      'أزالك رنا من قسم التصميم',
+    );
+    expect(render('department_archived')).toEqual({
+      text: 'أرشف رنا قسم التصميم ونقل ما فيه إلى قسم التصميم',
+      context: 'وصل إلى قسمك 3 سجلات',
+    });
+    expect(
+      textOf('department_archived', { department: 'design', target: 'design', received: null }),
+    ).toBe('أرشف رنا قسم التصميم وانتقلت إلى قسم التصميم');
+  });
+
   it('copies the security emails, naming who made the change', () => {
     expect(render('security_notice').text).toBe('تغيّرت الأدوار المسندة إليك بواسطة رنا');
     expect(
@@ -568,6 +596,7 @@ describe('finance, campaigns and people notices (F16 part C)', () => {
     expect(link('campaign_assigned', 'campaign')).toBe(`/campaigns/${SUBJECT_ID}`);
     expect(link('department_manager_assigned', 'department')).toBe(`/departments/${SUBJECT_ID}`);
     expect(link('member_moved', 'user')).toBe(`/team/${SUBJECT_ID}`);
+    expect(link('department_archived', 'department')).toBe(`/departments/${SUBJECT_ID}`);
     expect(link('ad_deposit_recorded', 'client')).toBe(`/clients/${SUBJECT_ID}?tab=ads`);
     expect(link('security_new_device', 'user')).toBe('/account');
   });
