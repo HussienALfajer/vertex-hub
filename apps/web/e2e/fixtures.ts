@@ -28,6 +28,7 @@ import {
   type ApprovalRequest,
   type ApprovalRequestDetail,
   type ApprovalWithdrawnReason,
+  type ArchiveDepartment,
   type AssigneeLeave,
   type AttendanceDay,
   type AttendanceDayList,
@@ -126,6 +127,7 @@ import {
   type CreateContentSnippet,
   type CreateCycleAdjustment,
   type CreateCycleLine,
+  type CreateDepartment,
   type CreateExtraWork,
   type CreateHrRequest,
   type CreateMeeting,
@@ -179,12 +181,16 @@ import {
   cyclePeriod,
   DASHBOARD_LIMITS,
   DEFAULT_ESTIMATE_MINUTES,
+  DEPARTMENT_CAPABILITIES,
   DEPARTMENT_COLORS,
   type DeliverableKind,
+  type DepartmentArchivePreview,
   type DepartmentCode,
   type DepartmentDashboard,
   type DepartmentDetailResponse,
+  type DepartmentOverview,
   type DepartmentResponse,
+  type DepartmentTransferCategory,
   type DeviceMatch,
   type DuplicatePost,
   daysInclusive,
@@ -529,6 +535,7 @@ import {
   type UpdateContentPillar,
   type UpdateContentSnippet,
   type UpdateCycleLine,
+  type UpdateDepartment,
   type UpdateExtraWork,
   type UpdateFollowing,
   type UpdateMeeting,
@@ -1772,32 +1779,15 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     ]),
   );
 
-  const membersOf = (d: Department) =>
-    users.filter((u) => u.status !== 'archived' && u.departments.some((x) => x.id === d.id));
-  const departmentOf = (d: Department): DepartmentResponse => {
-    const head = users.find((u) => u.id === managers.get(d.id));
-    return {
-      ...d,
-      manager: head ? { id: head.id, name: head.name, imageId: head.imageId } : null,
-      memberCount: membersOf(d).length,
-    };
-  };
-  const departmentDetail = (d: Department): DepartmentDetailResponse => ({
-    ...departmentOf(d),
-    members: membersOf(d)
-      .map((u) => ({
-        id: u.id,
-        name: u.name,
-        imageId: u.imageId,
-        title: u.title,
-        isPrimary: u.departments.find((x) => x.id === d.id)?.isPrimary ?? false,
-        status: u.status === 'invited' ? ('invited' as const) : ('active' as const),
-      }))
-      .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
-    // F23: the screens of PR 3 read these; until then no grants are shown.
-    grants: { member: [], manager: [] },
-    systemFunctions: [...departmentSystemFunctions(d.code)],
-    archivedBy: null,
+  const departmentsApi = departmentRoutes({
+    users,
+    tasks,
+    tasksApi,
+    projects,
+    retainers,
+    catalog,
+    managers,
+    me: () => me,
   });
 
   await page.route('**/api/**', async (route) => {
@@ -2107,25 +2097,9 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
       return json(route, self);
     }
 
-    // Departments.
-    if (path === '/api/departments')
-      return json(route, { items: departmentsSeed.map(departmentOf) });
-    const departmentMatch = path.match(/^\/api\/departments\/([^/]+)$/);
-    if (departmentMatch) {
-      const department = departmentsSeed.find((d) => d.id === departmentMatch[1]);
-      if (!department) return fail(route, 404, null);
-      if (method === 'PATCH') {
-        const body = request.postDataJSON() as { managerId?: string | null };
-        if (body.managerId !== undefined) managers.set(department.id, body.managerId);
-        for (const user of users) {
-          user.departments = user.departments.map((x) => ({
-            ...x,
-            isManager: managers.get(x.id) === user.id,
-          }));
-        }
-      }
-      return json(route, departmentDetail(department));
-    }
+    // Departments (F01, F23), with the overview the API's reports module serves.
+    const departed = departmentsApi(route, method, url, request);
+    if (departed) return departed;
 
     // HR (F17), with the documents of an employee file and of a request, and the entrance screen.
     const attended = attendanceApi.route(route, method, url, request);
@@ -2224,7 +2198,15 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
     if (notified) return notified;
 
     if (path === '/api/audit') {
-      return json(route, { items: auditSeed, total: auditSeed.length, page: 1, pageSize: 30 });
+      // A record's history (F23 department history) asks for its own entries.
+      const entityType = url.searchParams.get('entityType');
+      const entityId = url.searchParams.get('entityId');
+      const items = auditSeed.filter(
+        (entry) =>
+          (!entityType || entry.entityType === entityType) &&
+          (!entityId || entry.entityId === entityId),
+      );
+      return json(route, { items, total: items.length, page: 1, pageSize: 30 });
     }
     reportApiProblem(page, `No mock for ${method} ${path}`);
     return fail(route, 404, null);
@@ -17024,6 +17006,343 @@ function campaignRoutes({
 }
 
 // Dashboards and reports (F15)
+
+interface DepartmentState {
+  users: UserResponse[];
+  tasks: TaskRecord[];
+  tasksApi: ReturnType<typeof taskRoutes>;
+  projects: ProjectRecord[];
+  retainers: RetainerRecord[];
+  catalog: CatalogRecords;
+  /** Department id → its manager's user id. */
+  managers: Map<string, string | null>;
+  me: () => MeResponse;
+}
+
+type DepartmentRecord = Omit<DepartmentResponse, 'manager' | 'memberCount'> & {
+  archivedById: string | null;
+};
+
+/**
+ * The departments of F01 and F23: the list in its order, identity, members, the archive with its
+ * transfer, restore, and the overview (served by `reports` in the API).
+ */
+function departmentRoutes({
+  users,
+  tasks,
+  tasksApi,
+  projects,
+  retainers,
+  catalog,
+  managers,
+  me,
+}: DepartmentState) {
+  const records: DepartmentRecord[] = departmentsSeed.map((d) => ({ ...d, archivedById: null }));
+  const scopes = (permission: Permission) =>
+    me().permissions.find((g) => g.permission === permission)?.scopes ?? [];
+  const person = (u: UserResponse) => ({ id: u.id, name: u.name, imageId: u.imageId });
+  const ordered = () => [
+    ...records.filter((d) => !d.archivedAt).sort((a, b) => a.position - b.position),
+    ...records.filter((d) => d.archivedAt),
+  ];
+  const membersOf = (d: DepartmentRecord) =>
+    users.filter((u) => u.status !== 'archived' && u.departments.some((x) => x.id === d.id));
+  const syncManagers = () => {
+    for (const user of users) {
+      user.departments = user.departments.map((x) => ({
+        ...x,
+        isManager: managers.get(x.id) === user.id,
+      }));
+    }
+  };
+  const departmentOf = (d: DepartmentRecord): DepartmentResponse => {
+    const { archivedById: _, ...record } = d;
+    const head = users.find((u) => u.id === managers.get(d.id));
+    return {
+      ...record,
+      manager: head ? person(head) : null,
+      memberCount: membersOf(d).length,
+    };
+  };
+  const grantsOf = (code: DepartmentCode, position: 'member' | 'manager') =>
+    Object.keys(
+      Object.entries(DEPARTMENT_CAPABILITIES).find(([key]) => key === code)?.[1]?.[position] ?? {},
+    ) as Permission[];
+  const detailOf = (d: DepartmentRecord): DepartmentDetailResponse => {
+    const archiver = users.find((u) => u.id === d.archivedById);
+    return {
+      ...departmentOf(d),
+      members: membersOf(d)
+        .map((u) => ({
+          id: u.id,
+          name: u.name,
+          imageId: u.imageId,
+          title: u.title,
+          isPrimary: u.departments.find((x) => x.id === d.id)?.isPrimary ?? false,
+          status: u.status === 'invited' ? ('invited' as const) : ('active' as const),
+        }))
+        .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
+      grants: { member: grantsOf(d.code, 'member'), manager: grantsOf(d.code, 'manager') },
+      systemFunctions: [...departmentSystemFunctions(d.code)],
+      archivedBy: archiver ? person(archiver) : null,
+    };
+  };
+  const openTasks = (d: DepartmentRecord) =>
+    tasks.filter((t) => !t.archived && isTaskOpen(t.status) && t.department === d.code);
+  const services = (d: DepartmentRecord) =>
+    catalog.services.filter((service) => service.department === d.code);
+  const engagements = (d: DepartmentRecord) => [
+    ...projects.filter(
+      (p) => !p.archived && OPEN_STATUSES.includes(p.status) && p.departments.includes(d.code),
+    ),
+    ...retainers.filter(
+      (r) =>
+        !r.archived &&
+        (r.status === 'active' || r.status === 'paused') &&
+        r.departments.includes(d.code),
+    ),
+  ];
+  const preview = (d: DepartmentRecord): DepartmentArchivePreview => {
+    const listed = (items: { id: string; name: string }[]) => ({
+      count: items.length,
+      items: items.slice(0, 5).map(({ id: itemId, name }) => ({ id: itemId, name })),
+    });
+    const members = membersOf(d);
+    return {
+      categories: [
+        { category: 'members', ...listed(members) },
+        { category: 'tasks', ...listed(openTasks(d).map((t) => ({ id: t.id, name: t.title }))) },
+        { category: 'questions', count: 0, items: [] },
+        { category: 'services', ...listed(services(d)) },
+        { category: 'templates', count: 0, items: [] },
+        { category: 'engagements', ...listed(engagements(d)) },
+      ],
+      systemFunctions: [...departmentSystemFunctions(d.code)],
+    };
+  };
+  const lastPosition = () =>
+    Math.max(0, ...records.filter((d) => !d.archivedAt).map((d) => d.position));
+  const nameTaken = (name: string, except?: string) =>
+    records.some((d) => d.id !== except && d.name.toLowerCase() === name.trim().toLowerCase());
+  const join = (user: UserResponse, d: DepartmentRecord, primary: boolean) => {
+    const others = user.departments
+      .filter((x) => x.id !== d.id)
+      .map((x) => (primary ? { ...x, isPrimary: false } : x));
+    const kept = user.departments.find((x) => x.id === d.id);
+    user.departments = [
+      ...others,
+      {
+        id: d.id,
+        code: d.code,
+        name: d.name,
+        isPrimary: primary || (kept?.isPrimary ?? false),
+        isManager: managers.get(d.id) === user.id,
+      },
+    ];
+  };
+
+  return (route: Route, method: string, url: URL, request: Request): Promise<void> | undefined => {
+    const path = url.pathname;
+    if (path === '/api/departments' && method === 'GET') {
+      return json(route, { items: ordered().map(departmentOf) });
+    }
+    if (path === '/api/departments' && method === 'POST') {
+      if (!scopes('departments.manage').length) return fail(route, 403, null);
+      const body = request.postDataJSON() as CreateDepartment;
+      if (nameTaken(body.name)) return fail(route, 409, 'DEPARTMENT_NAME_TAKEN');
+      const n = records.length + 1;
+      const created: DepartmentRecord = {
+        id: id(950 + n),
+        code: `d_test${n.toString().padStart(4, 'a')}`,
+        name: body.name.trim(),
+        description: body.description || null,
+        color: body.color,
+        icon: body.icon,
+        position: lastPosition() + 1,
+        archivedAt: null,
+        archivedById: null,
+      };
+      records.push(created);
+      managers.set(created.id, null);
+      return json(route, detailOf(created), 201);
+    }
+    if (path === '/api/departments/order' && method === 'PUT') {
+      if (!scopes('users.manage').length) return fail(route, 403, null);
+      const { ids } = request.postDataJSON() as { ids: string[] };
+      const active = records.filter((d) => !d.archivedAt);
+      if (ids.length !== active.length || active.some((d) => !ids.includes(d.id))) {
+        return fail(route, 409, 'DEPARTMENT_ORDER_MISMATCH');
+      }
+      for (const [index, departmentId] of ids.entries()) {
+        const department = records.find((d) => d.id === departmentId);
+        if (department) department.position = index + 1;
+      }
+      return json(route, { items: ordered().map(departmentOf) });
+    }
+    const match = path.match(/^\/api\/departments\/([^/]+)(?:\/(.+))?$/);
+    if (!match) return undefined;
+    const department = records.find((d) => d.id === match[1]);
+    if (!department) return fail(route, 404, null);
+    const action = match[2];
+    if (!action && method === 'GET') return json(route, detailOf(department));
+
+    if (action === 'overview') {
+      if (department.archivedAt) return fail(route, 409, 'DEPARTMENT_ARCHIVED');
+      const week = weekOf(PROJECTS_TODAY);
+      const own = openTasks(department);
+      const members = membersOf(department);
+      // Rule 25, as reports scope it: everything, or the departments the caller manages.
+      const reads =
+        scopes('reports.read').includes('all') ||
+        (scopes('reports.read').includes('department') &&
+          me().departments.some((x) => x.id === department.id && x.isManager));
+      const workload = (list: TaskRecord[]) => ({
+        open: list.length,
+        dueThisWeek: list.filter((t) => t.dueDate >= week.from && t.dueDate <= week.to).length,
+        overdue: list.filter(tasksApi.overdue).length,
+      });
+      const open = tasks.filter((t) => !t.archived && isTaskOpen(t.status));
+      const body: DepartmentOverview = {
+        week,
+        byStatus: OPEN_TASK_STATUSES.map((status) => ({
+          status,
+          count: own.filter((t) => t.status === status).length,
+        })),
+        overdue: workload(own).overdue,
+        dueThisWeek: workload(own).dueThisWeek,
+        unassigned: own.filter((t) => t.assigneeId === null).length,
+        services: services(department).filter((service) => !service.archivedAt).length,
+        projects: engagements(department).filter((e) => projects.some((p) => p.id === e.id)).length,
+        retainers: engagements(department).filter((e) => retainers.some((r) => r.id === e.id))
+          .length,
+        ...(reads && {
+          members: members.map((u) => ({
+            user: person(u),
+            ...workload(open.filter((t) => t.assigneeId === u.id)),
+          })),
+          onLeave: members.slice(0, 1).map((u) => ({
+            user: person(u),
+            startsOn: PROJECTS_TODAY,
+            endsOn: addDays(PROJECTS_TODAY, 2),
+          })),
+        }),
+      };
+      return json(route, body);
+    }
+
+    const manages = scopes('users.manage').length > 0;
+    const archives = scopes('departments.manage').length > 0;
+    if (!action && method === 'PATCH') {
+      if (!manages) return fail(route, 403, null);
+      if (department.archivedAt) return fail(route, 409, 'DEPARTMENT_ARCHIVED');
+      const body = request.postDataJSON() as UpdateDepartment;
+      if (body.name !== undefined && nameTaken(body.name, department.id)) {
+        return fail(route, 409, 'DEPARTMENT_NAME_TAKEN');
+      }
+      if (body.name !== undefined) department.name = body.name.trim();
+      if (body.description !== undefined) department.description = body.description || null;
+      if (body.color) department.color = body.color;
+      if (body.icon) department.icon = body.icon;
+      if (body.managerId !== undefined) managers.set(department.id, body.managerId);
+      syncManagers();
+      return json(route, detailOf(department));
+    }
+    if (action === 'archive-preview') {
+      if (!archives) return fail(route, 403, null);
+      if (department.archivedAt) return fail(route, 409, 'DEPARTMENT_ARCHIVED');
+      return json(route, preview(department));
+    }
+    if (action === 'archive') {
+      if (!archives) return fail(route, 403, null);
+      if (department.archivedAt) return fail(route, 409, 'DEPARTMENT_ARCHIVED');
+      const { targets } = request.postDataJSON() as ArchiveDepartment;
+      const target = (category: DepartmentTransferCategory) =>
+        records.find((d) => d.id === targets[category]);
+      for (const { category, count } of preview(department).categories) {
+        const chosen = target(category);
+        if (count > 0 && !targets[category]) return fail(route, 409, 'TRANSFER_TARGET_REQUIRED');
+        if (targets[category] && (!chosen || chosen.archivedAt || chosen.id === department.id)) {
+          return fail(route, 409, 'INVALID_TRANSFER_TARGET');
+        }
+      }
+      managers.set(department.id, null);
+      const people = target('members');
+      for (const user of membersOf(department)) {
+        const primary = user.departments.find((x) => x.id === department.id)?.isPrimary ?? false;
+        user.departments = user.departments.filter((x) => x.id !== department.id);
+        if (primary && people) join(user, people, true);
+      }
+      const work = target('tasks');
+      if (work) for (const task of openTasks(department)) task.department = work.code;
+      const performer = target('services');
+      if (performer)
+        for (const service of services(department)) service.department = performer.code;
+      const engagement = target('engagements');
+      if (engagement) {
+        for (const record of engagements(department)) {
+          record.departments = [
+            ...new Set(
+              record.departments.map((code) => (code === department.code ? engagement.code : code)),
+            ),
+          ];
+        }
+      }
+      department.archivedAt = '2026-10-10T09:00:00.000Z';
+      department.archivedById = me().user.id;
+      syncManagers();
+      return json(route, detailOf(department));
+    }
+    if (action === 'restore') {
+      if (!archives) return fail(route, 403, null);
+      if (!department.archivedAt) return fail(route, 409, 'DEPARTMENT_NOT_ARCHIVED');
+      department.position = lastPosition() + 1;
+      department.archivedAt = null;
+      department.archivedById = null;
+      return json(route, detailOf(department));
+    }
+
+    // Members (rules 17–21).
+    if (!manages) return fail(route, 403, null);
+    if (department.archivedAt) return fail(route, 409, 'DEPARTMENT_ARCHIVED');
+    if (action === 'members' && method === 'POST') {
+      const { userIds } = request.postDataJSON() as { userIds: string[] };
+      const joining = users.filter((u) => userIds.includes(u.id));
+      if (joining.some((u) => u.status === 'archived')) return fail(route, 409, 'USER_ARCHIVED');
+      if (joining.some((u) => u.departments.some((x) => x.id === department.id))) {
+        return fail(route, 409, 'ALREADY_MEMBER');
+      }
+      for (const user of joining) join(user, department, false);
+      return json(route, detailOf(department));
+    }
+    const memberMatch = action?.match(/^members\/([^/]+)(?:\/(primary|move))?$/);
+    if (!memberMatch) return undefined;
+    const user = membersOf(department).find((u) => u.id === memberMatch[1]);
+    if (!user) return fail(route, 404, null);
+    const membership = user.departments.find((x) => x.id === department.id);
+    const isManager = managers.get(department.id) === user.id;
+    if (memberMatch[2] === 'primary') {
+      join(user, department, true);
+      return json(route, detailOf(department));
+    }
+    if (isManager) return fail(route, 409, 'MANAGER_MEMBERSHIP_REQUIRED');
+    if (memberMatch[2] === 'move') {
+      const { departmentId } = request.postDataJSON() as { departmentId: string };
+      const next = records.find((d) => d.id === departmentId);
+      if (!next || next.archivedAt || next.id === department.id) {
+        return fail(route, 409, 'INVALID_TRANSFER_TARGET');
+      }
+      user.departments = user.departments.filter((x) => x.id !== department.id);
+      join(user, next, membership?.isPrimary ?? false);
+      return json(route, detailOf(department));
+    }
+    if (method === 'DELETE') {
+      if (membership?.isPrimary) return fail(route, 400, 'PRIMARY_DEPARTMENT_REQUIRED');
+      user.departments = user.departments.filter((x) => x.id !== department.id);
+      return json(route, detailOf(department));
+    }
+    return undefined;
+  };
+}
 
 interface ReportState {
   users: UserResponse[];
