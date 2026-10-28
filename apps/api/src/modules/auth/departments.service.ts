@@ -1,10 +1,18 @@
+import { randomBytes } from 'node:crypto';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  type CreateDepartment,
+  DEPARTMENT_CAPABILITIES,
   type DepartmentDetailResponse,
   type DepartmentListResponse,
+  type DepartmentOrder,
   type DepartmentResponse,
   departmentIconSchema,
+  departmentSystemFunctions,
+  generatedDepartmentCode,
   hasPermission,
+  PERMISSIONS,
+  type Permission,
   type UpdateDepartment,
 } from '@vertex-hub/contracts';
 import {
@@ -14,7 +22,7 @@ import {
   type Transaction,
   users,
 } from '@vertex-hub/db';
-import { aliasedTable, and, asc, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { aliasedTable, and, asc, desc, eq, isNull, max, ne, sql } from 'drizzle-orm';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
 import { changedFields, recordAudit } from '../audit/index.js';
@@ -24,6 +32,7 @@ import { departmentOrder } from './user-directory.js';
 import { hasPassword, lockAccessChanges } from './user-status.js';
 
 const managers = aliasedTable(users, 'managers');
+const archivers = aliasedTable(users, 'archivers');
 
 const memberCount = sql<number>`(
   select count(*)::int from ${departmentMembers}
@@ -46,7 +55,11 @@ const departmentFields = {
   memberCount,
 };
 
-/** Departments (ADR 0014, ADR 0043): names and managers are editable. */
+/**
+ * Departments (ADR 0014, ADR 0043, F23): the General Manager creates and restores them; user
+ * managers edit their identity, manager and order. Archiving is `DepartmentArchiveService`,
+ * members `DepartmentMembersService`.
+ */
 @Injectable()
 export class DepartmentsService {
   constructor(
@@ -66,11 +79,20 @@ export class DepartmentsService {
   /** Member status (invited or active) is shown to user managers only. */
   async detail(actor: CurrentUserInfo, id: string): Promise<DepartmentDetailResponse> {
     const [row] = await this.db
-      .select(departmentFields)
+      .select({
+        ...departmentFields,
+        archivedById: archivers.id,
+        archivedByName: archivers.name,
+        archivedByImageId: archivers.imageId,
+      })
       .from(departments)
       .leftJoin(managers, eq(managers.id, departments.managerId))
+      .leftJoin(archivers, eq(archivers.id, departments.archivedById))
       .where(eq(departments.id, id));
     if (!row) throw new NotFoundException();
+    const capabilities = DEPARTMENT_CAPABILITIES[row.code];
+    const granted = (grants: Partial<Record<Permission, unknown>> | undefined) =>
+      PERMISSIONS.filter((permission) => grants?.[permission] !== undefined);
     const members = await this.db
       .select({
         id: users.id,
@@ -91,7 +113,113 @@ export class DepartmentsService {
           ? { ...member, status: active ? 'active' : 'invited' }
           : member,
       ),
+      // Rule 27: what the department grants, read-only.
+      grants: { member: granted(capabilities?.member), manager: granted(capabilities?.manager) },
+      systemFunctions: [...departmentSystemFunctions(row.code)],
+      archivedBy: row.archivedById
+        ? { id: row.archivedById, name: row.archivedByName ?? '', imageId: row.archivedByImageId }
+        : null,
     };
+  }
+
+  /** Rule 2: no members, no manager, last in the order; the code is generated (ADR 0043). */
+  async create(actor: CurrentUserInfo, input: CreateDepartment): Promise<DepartmentDetailResponse> {
+    const id = await this.db.transaction(async (tx) => {
+      await lockAccessChanges(tx);
+      await this.assertNameFree(tx, input.name);
+      const fields = {
+        name: input.name,
+        description: input.description || null,
+        color: input.color,
+        icon: input.icon,
+      };
+      const [created] = await tx
+        .insert(departments)
+        .values({ code: await this.newCode(tx), ...fields, position: await nextPosition(tx) })
+        .returning({ id: departments.id });
+      if (!created) throw new Error('The department was not created');
+      await recordAudit(tx, {
+        actor: { id: actor.id, name: actor.name },
+        action: 'department.created',
+        entityType: 'department',
+        entityId: created.id,
+        after: fields,
+      });
+      return created.id;
+    });
+    return this.detail(actor, id);
+  }
+
+  /** Rule 4: the whole list of active departments, in its new order. */
+  async order(actor: CurrentUserInfo, input: DepartmentOrder): Promise<DepartmentListResponse> {
+    await this.db.transaction(async (tx) => {
+      await lockAccessChanges(tx);
+      const active = await tx
+        .select({ id: departments.id, position: departments.position })
+        .from(departments)
+        .where(isNull(departments.archivedAt));
+      const ids = new Set(input.ids);
+      if (
+        ids.size !== input.ids.length ||
+        ids.size !== active.length ||
+        active.some((department) => !ids.has(department.id))
+      ) {
+        throw new CodedException(
+          409,
+          'DEPARTMENT_ORDER_MISMATCH',
+          'The order must name every active department once',
+        );
+      }
+      const before = new Map(active.map((department) => [department.id, department.position]));
+      for (const [index, id] of input.ids.entries()) {
+        const position = index + 1;
+        const was = before.get(id);
+        if (was === position) continue;
+        await tx.update(departments).set({ position }).where(eq(departments.id, id));
+        await recordAudit(tx, {
+          actor: { id: actor.id, name: actor.name },
+          action: 'department.reordered',
+          entityType: 'department',
+          entityId: id,
+          before: { position: was },
+          after: { position },
+        });
+      }
+    });
+    return this.list();
+  }
+
+  /**
+   * Rule 16: back with no members and no manager, last in the order; nothing moved by the archive
+   * moves back.
+   */
+  async restore(actor: CurrentUserInfo, id: string): Promise<DepartmentDetailResponse> {
+    await this.db.transaction(async (tx) => {
+      await lockAccessChanges(tx);
+      const [current] = await tx
+        .select({ archivedAt: departments.archivedAt, position: departments.position })
+        .from(departments)
+        .where(eq(departments.id, id))
+        .for('update');
+      if (!current) throw new NotFoundException();
+      if (!current.archivedAt) {
+        throw new CodedException(409, 'DEPARTMENT_NOT_ARCHIVED', 'The department is not archived');
+      }
+      const position = await nextPosition(tx);
+      await tx
+        .update(departments)
+        .set({ archivedAt: null, archivedById: null, position })
+        .where(eq(departments.id, id));
+      await recordAudit(tx, {
+        actor: { id: actor.id, name: actor.name },
+        action: 'department.restored',
+        entityType: 'department',
+        entityId: id,
+        before: { archived: true, position: current.position },
+        after: { archived: false, position },
+      });
+    });
+    return this.detail(actor, id);
   }
 
   async update(
@@ -105,6 +233,9 @@ export class DepartmentsService {
         .select({
           code: departments.code,
           name: departments.name,
+          description: departments.description,
+          color: departments.color,
+          icon: departments.icon,
           managerId: departments.managerId,
           managerName: managers.name,
           archivedAt: departments.archivedAt,
@@ -119,19 +250,7 @@ export class DepartmentsService {
       }
 
       if (input.name !== undefined && input.name !== current.name) {
-        const [taken] = await tx
-          .select({ id: departments.id })
-          .from(departments)
-          .where(
-            and(sql`lower(${departments.name}) = lower(${input.name})`, ne(departments.id, id)),
-          );
-        if (taken) {
-          throw new CodedException(
-            409,
-            'DEPARTMENT_NAME_TAKEN',
-            'Another department has this name',
-          );
-        }
+        await this.assertNameFree(tx, input.name, id);
       }
 
       let manager: { id: string; name: string } | null | undefined;
@@ -142,14 +261,26 @@ export class DepartmentsService {
 
       const before = {
         name: current.name,
+        description: current.description,
+        color: current.color,
+        icon: current.icon,
         manager: current.managerId ? { id: current.managerId, name: current.managerName } : null,
       };
-      const change = changedFields(before, { name: input.name, manager });
+      const identity = {
+        name: input.name,
+        description: input.description === undefined ? undefined : input.description || null,
+        color: input.color,
+        icon: input.icon,
+      };
+      const change = changedFields(before, { ...identity, manager });
       if (!change) return;
       await tx
         .update(departments)
         .set({
-          ...(input.name !== undefined && { name: input.name }),
+          ...(identity.name !== undefined && { name: identity.name }),
+          ...(identity.description !== undefined && { description: identity.description }),
+          ...(identity.color !== undefined && { color: identity.color }),
+          ...(identity.icon !== undefined && { icon: identity.icon }),
           ...(manager !== undefined && { managerId: manager?.id ?? null }),
         })
         .where(eq(departments.id, id));
@@ -196,6 +327,34 @@ export class DepartmentsService {
         data: { role: 'department_manager', record: name, holder: manager.name },
       },
     ]);
+  }
+
+  /** Rule 3: names are unique regardless of case, archived departments included. */
+  private async assertNameFree(tx: Transaction, name: string, exceptId?: string): Promise<void> {
+    const [taken] = await tx
+      .select({ id: departments.id })
+      .from(departments)
+      .where(
+        and(
+          sql`lower(${departments.name}) = lower(${name})`,
+          exceptId ? ne(departments.id, exceptId) : undefined,
+        ),
+      );
+    if (taken) {
+      throw new CodedException(409, 'DEPARTMENT_NAME_TAKEN', 'Another department has this name');
+    }
+  }
+
+  /** A generated code nobody holds yet (ADR 0043). */
+  private async newCode(tx: Transaction): Promise<string> {
+    for (;;) {
+      const code = generatedDepartmentCode(randomBytes(8));
+      const [taken] = await tx
+        .select({ id: departments.id })
+        .from(departments)
+        .where(eq(departments.code, code));
+      if (!taken) return code;
+    }
   }
 
   /** A manager must be an active member of the department (F01 rule 8). */
@@ -255,4 +414,13 @@ function toDepartment(row: {
       : null,
     memberCount: row.memberCount,
   };
+}
+
+/** The place after the last active department (rules 2 and 16). */
+async function nextPosition(tx: Transaction): Promise<number> {
+  const [last] = await tx
+    .select({ value: max(departments.position) })
+    .from(departments)
+    .where(isNull(departments.archivedAt));
+  return (last?.value ?? 0) + 1;
 }

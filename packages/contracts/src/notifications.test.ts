@@ -102,6 +102,10 @@ describe('notification catalog', () => {
         'attendance_month_closed',
         'field_punch_recorded',
         'field_punch_rejected',
+        // F23.
+        'department_member_added',
+        'department_member_removed',
+        'department_archived',
         // F16 part C: the new types of the sales and engagement modules.
         'responsibility_moved',
         'client_status_changed',

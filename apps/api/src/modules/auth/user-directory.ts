@@ -349,6 +349,18 @@ export class UserDirectory implements OnModuleInit {
     return [...members.values()];
   }
 
+  /** A department by id, archived or not; null when there is none. */
+  async department(
+    id: string,
+    executor: Database | Transaction = this.db,
+  ): Promise<{ id: string; code: DepartmentCode; archived: boolean } | null> {
+    const [row] = await executor
+      .select({ id: departments.id, code: departments.code, archivedAt: departments.archivedAt })
+      .from(departments)
+      .where(eq(departments.id, id));
+    return row ? { id: row.id, code: row.code, archived: !!row.archivedAt } : null;
+  }
+
   /** The managers of each of the departments, by code; a department without one is left out. */
   async departmentManagers(
     codes: DepartmentCode[],
@@ -441,10 +453,13 @@ export class UserDirectory implements OnModuleInit {
   ): Promise<void> {
     const unique = [...new Set(codes)];
     if (unique.length === 0) return;
+    // A share lock waits for an archive in progress (F23 rule 12, edge case 2): the write then
+    // reads the department as archived, instead of adding work the archive did not move.
     const rows = await executor
       .select({ archivedAt: departments.archivedAt })
       .from(departments)
-      .where(inArray(departments.code, unique));
+      .where(inArray(departments.code, unique))
+      .for('share');
     if (rows.length !== unique.length) {
       throw new CodedException(400, 'UNKNOWN_DEPARTMENT', 'A department does not exist');
     }

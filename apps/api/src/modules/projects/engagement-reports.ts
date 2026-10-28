@@ -6,6 +6,7 @@ import {
   type Cycle,
   type CycleReport,
   cyclePeriod,
+  type DepartmentCode,
   deliveryRate,
   OPEN_PROJECT_STATUSES,
   type ProjectStatus,
@@ -13,7 +14,19 @@ import {
   type ReportPeriod,
 } from '@vertex-hub/contracts';
 import { type Database, projectMilestones, projects, retainers } from '@vertex-hub/db';
-import { and, asc, count, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import {
+  and,
+  arrayContains,
+  asc,
+  count,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { businessDateSql, inBusinessPeriod } from '../../core/database/business-date.js';
 import { DATABASE } from '../../core/database/database.module.js';
 import { ClientDirectory } from '../clients/index.js';
@@ -85,6 +98,40 @@ export class EngagementReports {
       projects: OPEN_PROJECT_STATUSES.map((status) => ({ status, count: counts.get(status) ?? 0 })),
       retainers: active?.value ?? 0,
     };
+  }
+
+  /**
+   * F23 rule 24: open projects and active or paused retainers listing the department (of live
+   * clients, as the lists show them).
+   */
+  async departmentCounts(
+    department: DepartmentCode,
+  ): Promise<{ projects: number; retainers: number }> {
+    const [[open], [live]] = await Promise.all([
+      this.db
+        .select({ value: count() })
+        .from(projects)
+        .where(
+          and(
+            arrayContains(projects.departments, [department]),
+            inArray(projects.status, [...OPEN_PROJECT_STATUSES]),
+            isNull(projects.archivedAt),
+            this.clients.isLive(projects.clientId),
+          ),
+        ),
+      this.db
+        .select({ value: count() })
+        .from(retainers)
+        .where(
+          and(
+            arrayContains(retainers.departments, [department]),
+            inArray(retainers.status, ['active', 'paused']),
+            isNull(retainers.archivedAt),
+            this.clients.isLive(retainers.clientId),
+          ),
+        ),
+    ]);
+    return { projects: open?.value ?? 0, retainers: live?.value ?? 0 };
   }
 
   /** Open projects per client. */

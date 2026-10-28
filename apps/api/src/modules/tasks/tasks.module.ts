@@ -16,6 +16,7 @@ import { TaskApprovals } from './task-approvals.js';
 import { TaskCommentsController } from './task-comments.controller.js';
 import { TaskCommentsService } from './task-comments.service.js';
 import { TaskCreation } from './task-creation.js';
+import { TaskDepartmentTransfers } from './task-department-transfers.js';
 import { TaskDigest } from './task-digest.js';
 import { TaskFileOwner } from './task-file-owner.js';
 import { TaskGenerator } from './task-generator.js';
@@ -67,7 +68,8 @@ import { TasksService } from './tasks.service.js';
  * task with its parts in one transaction, checks readiness and shows estimates against `hr`'s
  * `WorkCapacity`, draws a project's tree, and exports `TaskTemplates` (snapshots and draft
  * assignees) and the `TaskTemplateHooks` registry, where `templates` records the run of a task
- * template, for the `templates` module (F06B part D).
+ * template, for the `templates` module (F06B part D). Moves an archived department's open tasks
+ * and questions through `auth`'s `DepartmentTransfers` (F23).
  */
 @Module({
   imports: [AuthModule, ClientsModule, ProjectsModule, NotificationsModule, FilesModule, HrModule],
@@ -114,6 +116,7 @@ import { TasksService } from './tasks.service.js';
     TaskTreeService,
     TaskTemplates,
     TaskTemplateHooks,
+    TaskDepartmentTransfers,
   ],
   exports: [
     TaskGenerator,

@@ -464,6 +464,25 @@ export const NOTIFICATION_TEXT = {
     many: 'أُرشف {{member}} وما زال لديه {{n}} عملًا مفتوحًا',
     other: 'أُرشف {{member}} وما زال لديه {{n}} عمل مفتوح',
   },
+  department_member_added: {
+    primary: 'أضافك {{actor}} إلى قسم {{department}} عضوًا أساسيًا',
+    secondary: 'أضافك {{actor}} إلى قسم {{department}} عضوًا ثانويًا',
+    other: 'انضم {{member}} إلى قسم {{department}}',
+  },
+  department_member_removed: {
+    self: 'أزالك {{actor}} من قسم {{department}}',
+    other: 'غادر {{member}} قسم {{department}}',
+  },
+  department_archived: 'أرشف {{actor}} قسم {{department}} ونقل ما فيه إلى قسم {{target}}',
+  departmentArchivedMember: 'أرشف {{actor}} قسم {{department}} وانتقلت إلى قسم {{target}}',
+  departmentReceived: {
+    zero: '',
+    one: 'وصل إلى قسمك سجل واحد',
+    two: 'وصل إلى قسمك سجلان',
+    few: 'وصل إلى قسمك {{n}} سجلات',
+    many: 'وصل إلى قسمك {{n}} سجلًا',
+    other: 'وصل إلى قسمك {{n}} سجل',
+  },
   security_new_device: 'سُجّل الدخول إلى حسابك من جهاز جديد: {{device}}',
   security_notice: {
     by: '{{what}} بواسطة {{by}}',
@@ -1488,6 +1507,42 @@ export function notificationText(
         ),
       };
     }
+    case 'department_member_added': {
+      const { data } = notification;
+      const department = departmentName(data.department) || data.department;
+      const forms = text.department_member_added;
+      return {
+        text: data.member
+          ? fill(forms.other, { member: data.member, department })
+          : fill(data.primary ? forms.primary : forms.secondary, { actor, department }),
+        context: null,
+      };
+    }
+    case 'department_member_removed': {
+      const { data } = notification;
+      const department = departmentName(data.department) || data.department;
+      const forms = text.department_member_removed;
+      return {
+        text: data.member
+          ? fill(forms.other, { member: data.member, department })
+          : fill(forms.self, { actor, department }),
+        context: null,
+      };
+    }
+    case 'department_archived': {
+      const { data } = notification;
+      const values = {
+        actor,
+        department: departmentName(data.department) || data.department,
+        target: departmentName(data.target) || data.target,
+      };
+      return data.received === null
+        ? { text: fill(text.departmentArchivedMember, values), context: null }
+        : {
+            text: fill(text.department_archived, values),
+            context: counted(text.departmentReceived, data.received, {}),
+          };
+    }
     case 'member_archived_open_work':
       return {
         text: counted(text.member_archived_open_work, notification.data.count, {
@@ -1784,7 +1839,7 @@ type TaskNotification = Exclude<
       | `payment_${string}`
       | 'ad_deposit_recorded'
       | `campaign_${string}`
-      | 'department_manager_assigned'
+      | `department_${string}`
       | `member_${string}`
       | `security_${string}`
       | 'probation_ending'

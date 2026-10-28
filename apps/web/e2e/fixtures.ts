@@ -195,6 +195,7 @@ import {
   decideItemSchema,
   defaultInstallmentMilestones,
   deliveryRate,
+  departmentSystemFunctions,
   deviceMatch,
   deviceOf,
   EMPHASIS_MARK,
@@ -1793,6 +1794,10 @@ export async function mockApi(page: Page, options: MockOptions): Promise<MockedA
         status: u.status === 'invited' ? ('invited' as const) : ('active' as const),
       }))
       .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
+    // F23: the screens of PR 3 read these; until then no grants are shown.
+    grants: { member: [], manager: [] },
+    systemFunctions: [...departmentSystemFunctions(d.code)],
+    archivedBy: null,
   });
 
   await page.route('**/api/**', async (route) => {

@@ -2,8 +2,8 @@
 
 Spec: `docs/specs/F23-departments-management.md` (Approved 2026-10-28) · ADR 0043 · PR split from the spec (1 records, 2 API, 3 screens).
 
-- Branch: `claude/wizardly-galileo-lr0tiv` (cloud session's designated branch; PR 1)
-- Stopped at: PR 1 open with auto-merge (`pnpm verify` passed, reviewer findings fixed); next: once it merges, PR 2 (Departments API) from `main` — first settle the open item on the list query with the owner
+- Branch: `claude/clever-ride-6p9y8q` (cloud session's designated branch; PR 2). PR 1 merged (#192).
+- Stopped at: PR 2 open with auto-merge (`pnpm verify` passed, reviewer's finding fixed: `assertActiveDepartments` takes a share lock); next: once it merges, PR 3 (Departments screens) from `main`
 
 ## PR 1 — Departments as records (contracts, db, api, web adjustments; no new screens)
 - [x] contracts: `departmentCodeSchema` as the pattern `^[a-z][a-z0-9_]{1,39}$`; `SYSTEM_DEPARTMENT_CODES` (today's `DEPARTMENT_CODES`); `DEPARTMENT_CAPABILITIES` and `DEPARTMENT_BRIEF_KINDS` keyed by system codes; `DEPARTMENT_COLORS`, `DEPARTMENT_ICONS`, `DEPARTMENT_SYSTEM_FUNCTIONS`; `departmentResponseSchema` gains `description`, `color`, `icon`, `position`, `archivedAt`; error code `DEPARTMENT_ARCHIVED` (`UNKNOWN_DEPARTMENT` exists); unit tests (pattern, system functions cover the capability keys)
@@ -14,11 +14,12 @@ Spec: `docs/specs/F23-departments-management.md` (Approved 2026-10-28) · ADR 00
 - [x] wiring checklist, checks, reviewer, PR with auto-merge
 
 ## PR 2 — Departments API
-- [ ] contracts: `departments.manage` (General Manager through `everything`); create, update, order, archive preview, archive, member and overview schemas; error codes (`DEPARTMENT_NAME_TAKEN`, `DEPARTMENT_ORDER_MISMATCH`, `TRANSFER_TARGET_REQUIRED`, `INVALID_TRANSFER_TARGET`, `DEPARTMENT_NOT_ARCHIVED`, `ALREADY_MEMBER`, `MANAGER_MEMBERSHIP_REQUIRED`); audit actions; notification types `department_member_added`, `department_member_removed`, `department_archived` (with `ar.json` and `packages/messages` texts)
-- [ ] api: create, edit identity, order, archive preview and transfer (one transaction, exported services of tasks, catalog, quotes, templates, projects, retainers), restore, members (add, primary, move, remove), overview; audit and notices; `test/departments.test.ts` per endpoint and rule; architecture test
-- [ ] list query `archived` (`users.manage` beyond `false`): keep archived departments' names readable for rule 7 (a closed task shows "Design (archived)" to every employee), since the web reads names from this list; settle with the owner before building
-- [ ] bridge: `openapi:export`, `api:generate`
-- [ ] wiring checklist, checks, reviewer, PR with auto-merge
+- [x] db (`/db-migration`): the three notification types in `notification_type`; `departments.archived_by_id` (rule 26: who archived it)
+- [x] contracts: `departments.manage` (General Manager through `everything`); create, update, order, archive preview, archive, member and overview schemas; error codes (`DEPARTMENT_NAME_TAKEN`, `DEPARTMENT_ORDER_MISMATCH`, `TRANSFER_TARGET_REQUIRED`, `INVALID_TRANSFER_TARGET`, `DEPARTMENT_NOT_ARCHIVED`, `ALREADY_MEMBER`, `MANAGER_MEMBERSHIP_REQUIRED`); audit actions; notification types `department_member_added`, `department_member_removed`, `department_archived` (with `ar.json` and `packages/messages` texts)
+- [x] api: create, edit identity, order, archive preview and transfer (one transaction, exported services of tasks, catalog, quotes, templates, projects, retainers), restore, members (add, primary, move, remove), overview; audit and notices; `test/departments.test.ts` per endpoint and rule; architecture test
+- [x] list query settled (owner, 2026-10-28): `GET /api/departments` keeps returning active then archived departments to `users.read`, so every employee reads archived names (rule 7); only the screen's "Archived" toggle is for `users.manage`. Spec updated
+- [x] bridge: `openapi:export`, `api:generate`
+- [x] wiring checklist, checks, reviewer, PR with auto-merge
 
 ## PR 3 — Departments screens
 - [ ] ui: `--department-1` … `--department-8` tokens (light and dark) with contrast checks

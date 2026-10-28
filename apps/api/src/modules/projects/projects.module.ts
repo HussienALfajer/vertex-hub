@@ -12,6 +12,7 @@ import { ContractSettingsService } from './contract-settings.service.js';
 import { ContractSources } from './contract-sources.js';
 import { CycleClosedHooks } from './cycle-closed-hooks.js';
 import { CycleOpenedHooks } from './cycle-opened-hooks.js';
+import { EngagementDepartmentTransfers } from './engagement-department-transfers.js';
 import { EngagementDirectory } from './engagement-directory.js';
 import { EngagementFactory } from './engagement-factory.js';
 import { EngagementFileOwners } from './engagement-file-owners.js';
@@ -58,7 +59,8 @@ import { WorkProgress } from './work-progress.js';
  * `EngagementReports` for `reports` (F15). Holds the contract settings and default articles,
  * and the retainer contracts and annexes with their PDFs (F05C): `ContractSources` takes contract
  * numbers and payment terms from `invoices` and quote services from `quotes`; the contract owner
- * policy is registered in `files`.
+ * policy is registered in `files`. Moves the departments of an archived department's open projects
+ * and live retainers through `auth`'s `DepartmentTransfers` (F23).
  */
 @Module({
   imports: [AuthModule, ClientsModule, NotificationsModule, FilesModule],
@@ -75,6 +77,7 @@ import { WorkProgress } from './work-progress.js';
     RetainerContractsController,
   ],
   providers: [
+    EngagementDepartmentTransfers,
     ProjectsService,
     ProjectMilestonesService,
     RetainersService,

@@ -295,6 +295,11 @@
     "MANAGER_MEMBERSHIP_REQUIRED": "لا يمكن إخراج المستخدم من قسم يديره. غيّر مدير القسم أولًا.",
     "DEPARTMENT_NAME_TAKEN": "يوجد قسم آخر بهذا الاسم.",
     "DEPARTMENT_ARCHIVED": "هذا القسم مؤرشف. اختر قسمًا نشطًا.",
+    "DEPARTMENT_NOT_ARCHIVED": "هذا القسم ليس مؤرشفًا.",
+    "DEPARTMENT_ORDER_MISMATCH": "تغيّرت قائمة الأقسام أثناء الترتيب. أعد تحميلها ثم رتّبها من جديد.",
+    "TRANSFER_TARGET_REQUIRED": "اختر قسمًا تنتقل إليه كل فئة فيها شيء.",
+    "INVALID_TRANSFER_TARGET": "القسم المختار للنقل غير صالح: اختر قسمًا نشطًا آخر.",
+    "ALREADY_MEMBER": "أحد المستخدمين المختارين عضو في القسم من قبل.",
     "LINK_INVALID": "الرابط غير صالح أو انتهت صلاحيته.",
     "CURRENT_SESSION": "لا يمكن تسجيل الخروج من هذا الجهاز من هنا.",
     "CLIENT_NAME_TAKEN": "يوجد عميل آخر بهذا الاسم التجاري.",
@@ -1030,7 +1035,14 @@
         "image_removed": "أزال الصورة"
       },
       "department": {
-        "updated": "عدّل قسمًا"
+        "created": "أنشأ قسمًا",
+        "updated": "عدّل قسمًا",
+        "reordered": "غيّر ترتيب الأقسام",
+        "member_added": "أضاف عضوًا إلى قسم",
+        "member_removed": "أزال عضوًا من قسم",
+        "primary_changed": "غيّر القسم الأساسي لعضو",
+        "archived": "أرشف قسمًا",
+        "restored": "استعاد قسمًا"
       },
       "client": {
         "created": "أنشأ عميلًا",
@@ -1477,6 +1489,9 @@
       }
     },
     "fields": {
+      "icon": "الأيقونة",
+      "targets": "أقسام النقل",
+      "moved": "ما نُقل",
       "push": "إشعارات الأجهزة",
       "pastCycles": "الدورات السابقة",
       "startMonth": "شهر البداية",
@@ -1897,7 +1912,8 @@
       "task_linked": "رُبطت به مهمة",
       "retainer_ended": "انتهى العقد الشهري",
       "end_action_changed": "تغيّر ما يحدث عند نهاية المدة",
-      "quote_renewal": "جُدّد بعرض سعر"
+      "quote_renewal": "جُدّد بعرض سعر",
+      "department_archived": "أُرشف القسم ونُقل عمله"
     },
     "amendmentKinds": {
       "change": "تعديل",
@@ -5323,6 +5339,9 @@
       "department_manager_assigned": "تعييني مديرًا لقسم",
       "member_moved": "تغيّر أقسام أحد الأعضاء",
       "member_archived_open_work": "أرشفة عضو ما زال لديه عمل مفتوح",
+      "department_member_added": "انضمام عضو إلى قسم",
+      "department_member_removed": "مغادرة عضو قسمًا",
+      "department_archived": "أرشفة قسم ونقل ما فيه",
       "security_new_device": "تسجيل دخول من جهاز جديد",
       "security_notice": "تغيير أمني على حسابي",
       "push_device_lost": "توقف الإشعارات على أحد أجهزتي",

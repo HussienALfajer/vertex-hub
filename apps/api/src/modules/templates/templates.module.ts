@@ -6,6 +6,7 @@ import { NotificationsModule } from '../notifications/index.js';
 import { ProjectsModule } from '../projects/index.js';
 import { TasksModule } from '../tasks/index.js';
 import { RetainerTemplatesController } from './retainer-templates.controller.js';
+import { TemplateDepartmentTransfers } from './template-department-transfers.js';
 import { TemplateDirectory } from './template-directory.js';
 import { TemplateRunner } from './template-runner.js';
 import { TemplateRunsController } from './template-runs.controller.js';
@@ -22,11 +23,19 @@ import { TemplatesService } from './templates.service.js';
  * notifies each run's assignees and department managers through `notifications` (F14). Exports
  * `TemplateDirectory` (names, kinds, archived state) for the catalog (F04) and `TemplateRunner`
  * (project runs and monthly links inside another module's transaction) for quotes (F04 A01).
+ * Moves the steps and default assignees of an archived department through `auth`'s
+ * `DepartmentTransfers` (F23).
  */
 @Module({
   imports: [AuthModule, ClientsModule, HrModule, ProjectsModule, TasksModule, NotificationsModule],
   controllers: [TemplatesController, TemplateRunsController, RetainerTemplatesController],
-  providers: [TemplatesService, TemplateRunsService, TemplateDirectory, TemplateRunner],
+  providers: [
+    TemplatesService,
+    TemplateRunsService,
+    TemplateDirectory,
+    TemplateRunner,
+    TemplateDepartmentTransfers,
+  ],
   exports: [TemplateDirectory, TemplateRunner],
 })
 export class TemplatesModule {}

@@ -67,6 +67,9 @@ describe('permission map', () => {
     for (const permission of ['users.manage', 'audit.read', 'templates.manage'] as const) {
       expect(hasPermission(access(others), permission)).toBe(false);
     }
+    // F23: only the General Manager creates, archives and restores departments.
+    expect(hasPermission(access(others), 'departments.manage')).toBe(false);
+    expect(hasPermission(access(['general_manager']), 'departments.manage')).toBe(true);
     expect(hasPermission(access(['employee']), 'templates.read')).toBe(true);
   });
 

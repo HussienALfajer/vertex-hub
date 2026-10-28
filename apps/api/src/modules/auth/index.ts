@@ -8,6 +8,11 @@ export {
 export { AuthModule } from './auth.module.js';
 export { createUser, type NewUser } from './create-user.js';
 export { CurrentUser, type CurrentUserInfo } from './current-user.decorator.js';
+export {
+  type DepartmentTransfer,
+  DepartmentTransfers,
+  type TransferPreview,
+} from './department-transfers.js';
 export { deviceCookie } from './device-cookie.js';
 export { type DevicePushLookup, DevicePushStates } from './device-push-states.js';
 export { resetTwoFactor, userIdByEmail } from './reset-two-factor.js';

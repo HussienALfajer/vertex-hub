@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { personSchema } from './images.js';
+import { permissionSchema } from './permissions.js';
 
 /**
  * The ten seeded departments (ADR 0014, ADR 0043). Their codes never change; behavior keyed by
@@ -86,7 +87,23 @@ export const departmentIconSchema = z.enum(DEPARTMENT_ICONS).meta({ id: 'Departm
 
 export type DepartmentIcon = z.infer<typeof departmentIconSchema>;
 
-/** The functions a system department performs (F23 rule 30); the screens translate the keys. */
+/** Every system function a department can perform (F23 rule 30); the screens translate them. */
+export const DEPARTMENT_FUNCTIONS = [
+  'escalations',
+  'user_management',
+  'medical_review',
+  'lead_ownership',
+  'content_review',
+  'shoots',
+] as const;
+
+export const departmentSystemFunctionSchema = z
+  .enum(DEPARTMENT_FUNCTIONS)
+  .meta({ id: 'DepartmentSystemFunction' });
+
+export type DepartmentSystemFunction = z.infer<typeof departmentSystemFunctionSchema>;
+
+/** The functions a system department performs (F23 rule 30). */
 export const DEPARTMENT_SYSTEM_FUNCTIONS = {
   internal_operations: ['escalations', 'user_management'],
   medical_consultation: ['medical_review'],
@@ -94,10 +111,7 @@ export const DEPARTMENT_SYSTEM_FUNCTIONS = {
   marketing: ['lead_ownership'],
   content_management: ['content_review'],
   photography: ['shoots'],
-} as const satisfies Partial<Record<SystemDepartmentCode, readonly string[]>>;
-
-export type DepartmentSystemFunction =
-  (typeof DEPARTMENT_SYSTEM_FUNCTIONS)[keyof typeof DEPARTMENT_SYSTEM_FUNCTIONS][number];
+} as const satisfies Partial<Record<SystemDepartmentCode, readonly DepartmentSystemFunction[]>>;
 
 /** The system functions of a department; none for a department added by the General Manager. */
 export function departmentSystemFunctions(
@@ -164,14 +178,103 @@ export const departmentDetailResponseSchema = departmentResponseSchema
         status: z.enum(['invited', 'active']).optional(),
       }),
     ),
+    /** F23 rule 27: what members and the manager receive (system departments only). */
+    grants: z.object({ member: z.array(permissionSchema), manager: z.array(permissionSchema) }),
+    systemFunctions: z.array(departmentSystemFunctionSchema),
+    /** Rule 26: who archived it; null while active. */
+    archivedBy: personSchema.nullable(),
   })
   .meta({ id: 'DepartmentDetail' });
 
 export type DepartmentDetailResponse = z.infer<typeof departmentDetailResponseSchema>;
 
-export const updateDepartmentSchema = z
-  .object({ name: departmentNameSchema, managerId: z.uuid().nullable() })
+export const departmentDescriptionSchema = z.string().trim().max(500);
+
+/** F23 rule 2: a new department starts with no members and no manager, last in the order. */
+export const createDepartmentSchema = z
+  .object({
+    name: departmentNameSchema,
+    /** Plain text; empty clears it. */
+    description: departmentDescriptionSchema.nullable().optional(),
+    color: departmentColorSchema,
+    icon: departmentIconSchema,
+  })
+  .meta({ id: 'CreateDepartment' });
+
+export type CreateDepartment = z.infer<typeof createDepartmentSchema>;
+
+export const updateDepartmentSchema = createDepartmentSchema
+  .extend({ managerId: z.uuid().nullable() })
   .partial()
   .meta({ id: 'UpdateDepartment' });
 
 export type UpdateDepartment = z.infer<typeof updateDepartmentSchema>;
+
+/** F23 rule 4: every active department's id, in the new order. */
+export const departmentOrderSchema = z
+  .object({ ids: z.array(z.uuid()).min(1).max(200) })
+  .meta({ id: 'DepartmentOrder' });
+
+export type DepartmentOrder = z.infer<typeof departmentOrderSchema>;
+
+/** F23 rule 17: up to 20 users join as secondary members, all or nothing. */
+export const addDepartmentMembersSchema = z
+  .object({ userIds: z.array(z.uuid()).min(1).max(20) })
+  .meta({ id: 'AddDepartmentMembers' });
+
+export type AddDepartmentMembers = z.infer<typeof addDepartmentMembersSchema>;
+
+/** F23 rule 19: the active department the membership moves to. */
+export const moveDepartmentMemberSchema = z
+  .object({ departmentId: z.uuid() })
+  .meta({ id: 'MoveDepartmentMember' });
+
+export type MoveDepartmentMember = z.infer<typeof moveDepartmentMemberSchema>;
+
+/** What an archive moves, by category (F23 rule 8). */
+export const DEPARTMENT_TRANSFER_CATEGORIES = [
+  'members',
+  'tasks',
+  'questions',
+  'services',
+  'templates',
+  'engagements',
+] as const;
+
+export const departmentTransferCategorySchema = z
+  .enum(DEPARTMENT_TRANSFER_CATEGORIES)
+  .meta({ id: 'DepartmentTransferCategory' });
+
+export type DepartmentTransferCategory = z.infer<typeof departmentTransferCategorySchema>;
+
+/** One record an archive moves, as the wizard's short list names it. */
+export const departmentTransferItemSchema = z
+  .object({ id: z.uuid(), name: z.string() })
+  .meta({ id: 'DepartmentTransferItem' });
+
+export type DepartmentTransferItem = z.infer<typeof departmentTransferItemSchema>;
+
+export const departmentArchivePreviewSchema = z
+  .object({
+    /** Every category, empty ones with a count of zero. */
+    categories: z.array(
+      z.object({
+        category: departmentTransferCategorySchema,
+        count: z.number().int().min(0),
+        /** The first five. */
+        items: z.array(departmentTransferItemSchema).max(5),
+      }),
+    ),
+    /** Rule 15: what falls to the General Manager while the department is archived. */
+    systemFunctions: z.array(departmentSystemFunctionSchema),
+  })
+  .meta({ id: 'DepartmentArchivePreview' });
+
+export type DepartmentArchivePreview = z.infer<typeof departmentArchivePreviewSchema>;
+
+/** F23 rule 9: one active target per non-empty category. */
+export const archiveDepartmentSchema = z
+  .object({ targets: z.partialRecord(departmentTransferCategorySchema, z.uuid()) })
+  .meta({ id: 'ArchiveDepartment' });
+
+export type ArchiveDepartment = z.infer<typeof archiveDepartmentSchema>;

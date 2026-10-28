@@ -156,6 +156,8 @@ const SYSTEM_REASONS = [
   'retainer_ended',
   'end_action_changed',
   'quote_renewal',
+  // F23: work moved off an archived department.
+  'department_archived',
 ] as const;
 
 /** Translates a value from one of the contract's fixed lists, or returns undefined. */
