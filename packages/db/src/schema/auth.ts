@@ -160,11 +160,14 @@ export const departments = pgTable(
     managerId: uuid('manager_id').references(() => users.id),
     ...timestamps(),
     archivedAt: archivedAt(),
+    /** Who archived it (F23 rule 26); cleared by restoring. */
+    archivedById: uuid('archived_by_id').references(() => users.id),
   },
   (table) => [
     // "Design" and "design" are the same name (F01 rule 21).
     uniqueIndex('departments_name_idx').on(sql`lower(${table.name})`),
     index('departments_manager_id_idx').on(table.managerId),
+    index('departments_archived_by_id_idx').on(table.archivedById),
   ],
 );
 
