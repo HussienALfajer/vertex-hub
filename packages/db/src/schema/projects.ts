@@ -16,7 +16,6 @@ import {
 import { users } from './auth.js';
 import { clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
-import { departmentCodeEnum } from './department-codes.js';
 import { images } from './images.js';
 
 /*
@@ -42,7 +41,8 @@ export const projects = pgTable(
     projectManagerId: uuid('project_manager_id')
       .notNull()
       .references(() => users.id),
-    departments: departmentCodeEnum('departments').array().notNull(),
+    /** Department codes; the service checks each exists (an array has no foreign key). */
+    departments: text('departments').array().notNull(),
     status: projectStatusEnum('status').notNull().default('planned'),
     startDate: date('start_date', { mode: 'string' }).notNull(),
     dueDate: date('due_date', { mode: 'string' }).notNull(),

@@ -1,4 +1,4 @@
-import { ROLES } from '@vertex-hub/contracts';
+import { DEPARTMENT_COLORS, ROLES } from '@vertex-hub/contracts';
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
@@ -14,7 +14,6 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { archivedAt, id, timestamps } from './columns.js';
-import { departmentCodeEnum } from './department-codes.js';
 import { images } from './images.js';
 
 /*
@@ -140,13 +139,24 @@ export const twoFactors = pgTable(
   (table) => [index('two_factors_user_id_idx').on(table.userId)],
 );
 
-/** The ten fixed departments (ADR 0014), seeded by migration; never archived in V1. */
+export const departmentColorEnum = pgEnum('department_color', DEPARTMENT_COLORS);
+
+/**
+ * Departments (ADR 0014, ADR 0043): ten seeded by migration, more added by the General Manager
+ * (F23). The code is the stable key other tables reference; archived ones have no members.
+ */
 export const departments = pgTable(
   'departments',
   {
     id: id(),
-    code: departmentCodeEnum('code').notNull().unique(),
+    code: text('code').notNull().unique(),
     name: text('name').notNull(),
+    description: text('description'),
+    color: departmentColorEnum('color').notNull(),
+    /** One of `DEPARTMENT_ICONS`. */
+    icon: text('icon').notNull(),
+    /** The order of active departments, from 1. */
+    position: integer('position').notNull(),
     managerId: uuid('manager_id').references(() => users.id),
     ...timestamps(),
     archivedAt: archivedAt(),

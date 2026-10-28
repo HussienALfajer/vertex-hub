@@ -9,7 +9,6 @@ export * from './catalog.js';
 export * from './clients.js';
 export * from './content.js';
 export * from './deliverables.js';
-export * from './department-codes.js';
 export * from './email.js';
 export * from './files.js';
 export * from './hr.js';

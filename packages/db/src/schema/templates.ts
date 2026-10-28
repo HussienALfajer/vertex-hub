@@ -16,10 +16,9 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { users } from './auth.js';
+import { departments, users } from './auth.js';
 import { archivedAt, id, timestamps } from './columns.js';
 import { deliverableKindEnum } from './deliverables.js';
-import { departmentCodeEnum } from './department-codes.js';
 import { projects } from './projects.js';
 import { retainerCycleLines, retainerCycles, retainers } from './retainers.js';
 import { subtaskRunModeEnum, taskPriorityEnum, tasks } from './tasks.js';
@@ -96,7 +95,9 @@ export const workTemplateSteps = pgTable(
     position: integer('position').notNull(),
     title: text('title').notNull(),
     brief: text('brief'),
-    department: departmentCodeEnum('department').notNull(),
+    department: text('department')
+      .notNull()
+      .references(() => departments.code),
     /** Work day the task is due from the run's start; null for repeated steps. */
     dueDay: integer('due_day'),
     priority: taskPriorityEnum('priority').notNull().default('normal'),
@@ -117,6 +118,7 @@ export const workTemplateSteps = pgTable(
     index('work_template_steps_template_id_idx').on(table.templateId, table.position),
     index('work_template_steps_stage_id_idx').on(table.stageId),
     index('work_template_steps_parent_step_id_idx').on(table.parentStepId),
+    index('work_template_steps_department_idx').on(table.department),
     check(
       'work_template_steps_estimate_check',
       sql`${table.estimateMinutes} between 30 and 12000 and ${table.estimateMinutes} % 30 = 0`,
@@ -161,7 +163,9 @@ export const workTemplateAssignees = pgTable(
     templateId: uuid('template_id')
       .notNull()
       .references(() => workTemplates.id),
-    department: departmentCodeEnum('department').notNull(),
+    department: text('department')
+      .notNull()
+      .references(() => departments.code),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id),
@@ -169,6 +173,7 @@ export const workTemplateAssignees = pgTable(
   (table) => [
     primaryKey({ columns: [table.templateId, table.department] }),
     index('work_template_assignees_user_id_idx').on(table.userId),
+    index('work_template_assignees_department_idx').on(table.department),
   ],
 );
 

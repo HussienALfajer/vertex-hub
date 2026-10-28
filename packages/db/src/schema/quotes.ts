@@ -21,12 +21,11 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { users } from './auth.js';
+import { departments, users } from './auth.js';
 import { catalogPackages, catalogServices } from './catalog.js';
 import { clientContacts, clients } from './clients.js';
 import { archivedAt, id, minorAmount, timestamps } from './columns.js';
 import { deliverableKindEnum } from './deliverables.js';
-import { departmentCodeEnum } from './department-codes.js';
 import { fileItems } from './files.js';
 import { leads } from './leads.js';
 import { currencyEnum, projects } from './projects.js';
@@ -188,7 +187,7 @@ export const quoteLines = pgTable(
     name: text('name').notNull(),
     description: text('description'),
     /** Service lines: the performing department. */
-    department: departmentCodeEnum('department'),
+    department: text('department').references(() => departments.code),
     /** Always 1 on package lines. */
     quantity: integer('quantity').notNull(),
     unitPriceMinor: minorAmount('unit_price_minor').notNull(),
@@ -206,6 +205,7 @@ export const quoteLines = pgTable(
     index('quote_lines_service_id_idx').on(table.serviceId),
     index('quote_lines_package_id_idx').on(table.packageId),
     index('quote_lines_template_id_idx').on(table.templateId),
+    index('quote_lines_department_idx').on(table.department),
     check(
       'quote_lines_item_check',
       sql`(${table.serviceId} is null) <> (${table.packageId} is null)`,
@@ -229,7 +229,9 @@ export const quoteLineItems = pgTable(
       .notNull()
       .references(() => catalogServices.id),
     name: text('name').notNull(),
-    department: departmentCodeEnum('department').notNull(),
+    department: text('department')
+      .notNull()
+      .references(() => departments.code),
     quantity: integer('quantity').notNull(),
     revisionRounds: integer('revision_rounds').notNull(),
     deliverableKind: deliverableKindEnum('deliverable_kind'),
@@ -242,6 +244,7 @@ export const quoteLineItems = pgTable(
     index('quote_line_items_line_id_idx').on(table.lineId, table.position),
     index('quote_line_items_service_id_idx').on(table.serviceId),
     index('quote_line_items_template_id_idx').on(table.templateId),
+    index('quote_line_items_department_idx').on(table.department),
     check('quote_line_items_quantity_check', sql`${table.quantity} between 1 and 999`),
     check('quote_line_items_revision_rounds_check', sql`${table.revisionRounds} between 0 and 20`),
   ],
