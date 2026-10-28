@@ -3,7 +3,7 @@
 Spec: `docs/specs/F23-departments-management.md` (Approved 2026-10-28) · ADR 0043 · PR split from the spec (1 records, 2 API, 3 screens).
 
 - Branch: `claude/wizardly-galileo-lr0tiv` (cloud session's designated branch; PR 1)
-- Stopped at: PR 1 reviewer findings fixed (post and shoot editing tasks checked, filters refuse unknown codes, archived mark on every filter, tests per write); next: `pnpm verify` again, then the PR
+- Stopped at: PR 1 open with auto-merge (`pnpm verify` passed, reviewer findings fixed); next: once it merges, PR 2 (Departments API) from `main` — first settle the open item on the list query with the owner
 
 ## PR 1 — Departments as records (contracts, db, api, web adjustments; no new screens)
 - [x] contracts: `departmentCodeSchema` as the pattern `^[a-z][a-z0-9_]{1,39}$`; `SYSTEM_DEPARTMENT_CODES` (today's `DEPARTMENT_CODES`); `DEPARTMENT_CAPABILITIES` and `DEPARTMENT_BRIEF_KINDS` keyed by system codes; `DEPARTMENT_COLORS`, `DEPARTMENT_ICONS`, `DEPARTMENT_SYSTEM_FUNCTIONS`; `departmentResponseSchema` gains `description`, `color`, `icon`, `position`, `archivedAt`; error code `DEPARTMENT_ARCHIVED` (`UNKNOWN_DEPARTMENT` exists); unit tests (pattern, system functions cover the capability keys)
@@ -11,7 +11,7 @@ Spec: `docs/specs/F23-departments-management.md` (Approved 2026-10-28) · ADR 00
 - [x] api: departments list read from the database wherever `DEPARTMENT_CODES` was used (task views, dashboard, report access); every write that takes a code checks it (`UNKNOWN_DEPARTMENT`, `DEPARTMENT_ARCHIVED` on writes; filters accept archived codes); lists and pickers in department order; notices and reminders of an archived department go to the General Managers (rule 14: `UserDirectory.functionManagers` and `functionMembers` at every listed call site, tested on the directory); filters refuse unknown codes; tests per write
 - [x] bridge: `openapi:export`, `api:generate`
 - [x] web: filters and pickers read the departments query instead of `DEPARTMENT_CODES` (tasks, board, workload, new task, catalog, projects, retainers, productivity, audit values); `ar.json` keys for the new error codes; fixtures adapted
-- [ ] wiring checklist, checks, reviewer, PR with auto-merge
+- [x] wiring checklist, checks, reviewer, PR with auto-merge
 
 ## PR 2 — Departments API
 - [ ] contracts: `departments.manage` (General Manager through `everything`); create, update, order, archive preview, archive, member and overview schemas; error codes (`DEPARTMENT_NAME_TAKEN`, `DEPARTMENT_ORDER_MISMATCH`, `TRANSFER_TARGET_REQUIRED`, `INVALID_TRANSFER_TARGET`, `DEPARTMENT_NOT_ARCHIVED`, `ALREADY_MEMBER`, `MANAGER_MEMBERSHIP_REQUIRED`); audit actions; notification types `department_member_added`, `department_member_removed`, `department_archived` (with `ar.json` and `packages/messages` texts)
