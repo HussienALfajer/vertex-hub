@@ -30,7 +30,7 @@ import {
   type TaskDetail,
   type TaskListQuery,
   type TaskPage,
-  type TaskReminderInput,
+  type TaskReminder,
   type TaskRevision,
   type TaskStatusChange,
   taskDependenciesInputSchema,
@@ -38,7 +38,7 @@ import {
   taskDetailSchema,
   taskListQuerySchema,
   taskPageSchema,
-  taskReminderInputSchema,
+  taskReminderSchema,
   taskRevisionSchema,
   taskStatusChangeSchema,
   type UpdateFollowing,
@@ -175,7 +175,7 @@ export class TasksController {
   remind(
     @CurrentUser() actor: CurrentUserInfo,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body({ schema: taskReminderInputSchema }) input: TaskReminderInput,
+    @Body({ schema: taskReminderSchema }) input: TaskReminder,
   ): Promise<void> {
     return this.reminders.remind(actor, id, input);
   }

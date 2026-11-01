@@ -6,7 +6,7 @@ Status: Approved · Date: 2026-11-01 · Scope: requested by the owner (2026-11-0
 Whoever asked for a task, or manages it, can nudge its assignee with one click: a "Remind" button on the tasks list and on the task page sends the assignee an important notification (bell and push), with an optional short note. It saves a message or a call when the work is late or urgent.
 
 ## In scope / out of scope
-- In: the "Remind" button on each row of the tasks list (`/tasks`) and on the task page, the dialog with an optional note, the `task_reminder` notification, its audit entry.
+- In: the "Remind" button on each row of the tasks list (`/tasks/list`) and on the task page, the dialog with an optional note, the `task_reminder` notification, its audit entry.
 - Out: automatic reminders (A07 and the F16 escalations already do that), reminders to anyone but the assignee, a limit on how often (owner, 2026-11-01: no limit).
 
 ## Roles and access
@@ -25,10 +25,10 @@ Whoever asked for a task, or manages it, can nudge its assignee with one click: 
 ## API
 | Method and path | Permission | Request | Response | Error codes |
 |---|---|---|---|---|
-| `POST /api/tasks/:id/remind` | `tasks.read` (rule 2 in the service) | `taskReminderInputSchema` (`{ note?: string }`) | 204 | `TASK_NOT_ASSIGNED`, `TASK_CLOSED`, `TASK_ARCHIVED`, `CANNOT_REMIND_SELF`, 403, 404 |
+| `POST /api/tasks/:id/remind` | `tasks.read` (rule 2 in the service) | `taskReminderSchema` (`{ note?: string }`) | 204 | `TASK_NOT_ASSIGNED`, `TASK_CLOSED`, `TASK_ARCHIVED`, `CANNOT_REMIND_SELF`, 403, 404 |
 
 ## Screens
-- Tasks list (`/tasks`): a bell icon button at the end of each row where `canRemind` holds, with a tooltip "Remind the assignee". It opens the dialog.
+- Tasks list (`/tasks/list`): a bell icon button next to the assignee's name in each row where `canRemind` holds, with a tooltip "Remind <name> of the task". It opens the dialog.
 - Task page: a "Remind" outline button beside the moves, where `permissions.canRemind` holds.
 - Dialog: names the assignee, an optional note (300 characters), "Send reminder". On success a toast "Reminder sent to <name>"; errors through their codes.
 
@@ -42,6 +42,6 @@ Whoever asked for a task, or manages it, can nudge its assignee with one click: 
 2. A subtask is reminded about like any task; its parent's assignee reminds through manage rights only when they hold them.
 
 ## Acceptance
-- As a department manager, open `/tasks`, click the bell on an open task assigned to someone else, write a note, send: the toast shows, and the assignee gets a push and an entry in "Needs you" with the note.
+- As a department manager, open `/tasks/list` ("All tasks"), click the bell on an open task assigned to someone else, write a note, send: the toast shows, and the assignee gets a push and an entry in "Needs you" with the note.
 - As that assignee, deliver or get the task approved: the reminder leaves "Needs you".
 - As an employee who did not create the task, the bell does not show.

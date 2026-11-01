@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { isTaskFinished, type TaskReminderInput } from '@vertex-hub/contracts';
+import { isTaskFinished, type TaskReminder } from '@vertex-hub/contracts';
 import type { Database } from '@vertex-hub/db';
 import { DATABASE } from '../../core/database/database.module.js';
 import { CodedException } from '../../core/errors/index.js';
@@ -25,7 +25,7 @@ export class RemindAssigneeService {
     private readonly center: NotificationCenter,
   ) {}
 
-  async remind(actor: CurrentUserInfo, id: string, input: TaskReminderInput): Promise<void> {
+  async remind(actor: CurrentUserInfo, id: string, input: TaskReminder): Promise<void> {
     const directories = { clients: this.clients, engagements: this.engagements };
     await this.db.transaction(async (tx) => {
       const access = await readableTask(tx, directories, actor, id);

@@ -5531,7 +5531,19 @@ function taskRoutes({
       canEditCriteria: live && r.manage,
       canTickCriteria: live && (r.work || r.manage),
       canSaveTemplate: live && r.assign,
+      canRemind: remindable(task),
     };
+  };
+  /** F06C rules 1 and 2: an open assigned task, by its creator or manage rights, not its assignee. */
+  const remindable = (task: TaskRecord): boolean => {
+    const r = rights(task);
+    return (
+      !task.archived &&
+      !!task.assigneeId &&
+      task.assigneeId !== me().user.id &&
+      !['approved', 'delivered', 'cancelled'].includes(task.status) &&
+      (r.creator || r.manage)
+    );
   };
 
   const summary = (task: TaskRecord): Task => {
@@ -6180,7 +6192,7 @@ function taskRoutes({
             ? order * (PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority))
             : order * a.dueDate.localeCompare(b.dueDate),
         )
-        .map(summary);
+        .map((t) => ({ ...summary(t), canRemind: remindable(t) }));
       const pageSize = Number(q.get('pageSize') ?? 50);
       const page = Number(q.get('page') ?? 1);
       return json(route, {
@@ -6710,6 +6722,10 @@ function taskRoutes({
         if (!assignee?.departments.some((d) => d.code === input.department)) task.assigneeId = null;
       }
       return answer();
+    }
+    if (part === 'remind' && method === 'POST') {
+      if (!can.canRemind) return fail(route, 403, null);
+      return route.fulfill({ status: 204 });
     }
     if (part === 'status') {
       const change = body<TaskStatusChange>();

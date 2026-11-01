@@ -48,6 +48,7 @@ import { CommentsSection } from './task-comments';
 import { CriteriaSection } from './task-criteria';
 import { TaskFilesSection } from './task-files';
 import { ChecklistSection, DependenciesSection, LinksSection, TaskSection } from './task-parts';
+import { RemindButton } from './task-remind';
 import { ClientResponsesSection, ClientTextSection, ReviewHistorySection } from './task-review';
 import { RevisionsSection } from './task-revisions';
 import { HandoverNoteSection, SubtasksSection } from './task-subtasks';
@@ -233,6 +234,7 @@ function TaskHero({
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {!archived && <FollowButton target={{ subject: 'task', id: task.id }} />}
+          {task.permissions.canRemind && <RemindButton task={task} />}
           <TaskActions task={task} focus={focus} onArchive={onArchive} />
         </div>
       </div>

@@ -1006,11 +1006,13 @@ export const taskClientTextInputSchema = z
 export type TaskClientTextInput = z.infer<typeof taskClientTextInputSchema>;
 
 /** F06C: a reminder to the assignee, with an optional note (blank is no note). */
-export const taskReminderInputSchema = z
+export const taskReminderSchema = z
   .object({ note: optionalText(TASK_REMINDER_NOTE_MAX).optional() })
-  .meta({ id: 'TaskReminderInput' });
+  .meta({ id: 'TaskReminder' });
 
-export type TaskReminderInput = z.infer<typeof taskReminderInputSchema>;
+export type TaskReminder = z.infer<typeof taskReminderSchema>;
+
+export type TaskReminderInput = z.input<typeof taskReminderSchema>;
 
 /**
  * F09 rule 1: a token of what a review looks at, the latest version of each deliverable and the

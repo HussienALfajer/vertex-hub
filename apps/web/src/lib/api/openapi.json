@@ -7783,7 +7783,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TaskReminderInput"
+                "$ref": "#/components/schemas/TaskReminder"
               }
             }
           }
@@ -69469,7 +69469,7 @@
           "status"
         ]
       },
-      "TaskReminderInput": {
+      "TaskReminder": {
         "type": "object",
         "properties": {
           "note": {

@@ -27,6 +27,7 @@ import type {
   TaskDependenciesInput,
   TaskQuestionInput,
   TaskReadinessInput,
+  TaskReminder,
   TaskStatusChange,
   UpdateTask,
   UpdateTaskChecklistItem,
@@ -262,6 +263,14 @@ export const useArchiveTask = (id: string) =>
 
 export const useRestoreTask = (id: string) =>
   useTasksMutation(() => call(api.POST('/api/tasks/{id}/restore', path(id))));
+
+/** F06C: remind a task's assignee; nothing on the task changes but its history. */
+export const useRemindTask = () =>
+  useTasksMutation(
+    ({ id, ...input }: TaskReminder & { id: string }) =>
+      call(api.POST('/api/tasks/{id}/remind', { ...path(id), body: input })),
+    [['audit']],
+  );
 
 // Checklist and links
 

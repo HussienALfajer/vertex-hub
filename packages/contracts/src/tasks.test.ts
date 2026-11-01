@@ -40,7 +40,7 @@ import {
   taskMoveNeedsNote,
   taskQuestionInputSchema,
   taskReadinessInputSchema,
-  taskReminderInputSchema,
+  taskReminderSchema,
   taskStatusChangeSchema,
   taskTreeQuerySchema,
   taskWorkloadQuerySchema,
@@ -178,14 +178,14 @@ describe('createTaskSchema', () => {
   });
 });
 
-describe('taskReminderInputSchema (F06C rule 5)', () => {
+describe('taskReminderSchema (F06C rule 5)', () => {
   it('trims the note, turns a blank one into none and caps it at 300 characters', () => {
-    expect(taskReminderInputSchema.parse({ note: '  العميل ينتظر ' })).toEqual({
+    expect(taskReminderSchema.parse({ note: '  العميل ينتظر ' })).toEqual({
       note: 'العميل ينتظر',
     });
-    expect(taskReminderInputSchema.parse({ note: '   ' })).toEqual({ note: null });
-    expect(taskReminderInputSchema.parse({})).toEqual({});
-    expect(taskReminderInputSchema.safeParse({ note: 'ن'.repeat(301) }).success).toBe(false);
+    expect(taskReminderSchema.parse({ note: '   ' })).toEqual({ note: null });
+    expect(taskReminderSchema.parse({})).toEqual({});
+    expect(taskReminderSchema.safeParse({ note: 'ن'.repeat(301) }).success).toBe(false);
   });
 });
 

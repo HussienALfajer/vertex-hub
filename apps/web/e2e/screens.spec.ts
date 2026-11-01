@@ -1178,6 +1178,21 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await screenshot(page, testInfo, `task-list-${colorScheme}`);
     });
 
+    test('task reminder dialog (F06C)', async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));
+      await mockApi(page, { signedIn: true });
+      await page.goto('/tasks/list');
+      await page
+        .getByRole('row')
+        .filter({ hasText: 'تصاميم منيو الخريف' })
+        .getByRole('button', { name: /^ذكّر .+ بالمهمة$/ })
+        .click();
+      const dialog = page.getByRole('dialog', { name: /^ذكّر .+ بالمهمة$/ });
+      await dialog.getByRole('textbox', { name: ar.tasks.remind.note }).fill('العميل ينتظر اليوم');
+      await screenshot(page, testInfo, `task-remind-${colorScheme}`);
+    });
+
     test('new task, both modes', async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1280, height: 1900 });
       await page.clock.setFixedTime(new Date(`${PROJECTS_TODAY}T09:00:00+03:00`));

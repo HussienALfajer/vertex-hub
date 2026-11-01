@@ -19650,7 +19650,7 @@ export interface components {
             overrideDependencies: boolean;
             reason?: string | null;
         };
-        TaskReminderInput: {
+        TaskReminder: {
             note?: string | null;
         };
         TaskDependenciesInput: {
@@ -30883,7 +30883,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TaskReminderInput"];
+                "application/json": components["schemas"]["TaskReminder"];
             };
         };
         responses: {
