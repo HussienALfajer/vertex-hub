@@ -40,6 +40,7 @@ import {
   taskMoveNeedsNote,
   taskQuestionInputSchema,
   taskReadinessInputSchema,
+  taskReminderInputSchema,
   taskStatusChangeSchema,
   taskTreeQuerySchema,
   taskWorkloadQuerySchema,
@@ -174,6 +175,17 @@ describe('createTaskSchema', () => {
     expect(parsed.brief).toBeNull();
     expect(parsed.dependsOn).toEqual([ids.user]);
     expect(parsed.links).toEqual([{ url: 'https://drive.example.com/a', label: null }]);
+  });
+});
+
+describe('taskReminderInputSchema (F06C rule 5)', () => {
+  it('trims the note, turns a blank one into none and caps it at 300 characters', () => {
+    expect(taskReminderInputSchema.parse({ note: '  العميل ينتظر ' })).toEqual({
+      note: 'العميل ينتظر',
+    });
+    expect(taskReminderInputSchema.parse({ note: '   ' })).toEqual({ note: null });
+    expect(taskReminderInputSchema.parse({})).toEqual({});
+    expect(taskReminderInputSchema.safeParse({ note: 'ن'.repeat(301) }).success).toBe(false);
   });
 });
 

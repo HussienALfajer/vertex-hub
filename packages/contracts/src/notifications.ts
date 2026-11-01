@@ -58,6 +58,8 @@ export const NOTIFICATION_TYPES = [
   'task_commented',
   'task_file_added',
   'task_requested',
+  /** F06C: a reminder sent by hand by the task's creator or a manager. */
+  'task_reminder',
   'tasks_generated',
   'task_approved',
   'task_opened',
@@ -316,6 +318,7 @@ const CATALOG: Record<
   task_commented: { category: 'tasks', subject: 'task', mutable: true },
   task_file_added: { category: 'tasks', subject: 'task', mutable: true },
   task_requested: { category: 'tasks', subject: 'task', mutable: false },
+  task_reminder: { category: 'tasks', subject: 'task', mutable: false },
   tasks_generated: { category: 'tasks', subject: 'template_run', mutable: false },
   task_approved: { category: 'tasks', subject: 'task', mutable: true },
   task_opened: { category: 'tasks', subject: 'task', mutable: true },
@@ -560,6 +563,7 @@ const CHANNELS: Record<NotificationType, Channels> = {
   task_commented: normal(),
   task_file_added: normal(),
   task_requested: important(),
+  task_reminder: important(),
   /** The managers' notice about unassigned tasks is important (`notificationPriority`). */
   tasks_generated: normal(),
   task_approved: normal(),
@@ -812,6 +816,8 @@ const ENGINE: Record<NotificationType, Engine> = {
   task_commented: merged,
   task_file_added: merged,
   task_requested: chain,
+  /** F06C: no merging, each click is its own notification (owner, 2026-11-01: no limit). */
+  task_reminder: action(),
   /** The managers' notice about unassigned tasks is in "Needs you" (`notificationBox`). */
   tasks_generated: info,
   task_approved: info,
@@ -1041,6 +1047,9 @@ export const profileChangeSchema = z.enum(PROFILE_CHANGES).meta({ id: 'ProfileCh
 export type ProfileChange = z.infer<typeof profileChangeSchema>;
 
 export const NOTIFICATION_EXCERPT_MAX = 140;
+
+/** F06C rule 5: the longest note of a reminder sent by hand. */
+export const TASK_REMINDER_NOTE_MAX = 300;
 
 const nameSchema = z.string();
 
@@ -1275,6 +1284,8 @@ export const NOTIFICATION_DATA_SCHEMAS = {
   /** Merged like `task_commented`: the latest file name, `count` files (F10). */
   task_file_added: taskData.extend({ file: nameSchema }),
   task_requested: taskData,
+  /** F06C: the sender is the actor; the note is optional. */
+  task_reminder: taskData.extend({ note: z.string().max(TASK_REMINDER_NOTE_MAX).nullable() }),
   tasks_generated: z.object({
     template: nameSchema,
     count: z.number().int().min(1),

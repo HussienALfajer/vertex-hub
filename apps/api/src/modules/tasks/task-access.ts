@@ -4,6 +4,7 @@ import {
   type DepartmentCode,
   hasPermission,
   isProjectClosed,
+  isTaskFinished,
   type Permission,
   permissionScopes,
   type RequestScope,
@@ -201,6 +202,29 @@ export const isReadOnly = (task: TaskAccess) =>
   !!task.project?.archived ||
   !!task.cycle?.retainerArchived;
 
+/** The rows with the records that decide access, in their order. */
+export async function accessOf(
+  executor: Database | Transaction,
+  directories: { clients: ClientDirectory; engagements: EngagementDirectory },
+  rows: readonly TaskRow[],
+): Promise<TaskAccess[]> {
+  const linked = (key: 'clientId' | 'projectId' | 'retainerCycleId') =>
+    rows.flatMap((row) => (row[key] ? [row[key]] : []));
+  const [clients, projects, cycles, parents] = await Promise.all([
+    directories.clients.summaries(linked('clientId'), executor),
+    directories.engagements.projects(linked('projectId'), executor),
+    directories.engagements.cycles(linked('retainerCycleId'), executor),
+    parentsOf(executor, rows),
+  ]);
+  return rows.map((row) => ({
+    ...row,
+    client: (row.clientId && clients.get(row.clientId)) || null,
+    project: (row.projectId && projects.get(row.projectId)) || null,
+    cycle: (row.retainerCycleId && cycles.get(row.retainerCycleId)) || null,
+    parent: (row.parentId && parents.get(row.parentId)) || null,
+  }));
+}
+
 /**
  * Loads a task the actor may read, else 404. A read-only task (rule 17) is readable by scope-all
  * holders of `tasks.manage` only. `forUpdate` locks the task row.
@@ -215,19 +239,8 @@ export async function readableTask(
   const query = executor.select(accessColumns).from(tasks).where(eq(tasks.id, id));
   const [row] = options.forUpdate ? await query.for('update') : await query;
   if (!row || !holdsAll(actor, 'tasks.read')) throw new NotFoundException();
-  const [client, projects, cycles, parents] = await Promise.all([
-    row.clientId ? directories.clients.summary(row.clientId, executor) : null,
-    directories.engagements.projects(row.projectId ? [row.projectId] : [], executor),
-    directories.engagements.cycles(row.retainerCycleId ? [row.retainerCycleId] : [], executor),
-    parentsOf(executor, [row]),
-  ]);
-  const task: TaskAccess = {
-    ...row,
-    client,
-    project: (row.projectId && projects.get(row.projectId)) || null,
-    cycle: (row.retainerCycleId && cycles.get(row.retainerCycleId)) || null,
-    parent: (row.parentId && parents.get(row.parentId)) || null,
-  };
+  const [task] = await accessOf(executor, directories, [row]);
+  if (!task) throw new NotFoundException();
   if (isReadOnly(task) && !holdsAll(actor, 'tasks.manage')) throw new NotFoundException();
   return task;
 }
@@ -391,6 +404,20 @@ export const isRefusedOnLinkedTask = (
 ): boolean =>
   !!task.postId && task.status === 'approved' && (to === 'delivered' || to === 'revisions');
 
+/** F06C rule 1: an assigned task that is live and neither finished nor cancelled. */
+export const isRemindable = (task: TaskAccess): boolean =>
+  !!task.assigneeId &&
+  !isReadOnly(task) &&
+  !isTaskFinished(task.status) &&
+  task.status !== 'cancelled';
+
+/** F06C rule 2: the creator or manage rights remind the assignee, who never reminds themselves. */
+export const remindsAssignee = (
+  actor: CurrentUserInfo,
+  task: TaskAccess,
+  rights: TaskRights = taskRights(actor, task),
+): boolean => task.assigneeId !== actor.id && (rights.creator || rights.manage);
+
 /** What the UI shows, and the moves it offers; the API checks each action again. */
 export function taskPermissions(
   actor: CurrentUserInfo,
@@ -431,6 +458,7 @@ export function taskPermissions(
       canEditCriteria: !readOnly && editsCriteria(rights),
       canTickCriteria: !readOnly && ticksCriteria(rights),
       canSaveTemplate: !task.parentId && rights.assign,
+      canRemind: isRemindable(task) && remindsAssignee(actor, task, rights),
     },
     allowedTransitions,
   };

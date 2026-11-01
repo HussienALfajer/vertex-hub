@@ -37,6 +37,7 @@ export const TASK_ACTION_TYPES = [
   'task_awaiting_client',
   'task_over_limit',
   'task_requested',
+  'task_reminder',
   'task_due_soon',
   'task_overdue',
   'task_overdue_escalated',
@@ -91,7 +92,7 @@ export function taskResolutions(
     before.assigneeId && before.assigneeId !== after.assigneeId
       ? [
           {
-            types: ['task_assigned', 'task_returned'],
+            types: ['task_assigned', 'task_returned', 'task_reminder'],
             outcome: 'void',
             recipients: [before.assigneeId],
           },
@@ -120,7 +121,8 @@ export function taskResolutions(
     voided.push(...TASK_QUESTION_TYPES);
   }
   if (!isTaskFinished(before.status) && isTaskFinished(after.status)) {
-    done.push(...TASK_DUE_TYPES);
+    // F06C: a reminder by hand is done with once the work is.
+    done.push(...TASK_DUE_TYPES, 'task_reminder');
   } else if (before.dueDate !== after.dueDate || before.dueTime !== after.dueTime) {
     voided.push(...TASK_DUE_TYPES);
   }

@@ -10,6 +10,7 @@ import { OverLimitReminders } from './over-limit-reminders.js';
 import { PostTaskHooks } from './post-task-hooks.js';
 import { PostTasks } from './post-tasks.js';
 import { QuestionReminders } from './question-reminders.js';
+import { RemindAssigneeService } from './remind-assignee.service.js';
 import { ShootTasks } from './shoot-tasks.js';
 import { SubtaskRuns } from './subtask-runs.js';
 import { TaskApprovals } from './task-approvals.js';
@@ -98,6 +99,7 @@ import { TasksService } from './tasks.service.js';
     TaskFileOwner,
     TaskReviews,
     TaskReviewsService,
+    RemindAssigneeService,
     TaskApprovals,
     ClientReviewHooks,
     PostTasks,

@@ -142,6 +142,10 @@ export const NOTIFICATION_TEXT = {
     other: '{{n}} ملف جديد على «{{task}}»',
   },
   task_requested: 'طلب جديد لقسمك «{{task}}» من {{actor}}',
+  task_reminder: {
+    plain: 'يذكّرك {{actor}} بالمهمة «{{task}}»',
+    note: 'يذكّرك {{actor}} بالمهمة «{{task}}»: {{note}}',
+  },
   tasks_generated_assigned: {
     zero: 'لا مهام من قالب «{{template}}»',
     one: 'أُسندت إليك مهمة من قالب «{{template}}»',
@@ -1904,6 +1908,12 @@ function taskText(
           subtask: notification.data.subtask,
         },
       );
+    case 'task_reminder': {
+      const { note } = notification.data;
+      return note
+        ? fill(text.task_reminder.note, { actor, task, note })
+        : fill(text.task_reminder.plain, { actor, task });
+    }
     case 'task_assigned': {
       const parent = notification.data.task.parent;
       return parent
