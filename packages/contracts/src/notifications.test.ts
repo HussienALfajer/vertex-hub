@@ -605,6 +605,8 @@ describe('inboxes and resolution (F16 rules B5–B6)', () => {
       'approval_no_response',
       'approval_expired',
       'task_requested',
+      // F06C, created after the backfill.
+      'task_reminder',
       'post_returned',
       'post_review_requested',
       'post_medical_review_requested',

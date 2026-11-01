@@ -9,7 +9,7 @@ import {
   TASK_SORTS,
   TASK_STATUSES,
   TASK_TYPES,
-  type Task,
+  type TaskListItem,
   type TaskPriority,
   type TaskStatus,
   type TaskType,
@@ -100,6 +100,7 @@ import {
   TaskStatusBadge,
   useEngagementLabel,
 } from './task-badges';
+import { RemindButton } from './task-remind';
 import { type TaskListFilters, taskListQuery, taskQuery } from './tasks.queries';
 
 type TaskSort = (typeof TASK_SORTS)[number];
@@ -687,7 +688,7 @@ function TasksTable({
   order,
   onSort,
 }: {
-  tasks: Task[];
+  tasks: TaskListItem[];
   archived: boolean;
   sort: TaskSort;
   order: SortDirection;
@@ -760,6 +761,7 @@ function TasksTable({
                       {task.assignee.name}
                       {!task.assignee.inDepartment && <NotInDepartmentBadge />}
                     </span>
+                    {task.canRemind && <RemindButton task={task} compact />}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">{t('tasks.unassigned')}</span>

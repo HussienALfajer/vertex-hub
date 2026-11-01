@@ -11,7 +11,13 @@ import {
   Query,
   SerializeOptions,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   type CreateTask,
   createTaskSchema,
@@ -24,6 +30,7 @@ import {
   type TaskDetail,
   type TaskListQuery,
   type TaskPage,
+  type TaskReminder,
   type TaskRevision,
   type TaskStatusChange,
   taskDependenciesInputSchema,
@@ -31,6 +38,7 @@ import {
   taskDetailSchema,
   taskListQuerySchema,
   taskPageSchema,
+  taskReminderSchema,
   taskRevisionSchema,
   taskStatusChangeSchema,
   type UpdateFollowing,
@@ -40,6 +48,7 @@ import {
 } from '@vertex-hub/contracts';
 import { RequirePermissions } from '../../core/access/index.js';
 import { CurrentUser, type CurrentUserInfo } from '../auth/index.js';
+import { RemindAssigneeService } from './remind-assignee.service.js';
 import { TaskCreation } from './task-creation.js';
 import { TaskWorkflowService } from './task-workflow.service.js';
 import { TasksService } from './tasks.service.js';
@@ -51,6 +60,7 @@ export class TasksController {
     private readonly tasks: TasksService,
     private readonly workflow: TaskWorkflowService,
     private readonly creation: TaskCreation,
+    private readonly reminders: RemindAssigneeService,
   ) {}
 
   @Get()
@@ -154,6 +164,20 @@ export class TasksController {
     @Body({ schema: taskStatusChangeSchema }) change: TaskStatusChange,
   ): Promise<TaskDetail> {
     return this.workflow.changeStatus(actor, id, change);
+  }
+
+  @Post(':id/remind')
+  @HttpCode(204)
+  @RequirePermissions('tasks.read')
+  @ApiNoContentResponse({
+    description: "Reminds the assignee: the task's creator or manage rights (spec F06C, rule 2)",
+  })
+  remind(
+    @CurrentUser() actor: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body({ schema: taskReminderSchema }) input: TaskReminder,
+  ): Promise<void> {
+    return this.reminders.remind(actor, id, input);
   }
 
   @Put(':id/dependencies')

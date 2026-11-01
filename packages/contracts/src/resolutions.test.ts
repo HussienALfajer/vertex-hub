@@ -57,7 +57,11 @@ describe('task resolutions (F16 rule B5, part C)', () => {
       { types: ['task_assigned', 'subtask_turn', 'subtask_handover'], outcome: 'done' },
     ]);
     expect(taskResolutions(task, { ...task, assigneeId: 'b' })).toEqual([
-      { types: ['task_assigned', 'task_returned'], outcome: 'void', recipients: ['a'] },
+      {
+        types: ['task_assigned', 'task_returned', 'task_reminder'],
+        outcome: 'void',
+        recipients: ['a'],
+      },
     ]);
   });
 
@@ -95,7 +99,7 @@ describe('task resolutions (F16 rule B5, part C)', () => {
     ]);
   });
 
-  it('closes the due reminders when finished and voids them when re-dated', () => {
+  it('closes the due reminders and the reminders by hand (F06C) when finished, and voids the due reminders when re-dated', () => {
     const working = { ...task, status: 'in_progress' as const };
     expect(taskResolutions(working, { ...working, status: 'approved' })).toEqual([
       {
@@ -105,6 +109,7 @@ describe('task resolutions (F16 rule B5, part C)', () => {
           'task_overdue_escalated',
           'task_due_shortly',
           'subtask_holding_next',
+          'task_reminder',
         ],
         outcome: 'done',
       },

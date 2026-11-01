@@ -26,7 +26,7 @@ import {
   queryListSchema,
   sortOrderSchema,
 } from './lists.js';
-import { NOTIFICATION_EXCERPT_MAX } from './notifications.js';
+import { NOTIFICATION_EXCERPT_MAX, TASK_REMINDER_NOTE_MAX } from './notifications.js';
 import { deliverableKindSchema } from './retainers.js';
 import {
   mentionedUserIds,
@@ -1005,6 +1005,15 @@ export const taskClientTextInputSchema = z
 
 export type TaskClientTextInput = z.infer<typeof taskClientTextInputSchema>;
 
+/** F06C: a reminder to the assignee, with an optional note (blank is no note). */
+export const taskReminderSchema = z
+  .object({ note: optionalText(TASK_REMINDER_NOTE_MAX).optional() })
+  .meta({ id: 'TaskReminder' });
+
+export type TaskReminder = z.infer<typeof taskReminderSchema>;
+
+export type TaskReminderInput = z.input<typeof taskReminderSchema>;
+
 /**
  * F09 rule 1: a token of what a review looks at, the latest version of each deliverable and the
  * text for the client. It only tells whether the content changed, so a plain 64-bit FNV-1a hash
@@ -1309,6 +1318,8 @@ export const taskPermissionsSchema = z
     canTickCriteria: z.boolean(),
     /** "Save as template": assign scope on a top-level task (F06B rule D1). */
     canSaveTemplate: z.boolean(),
+    /** F06C: remind the assignee (the creator or manage rights, never the assignee). */
+    canRemind: z.boolean(),
   })
   .meta({ id: 'TaskPermissions', description: 'What the caller may do, for the UI' });
 
@@ -1467,7 +1478,14 @@ export type TaskListQuery = z.infer<typeof taskListQuerySchema>;
 
 export type TaskListQueryInput = z.input<typeof taskListQuerySchema>;
 
-export const taskPageSchema = pageSchema(taskSchema).meta({ id: 'TaskPage' });
+/** A row of the tasks list: the task and whether the caller may remind its assignee (F06C). */
+export const taskListItemSchema = taskSchema
+  .extend({ canRemind: z.boolean() })
+  .meta({ id: 'TaskListItem' });
+
+export type TaskListItem = z.infer<typeof taskListItemSchema>;
+
+export const taskPageSchema = pageSchema(taskListItemSchema).meta({ id: 'TaskPage' });
 
 export type TaskPage = z.infer<typeof taskPageSchema>;
 

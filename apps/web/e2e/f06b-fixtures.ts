@@ -318,6 +318,7 @@ export function parentDetail(variant: Variant): TaskDetail {
       canEditCriteria: true,
       canTickCriteria: true,
       canSaveTemplate: true,
+      canRemind: true,
     },
     allowedTransitions: revisions ? ['in_progress', 'cancelled'] : ['internal_review', 'cancelled'],
   };

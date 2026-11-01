@@ -57,6 +57,7 @@ const SAMPLES: Record<NotificationType, unknown> = {
   task_commented: { task, excerpt: 'تعليق' },
   task_file_added: { task, file: 'menu.pdf' },
   task_requested: { task },
+  task_reminder: { task, note: 'العميل ينتظر' },
   tasks_generated: {
     template: 'حملة شهرية',
     count: 3,
@@ -399,6 +400,14 @@ describe('notification texts', () => {
     const { text, context } = notificationText(sample(type), departmentName);
     expect(text.length).toBeGreaterThan(5);
     expect(`${text} ${context ?? ''}`).not.toMatch(/\{\{|undefined|null/);
+  });
+
+  it('names who reminds, with the note when there is one (F06C)', () => {
+    expect(notificationText(sample('task_reminder'), departmentName).text).toBe(
+      'يذكّرك رنا بالمهمة «تصميم منيو»: العميل ينتظر',
+    );
+    const plain = sample('task_reminder', { data: { task, note: null } });
+    expect(notificationText(plain, departmentName).text).toBe('يذكّرك رنا بالمهمة «تصميم منيو»');
   });
 
   it('names the system when there is no actor', () => {

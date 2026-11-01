@@ -1,3 +1,5 @@
+import { businessDate, currentCycleNumber, cyclePeriod } from '@vertex-hub/contracts';
+import { formatCalendarDate } from '@vertex-hub/messages';
 import ar from '../src/i18n/locales/ar.json' with { type: 'json' };
 import { accountManagerMe, manager, mockApi, seedIds } from './fixtures';
 import { expect, test } from './test';
@@ -106,11 +108,15 @@ test('unticking the template makes the installments the milestones; renew keeps 
   await expect(accept.getByText(ar.quotes.accept.errors.retainer)).toBeVisible();
   await accept.getByRole('combobox', { name: ar.quotes.accept.retainer.renewed }).click();
   await page.getByRole('option', { name: 'إدارة السوشيال ميديا' }).click();
-  // F05B Q2, F05C: an open-ended retainer renews at its next cycle (from 1 March: cycle 9).
+  // F05B Q2, F05C: an open-ended retainer (from 1 March) renews at its next cycle after today's.
+  const next = currentCycleNumber('2026-03-01', businessDate()) + 1;
   await expect(
     accept.getByText(
       fill(ar.quotes.accept.retainer.renewFrom, {
-        cycle: cycleFrom('9', '1 تشرين الثاني 2026'),
+        cycle: cycleFrom(
+          String(next),
+          formatCalendarDate(cyclePeriod('2026-03-01', next).periodStart),
+        ),
       }),
     ),
   ).toBeVisible();

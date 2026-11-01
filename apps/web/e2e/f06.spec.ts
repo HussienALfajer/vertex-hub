@@ -169,6 +169,43 @@ test('an employee sees every task but acts only on their own', async ({ page }) 
   await expect(page.getByRole('option')).toContainText('كريم الزين');
 });
 
+test('a manager reminds the assignee from the list and the task page (F06C)', async ({ page }) => {
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true });
+  await page.goto('/tasks/list');
+  const row = page.getByRole('row').filter({ hasText: 'تصاميم منيو الخريف' });
+  const bell = row.getByRole('button', { name: /^ذكّر .+ بالمهمة$/ });
+  await expect(bell).toBeVisible();
+  await bell.click();
+
+  const dialog = page.getByRole('dialog', { name: /^ذكّر .+ بالمهمة$/ });
+  await dialog.getByRole('textbox', { name: ar.tasks.remind.note }).fill('العميل ينتظر اليوم');
+  const sent = page.waitForRequest(
+    (request) => request.method() === 'POST' && /\/api\/tasks\/[^/]+\/remind$/.test(request.url()),
+  );
+  await dialog.getByRole('button', { name: ar.tasks.remind.send }).click();
+  expect((await sent).postDataJSON()).toEqual({ note: 'العميل ينتظر اليوم' });
+  await expect(page.getByText(/^أُرسل التذكير إلى /)).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+
+  // The task page offers it too; a blank note is sent as none.
+  await page.goto(`/tasks/${seedIds.openingPosts}`);
+  await page.getByRole('button', { name: ar.tasks.remind.button, exact: true }).click();
+  const plain = page.waitForRequest((request) => /\/remind$/.test(request.url()));
+  await page.getByRole('dialog').getByRole('button', { name: ar.tasks.remind.send }).click();
+  expect((await plain).postDataJSON()).toEqual({});
+});
+
+test('an employee is not offered a reminder on a colleague’s task (F06C)', async ({ page }) => {
+  await onTasksToday(page);
+  await mockApi(page, { signedIn: true, me: employeeMe });
+  await page.goto(`/tasks/${seedIds.openingPosts}`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('بوستات أسبوع الافتتاح');
+  await expect(page.getByRole('button', { name: ar.tasks.remind.button, exact: true })).toHaveCount(
+    0,
+  );
+});
+
 test('the task list keeps its filters in the URL and sorts by column', async ({ page }) => {
   await onTasksToday(page);
   await mockApi(page, { signedIn: true, me: accountManagerMe });

@@ -116,6 +116,7 @@ export const AUDIT_ACTIONS = [
   'task.reviewed',
   'task.client_text_updated',
   'task.client_response_recorded',
+  'task.reminded',
   'task_checklist_item.created',
   'task_checklist_item.updated',
   'task_checklist_item.reordered',

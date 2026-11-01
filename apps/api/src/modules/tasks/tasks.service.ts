@@ -75,6 +75,7 @@ import { PostTaskHooks, unlinkRemovedTask } from './post-task-hooks.js';
 import { SubtaskRuns } from './subtask-runs.js';
 import {
   accessColumns,
+  accessOf,
   actorOf,
   assertTaskWritable,
   belongsTo,
@@ -83,11 +84,13 @@ import {
   hasClientScope,
   holdsAll,
   inClosedProject,
+  isRemindable,
   lockParentOf,
   ownsOpenRequest,
   type ParentRef,
   parentsOf,
   readableTask,
+  remindsAssignee,
   type TaskAccess,
   type TaskRow,
   taskPermissions,
@@ -260,8 +263,18 @@ export class TasksService {
         .offset((query.page - 1) * query.pageSize),
       this.db.select({ value: count() }).from(tasks).where(where),
     ]);
+    const [items, access] = await Promise.all([
+      this.present(rows, this.db, now),
+      accessOf(this.db, this.directories, rows),
+    ]);
     return {
-      items: await this.present(rows, this.db, now),
+      items: items.map((item, index) => {
+        const task = access[index];
+        return {
+          ...item,
+          canRemind: !!task && isRemindable(task) && remindsAssignee(actor, task),
+        };
+      }),
       total: total?.value ?? 0,
       page: query.page,
       pageSize: query.pageSize,

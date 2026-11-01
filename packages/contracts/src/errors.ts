@@ -287,6 +287,9 @@ export const ERROR_CODES = [
   'QUESTION_NO_REPLY',
   'QUESTION_CLOSED',
   'NOT_QUESTION_ASKER',
+  // F06C.
+  'TASK_NOT_ASSIGNED',
+  'CANNOT_REMIND_SELF',
 ] as const;
 
 export const errorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });
