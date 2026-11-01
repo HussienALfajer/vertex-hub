@@ -38,8 +38,9 @@ describe('task reminders by hand (F06C)', () => {
     return taskDetailSchema.parse(await response.json());
   }
 
-  async function listItem(taskId: string, cookie: string) {
-    const response = await client.get(`/api/tasks?search=${encodeURIComponent(cast.run)}`, cookie);
+  async function listItem(taskId: string, cookie: string, query = '') {
+    const search = encodeURIComponent(cast.run);
+    const response = await client.get(`/api/tasks?search=${search}${query}`, cookie);
     expect(response.status).toBe(200);
     return taskPageSchema.parse(await response.json()).items.find((item) => item.id === taskId);
   }
@@ -139,6 +140,34 @@ describe('task reminders by hand (F06C)', () => {
     expect(row?.resolution).toBe('done');
     expect((await detail(task.id, cast.designManager.cookie)).permissions.canRemind).toBe(false);
     await expectError(await remind(task.id, cast.designManager.cookie), 409, 'TASK_CLOSED');
+  });
+
+  it('voids the reminder and refuses a new one once the task is cancelled (rules 1 and 3)', async () => {
+    const task = await designTask();
+    expect((await remind(task.id, cast.designManager.cookie)).status).toBe(204);
+    await cast.moveOk(task.id, cast.designManager.cookie, {
+      status: 'cancelled',
+      note: 'لم يعد مطلوبًا',
+    });
+    const [row] = await remindersOf(cast.designer.id, task.id);
+    expect(row?.resolution).toBe('void');
+    expect((await detail(task.id, cast.designManager.cookie)).permissions.canRemind).toBe(false);
+    expect(
+      (await listItem(task.id, cast.designManager.cookie, '&status=cancelled'))?.canRemind,
+    ).toBe(false);
+    await expectError(await remind(task.id, cast.designManager.cookie), 409, 'TASK_CLOSED');
+  });
+
+  it('voids the reminder and refuses a new one on an archived task (rules 1 and 3)', async () => {
+    const task = await designTask();
+    expect((await remind(task.id, cast.gm.cookie)).status).toBe(204);
+    const archived = await client.post(`/api/tasks/${task.id}/archive`, cast.gm.cookie);
+    expect(archived.status, await archived.clone().text()).toBe(200);
+    const [row] = await remindersOf(cast.designer.id, task.id);
+    expect(row?.resolution).toBe('void');
+    // Only scope-all managers read it now; the reminder is refused for them too.
+    expect((await detail(task.id, cast.gm.cookie)).permissions.canRemind).toBe(false);
+    await expectError(await remind(task.id, cast.gm.cookie), 409, 'TASK_ARCHIVED');
   });
 
   it('voids the previous assignee’s reminder on a reassignment', async () => {

@@ -10,6 +10,7 @@ import {
   retainerDetailSchema,
   retainerTermListSchema,
   retainerTermSchema,
+  TERM_RENEWAL_DAYS,
 } from '@vertex-hub/contracts';
 import {
   auditEntries,
@@ -585,7 +586,10 @@ describe("retainer terms (F05B T1–T12, E1–E3, F05C T1'–T5')", () => {
       const created = await retainer({ term: term(1, [3000]) });
       await runJob(end(1));
       await runJob(start(2));
-      // The one-cycle renewal is within 30 days of its own end once it starts: it renews too.
+      // The one-cycle renewal renews within 30 days of its own end (T7): on the day it starts
+      // when its cycle has 30 days or fewer, a day later in a 31-day cycle.
+      const renewsOn = addDays(dayAfterTerm(end(2)), -TERM_RENEWAL_DAYS);
+      if (renewsOn > start(2)) await runJob(renewsOn);
       const [next, renewal, first] = await listTerms(created.id);
       expect([first?.status, renewal?.status, next?.status]).toEqual([
         'completed',
