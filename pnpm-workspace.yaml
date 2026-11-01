@@ -22,3 +22,5 @@ overrides:
   multer: ^2.5.0
   # @hookform/resolvers pins zod 4.6.5. GHSA-mrhx-c7xc-m3w5.
   '@hookform/resolvers>zod': ^4.6.7
+  # @tanstack/router-core's lock held seroval 1.6.7. GHSA-97r2-qh9m-474h, GHSA-wp97-x4hv-qvhp, GHSA-7rv5-mrxv-xcr9.
+  seroval: ^1.6.8
