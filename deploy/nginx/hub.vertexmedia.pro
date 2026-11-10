@@ -195,6 +195,8 @@ server {
     # Hashed build assets never change: cache them for a year.
     location /assets/ {
         try_files $uri =404;
+        # Replaces the server block's `limit_conn perip 100` here (vertexhub-limits.conf).
+        limit_conn vhassets 1000;
         include snippets/vertexhub-headers.conf;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
         access_log off;
