@@ -47,7 +47,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0041](0041-subtasks-and-task-questions.md) | Subtasks as tasks under a parent, run modes through dependencies, questions in the task thread | Accepted |
 | [0042](0042-content-captions-per-platform-and-planning.md) | Content: captions per platform group, a media layout on the post, and planning data owned by content | Accepted |
 | [0043](0043-departments-as-records.md) | Departments as records: a stable text code, archiving with a transfer, system functions falling back to the General Manager | Accepted |
-| [0044](0044-mizan-integration-outbox-and-cutover.md) | The Mizan integration: an ordered outbox, a fail-open period check, a one-time cutover replaying final states | Proposed |
+| [0044](0044-mizan-integration-outbox-and-cutover.md) | The Mizan integration: an ordered outbox, a fail-open period check, a one-time cutover replaying final states | Accepted |
 
 Template:
 

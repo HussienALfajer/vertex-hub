@@ -1,6 +1,6 @@
 # F18A — Mizan integration (the Hub's side)
 
-Status: Draft · Date: 2026-11-13 · Scope: `docs/product/v2-scope.md` §F18 (plan of 2026-11-13) · ADRs: 0006, 0013, 0018, 0024, 0025, 0028, 0035, 0037, 0043, 0044 · Mizan (read-only, `D:\vertex-mizan`): ADR 0006, 0008, 0014, 0017, 0019; open question Q5; specs S05, S06, S08, S09, S10
+Status: Approved · Date: 2026-11-13 · Scope: `docs/product/v2-scope.md` §F18 (plan of 2026-11-13) · ADRs: 0006, 0013, 0018, 0024, 0025, 0028, 0035, 0037, 0043, 0044 · Mizan (read-only, `D:\vertex-mizan`): ADR 0006, 0008, 0014, 0017, 0019; open question Q5; specs S05, S06, S08, S09, S10
 
 ## Summary
 Vertex Mizan is the agency's ledger and the Hub stays the operational system (ADR 0035). Mizan's `/v1` contract is implemented and deployed. F18A builds everything Mizan's open question Q5 lists for the Hub:

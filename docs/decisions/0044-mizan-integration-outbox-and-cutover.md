@@ -1,6 +1,6 @@
 # 0044 — The Hub's side of the Mizan integration: an ordered outbox, a fail-open period check, and a one-time cutover replaying each document's final state
 
-Status: Proposed · Date: 2026-11-13
+Status: Accepted · Date: 2026-11-13 (owner, with the F18A spec)
 
 ## Context
 ADR 0035 makes Vertex Mizan the ledger and the Hub the operational system. It fixes the shape of the integration: an outbox written in the change's transaction, delivery with an idempotency key, closed periods respected, and a daily reconciliation. Mizan's contract (its ADR 0006, 0008, 0014, 0017, 0019; specs S05, S06, S08, S10) is now implemented and deployed. It also requires:
