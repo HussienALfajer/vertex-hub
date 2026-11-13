@@ -8,7 +8,7 @@ V1 runs the client lifecycle. V2 makes the system reach every person wherever th
 
 - an installable app with notifications that arrive with the app closed and the phone locked, and a complete notification engine;
 - HR: employee files, attendance, leave, payroll, commissions and profit shares;
-- full accounting, built as a separate product, **Vertex Mizan**, and integrated with the Hub (ADR 0035);
+- full accounting, built inside the Hub (ADR 0035);
 - a client portal with login;
 - chat between staff, and between the company and its clients;
 - an interactive board, last.
@@ -28,8 +28,6 @@ The directions below are what the owner approved in the V2 discussion (2026-10-2
 
 ## 3. Features and build order
 
-Two tracks run in parallel: the Hub (this repository) and Vertex Mizan (its own repository, ADR 0035).
-
 | Order | Feature | Depends on |
 |---|---|---|
 | 1 | F16 Notifications 2.0, installable app and announcements | — |
@@ -38,8 +36,7 @@ Two tracks run in parallel: the Hub (this repository) and Vertex Mizan (its own 
 | 4 | F06B Tasks 2.0: subtasks, questions, attachments and smart creation | F06, F07, F10, F16 |
 | 5 | F08B Content 2.0: per-platform captions, media and tasks at creation, calendar | F08, F06B, F10, F16 |
 | 5b | F23 Departments management: create, archive with transfer, identity, members, overview | F01, F16 |
-| 6 | F18A Mizan integration: outbox, the `/v1` events, period check, held events, daily reconciliation, opening snapshot and history replay | Mizan's `/v1` contract, implemented and deployed (2026-11) |
-| 6b | F18 remainder: purchases for clients, profitability in the Hub, the cash box on payments | Additions to Mizan's `/v1` (a purchase event, a read API for profitability, cash boxes) |
+| 6 | F18 Accounting inside the Hub: ledger, cash and banks, expenses and suppliers, statements, profitability (several features, split by its spec) | F13, F12, F17 |
 | 7 | F19 HR: payroll, commissions and profit shares | F17, F18; Q15 and Q16 |
 | 8 | F20 Client portal (with client conversations) | F16 |
 | 9 | F21 Chat | F16, F20 for client conversations |
@@ -47,9 +44,9 @@ Two tracks run in parallel: the Hub (this repository) and Vertex Mizan (its own 
 
 HR is split around accounting because payroll shares need trusted revenue and profit figures (owner, 2026-10-20).
 
-F01C, F06B and F08B were added on 2026-10-25 (owner): they improve the daily work of every department, F18 waits on Mizan, and F08B builds on F06B's subtasks. F01C comes first because it is small, independent and every later screen shows its images.
+F01C, F06B and F08B were added on 2026-10-25 (owner): they improve the daily work of every department, and F08B builds on F06B's subtasks. F01C comes first because it is small, independent and every later screen shows its images.
 
-F23 was added on 2026-10-28 (owner): the General Manager adds and archives departments instead of a code change; it is independent of Mizan, so it runs before F18.
+F23 was added on 2026-10-28 (owner): the General Manager adds and archives departments instead of a code change; it is small and independent, so it runs before F18.
 
 ## 4. Features
 
@@ -208,29 +205,18 @@ Added by the owner on 2026-10-28. ADR 0043 supersedes the fixed departments of A
 - Automatic publishing through the platforms' APIs and pulling their statistics (excluded from V1, `v1-scope.md` F08).
 - Comments on a point of an image or a moment of a video: part of F20.
 
-### F18 — Accounting through Vertex Mizan
-The owner wants a complete, comprehensive and professional accounting system. It is built as Vertex Mizan, and the Hub integrates with it (ADR 0035).
+### F18 — Accounting inside the Hub
+The owner wants a complete, comprehensive and professional accounting system, built inside the Hub (ADR 0035, owner, 2026-11-13). The Hub is both the operational system (invoices, payments, expenses, the ad budget wallet, payroll) and the ledger: each financial document writes its journal entry in the same transaction.
 
-- **Roles:** the Hub stays the operational system (invoices, payments, expenses, payroll), and Mizan is the ledger.
-- **Integration:**
-  - every financial event in the Hub is posted to Mizan through an outbox, with an idempotency key;
-  - the Hub chooses the cash box when a payment is recorded;
-  - closed periods in Mizan block Hub changes dated inside them;
-  - a daily reconciliation report shows any event that did not arrive.
 - **Purchases for clients** (the owner's example: fireworks bought for $200 for a shoot and sold to the client for $300):
   - a separate line type with cost, price, supplier and receipt, shown as its own invoice line;
   - its margin is counted on its own, outside the project's service profit and outside every employee share;
   - one concept with the ad budget wallet of F12.
-- **Profitability** by client, project, department and service, from Mizan's dimensions, shown in the Hub.
-- **Accounting features kept from the analysis,** in Mizan or the Hub as ADR 0035 splits them: a chart of accounts in Arabic, automatic double-entry journals, cash boxes and banks, person wallets, transfers and currency exchange, general and recurring expenses, employee custody and advances, suppliers and payables, monthly period close, the financial statements, partner profit distribution, exchange gains and losses, a cash forecast, and later receipt reading by AI.
-- **History:** resolved by Mizan's S10 and ADR 0019 (owner, 2026-11-12): a snapshot of the open documents as of 2026-09-30, then every event dated from the books start, 2026-10-01, replayed in the Hub's order (Q17).
-- **Plan** (owner, 2026-11-13):
-  - **F18A, one spec** (`docs/specs/F18A-mizan-integration.md`, written with `/spec`): everything Mizan's open question Q5 lists for the Hub, against the contract in Mizan's ADR 0006 and 0008 and specs S05, S06, S08, S09 and S10, with the JSON Schema and examples from `pnpm --filter @vertex-mizan/contracts export:hub-schema`. That is the outbox and its worker, every `/v1` event, the fields the events need, the period check, held and refused events, the daily reconciliation report, the opening snapshot and the replay. It is split into several PRs.
-  - **Payments carry the method only** (cash, bank transfer, e-wallet), as `/v1` defines them; Mizan maps each method and currency to its account. The Hub picks a cash box once Mizan adds cash boxes to `/v1`.
-  - **A service on every revenue line and a department on every project expense are required.** The Hub suggests them from the source (the quote line, the retainer, the project's departments) and Finance confirms. An invoice is not issued and an expense is not saved without them. Finance completes the documents dated from 2026-10-01 before the replay.
-  - **Reopening a completed or cancelled project stays allowed** and notifies the accountant, who corrects the ledger by a manual entry, until Mizan adds `project.reopened` (Mizan's Q16); the Hub then sends it.
-  - **Later, after Mizan's additions:** purchases for clients, profitability shown in the Hub, the cash box on payments.
-- **Gaps found in the Hub** (2026-11-13), for the F18A spec: automatic invoice drafts never set a line's service; a line's department is only the service's current department, which can change; a line's source is derivable (milestone, retainer charge or extra-work link, with the charge's kind and the invoice's origin) but a deposit has no flag; retainer charges store `cycle_start` and no cycle end; voids, milestone dones and project completion or cancellation are timestamps (the project's are cleared on reopen), not dates; project expenses have no department; the rate has no history (the audit log only); and due-date, service, expense and spend edits, milestone reopens and charges settled outside each need their event.
+- **Profitability** by client, project, department and service, from the dimensions on every journal line.
+- **Accounting features kept from the analysis** (confirmed or changed in the spec): a chart of accounts in Arabic, automatic double-entry journals, cash boxes and banks, person wallets, transfers and currency exchange, general and recurring expenses, employee custody and advances, suppliers and payables, monthly period close, the financial statements, partner profit distribution, exchange gains and losses, a cash forecast, and later receipt reading by AI.
+- **Dimensions** (to confirm in the spec): a service on every revenue line and a department on every project expense, suggested from the source (the quote line, the retainer, the project's departments) and confirmed by Finance.
+- **Gaps found in the Hub** (2026-11-13), for the F18 spec: automatic invoice drafts never set a line's service; a line's department is only the service's current department, which can change; a deposit has no flag of its own; retainer charges store `cycle_start` and no cycle end; voids, milestone dones and project completion or cancellation are timestamps (the project's are cleared on reopen), not dates; project expenses have no department; the rate has no history (the audit log only).
+- **Plan:** one `/spec` session for the full analysis and the owner's questions, then several features and PRs in the order the spec sets.
 
 ### F19 — HR: payroll, commissions and profit shares
 - **Compensation as components per employee:**
@@ -242,7 +228,7 @@ The owner wants a complete, comprehensive and professional accounting system. It
   - a commission for bringing a client (from the lead owner of F03);
   - bonuses.
 - **Deductions:** lateness (after approval), absence, advances repaid in installments, penalties, social insurance and salary tax. Syrian rates are not confirmed; verify them at the spec.
-- **Monthly payroll run:** draft → review → General Manager approval → paid → locked. Each employee gets an Arabic payslip PDF, and the payroll is posted to Mizan.
+- **Monthly payroll run:** draft → review → General Manager approval → paid → locked. Each employee gets an Arabic payslip PDF, and the payroll posts its journal entry in the Hub's books (F18).
 - **A transparent commission statement:** the employee sees how their share was computed, invoice by invoice and payment by payment.
 - **Rules for shares:** a share paid on a later voided or refunded amount is deducted the next month, and purchases for clients never count toward any share.
 - **Open:** the base of a department share (Q15), the period and losses of a profit share (Q16), and the salary currency (decided in the spec).
@@ -302,7 +288,3 @@ Approved by the owner in full (2026-10-20). The spec's analysis completes it int
 - **Analysis notes for that discussion:**
   - the request combines three things: a whiteboard canvas, a rich document, and live presenting;
   - the discussion leaned toward building on open-source editors (Excalidraw, TipTap, Yjs) rather than writing editors from scratch.
-
-## 5. Vertex Mizan
-
-Accounting is built in parallel as Vertex Mizan, a separate product in its own repository, `vertex-mizan`, where its scope, phases and roadmap live. The Hub's side of the decision and the integration: ADR 0035.

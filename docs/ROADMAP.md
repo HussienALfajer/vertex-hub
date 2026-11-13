@@ -2,7 +2,7 @@
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Feature IDs refer to `docs/product/v1-scope.md` (V1) and `docs/product/v2-scope.md` (V2). Production is deployed once at the end of each phase (`docs/workflow.md`).
 
-**V1 complete (owner, 2026-10-20):** every feature and automation of `docs/product/v1-scope.md` (Phases 0 to 4) is delivered and runs in production (first deployed 2026-10-19, `141fe6f`; the latest deploy is the last deploy item below). One launch item stays open by the owner's choice: off-server backups and a tested restore wait until a storage service is subscribed (ADR 0034); until then backups exist on the server only. V2's direction is approved (`docs/product/v2-scope.md`, 2026-10-20): the Hub track below; accounting is built in parallel as Vertex Mizan, tracked in its own repository (ADR 0035). The V1 success metrics (`v1-scope.md` §8) are measured around 2026-12-19, two months after all users were onboarded.
+**V1 complete (owner, 2026-10-20):** every feature and automation of `docs/product/v1-scope.md` (Phases 0 to 4) is delivered and runs in production (first deployed 2026-10-19, `141fe6f`; the latest deploy is the last deploy item below). One launch item stays open by the owner's choice: off-server backups and a tested restore wait until a storage service is subscribed (ADR 0034); until then backups exist on the server only. V2's direction is approved (`docs/product/v2-scope.md`, 2026-10-20): the Hub track below; accounting is built inside the Hub as F18 (ADR 0035, owner, 2026-11-13). The V1 success metrics (`v1-scope.md` §8) are measured around 2026-12-19, two months after all users were onboarded.
 
 ## Phase 0 — Foundation
 - [x] Product scope, decisions and working method documented
@@ -79,8 +79,7 @@ Order and directions: `docs/product/v2-scope.md` §3–4. Each feature starts wi
 - [x] Production deploy of F23 (2026-10-28, `9e1ec0d`: migrations 0095–0098 applied by this deploy, the seeded departments got their colors, icons and order; no `deploy/` changes, so no `provision.sh` run)
 - [x] F06C Task reminders by hand (requested by the owner 2026-11-01; spec `docs/specs/F06C-task-reminders.md`): a bell next to the assignee on the tasks list and a "Remind" button on the task page send the assignee an important `task_reminder` notification (in-app and push) with an optional note; the task's creator and whoever manages it may send it, with no limit; migration 0099
 - [x] Production deploy of F06C (2026-11-01, `d5deba2`: migration 0099 applied by this deploy; no `deploy/` changes, so no `provision.sh` run)
-- [~] F18A Mizan integration (Mizan's Q5; plan approved 2026-11-13, `v2-scope.md` F18): outbox and worker, the `/v1` events with the fields they need, period check, held events, daily reconciliation, opening snapshot and history replay from 2026-10-01. Spec: `docs/specs/F18A-mizan-integration.md` (five PRs), ADR 0044
-- [ ] F18 remainder: purchases for clients, profitability in the Hub, the cash box on payments (after Mizan adds them to `/v1`, ADR 0035)
+- [ ] F18 Accounting inside the Hub (ADR 0035, owner, 2026-11-13; `v2-scope.md` F18): the full analysis and the owner's questions in a `/spec` session, then several features and PRs
 - [ ] F19 HR: payroll, commissions and profit shares (Q15, Q16)
 - [ ] F20 Client portal (with client conversations)
 - [ ] F21 Chat

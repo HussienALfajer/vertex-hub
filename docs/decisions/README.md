@@ -38,7 +38,7 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0032](0032-signed-in-devices.md) | Signed-in devices: a browser cookie, a hardware key and a local GeoIP database | Accepted |
 | [0033](0033-noto-kufi-arabic-typeface.md) | Noto Kufi Arabic is the Arabic typeface (replaces Madani Arabic) | Accepted |
 | [0034](0034-backups-on-the-server-for-now.md) | Backups stay on the server until an off-server storage is subscribed | Accepted |
-| [0035](0035-accounting-in-vertex-mizan.md) | Accounting in Vertex Mizan, a separate product integrated with the Hub through an API | Accepted |
+| [0035](0035-accounting-inside-the-hub.md) | Accounting is built inside the Hub: one module, the Hub is the operational system and the ledger | Accepted |
 | [0036](0036-installable-app-and-web-push.md) | Installable app and Web Push: a service worker, one subscription per session, sent by the worker | Accepted |
 | [0037](0037-notification-engine-2.md) | Notification engine 2.0: priorities, channel policy, self-resolving rows, escalation and a minute job | Accepted |
 | [0038](0038-announcements-and-audiences.md) | Announcements and one audience resolver | Accepted |
@@ -47,7 +47,6 @@ Short records of decisions that shape the system. Each has a status: **Accepted*
 | [0041](0041-subtasks-and-task-questions.md) | Subtasks as tasks under a parent, run modes through dependencies, questions in the task thread | Accepted |
 | [0042](0042-content-captions-per-platform-and-planning.md) | Content: captions per platform group, a media layout on the post, and planning data owned by content | Accepted |
 | [0043](0043-departments-as-records.md) | Departments as records: a stable text code, archiving with a transfer, system functions falling back to the General Manager | Accepted |
-| [0044](0044-mizan-integration-outbox-and-cutover.md) | The Mizan integration: an ordered outbox, a fail-open period check, a one-time cutover replaying final states | Accepted |
 
 Template:
 
