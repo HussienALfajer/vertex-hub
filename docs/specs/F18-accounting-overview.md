@@ -1,6 +1,6 @@
 # F18 — Accounting inside the Hub: overview
 
-Status: Draft · Date: 2026-11-13 · Scope: `docs/product/v2-scope.md` §F18 · ADRs: 0006, 0007, 0013, 0014, 0035, 0045
+Status: Approved · Date: 2026-11-13 · Scope: `docs/product/v2-scope.md` §F18 · ADRs: 0006, 0007, 0013, 0014, 0035, 0045
 
 ## Summary
 Vertex Media's finance in the Hub is operational only: invoices, payments, project expenses, retainer charges, the ad budget wallet and salary history, with revenue and overdue reports. There is no chart of accounts, no journal, no periods, no cash boxes, suppliers, credit notes, allocations, tax or exchange differences. F18 builds a complete, professional double-entry accounting system inside the Hub (ADR 0035): the Hub stays the operational system and becomes the ledger, and every financial document writes its journal entry in the same transaction as its change.

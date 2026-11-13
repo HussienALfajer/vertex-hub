@@ -1,6 +1,6 @@
 # F18A — Ledger core
 
-Status: Draft · Date: 2026-11-13 · Scope: `docs/product/v2-scope.md` §F18, `docs/specs/F18-accounting-overview.md` · ADRs: 0006, 0007, 0013, 0014, 0035, 0045
+Status: Approved · Date: 2026-11-13 · Scope: `docs/product/v2-scope.md` §F18, `docs/specs/F18-accounting-overview.md` · ADRs: 0006, 0007, 0013, 0014, 0035, 0045
 
 ## Summary
 The Hub has no books: no chart of accounts, no journal and no periods. F18A builds the ledger every later F18 package posts into: an Arabic chart of accounts for a media agency, balanced double-entry journal entries in USD and SYP with the rate, the USD amount and five dimensions on every line, manual entries reviewed by a second person, fiscal years and monthly periods with close and the year's closing entry, and the opening balances at the books' start date (2026-10-01). It adds the `accountant` role and exports the posting service and the period guard that F18B onward use. F18A posts nothing automatically: documents start posting in F18B.
