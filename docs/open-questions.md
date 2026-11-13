@@ -5,7 +5,7 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | ID | Question | Needed before | Recommendation |
 |---|---|---|---|
 | Q15 | A department revenue share (e.g. the developer's 50% of the Development department): computed on invoiced or collected amounts, and before or after the department's direct expenses? | F19 spec | Collected amounts only, on invoice lines whose service belongs to the department; excluding purchases for clients, ad budget and taxes; after the direct expenses recorded on those projects for that department. A share paid on an amount later voided or refunded is deducted from the next payroll |
-| Q16 | A company profit share: settled monthly, quarterly or yearly, and is a losing month carried forward? | F19 spec | Settled quarterly on Mizan's net profit, with an optional monthly advance; losses carried forward within the fiscal year and reset at its start |
+| Q16 | A company profit share: settled monthly, quarterly or yearly, and is a losing month carried forward? | F19 spec | Settled quarterly on the net profit from the Hub's books (F18), with an optional monthly advance; losses carried forward within the fiscal year and reset at its start |
 
 ## Resolved
 
@@ -33,4 +33,3 @@ Decisions that belong to the owner. Agents must not guess answers to these. When
 | Madani Arabic license and files (was Q11) | Dropped: Noto Kufi Arabic is the Arabic typeface (ADR 0033) | 2026-10-19 |
 | Original vector logo files (was Q12) | Not needed: the traced SVGs in `brand/logo/` are the logo, and the wordmark stays as traced | 2026-10-19 |
 | Swap on the server (was Q7) | Yes: a 4 GB swap file with `vm.swappiness=10`, added on 2026-10-19 and kept by `provision.sh` (`docs/deployment.md`) | 2026-10-19 |
-| How the Hub's existing financial history reaches Mizan (was Q17) | A snapshot of the open documents as of 2026-09-30, then every event dated from Mizan's books start (2026-10-01) replayed through the posting API in the Hub's order (Mizan's S10 and ADR 0019); built in F18A | 2026-11-12 |

@@ -122,8 +122,6 @@ The dev database in a cloud session is disposable, so the hook migrates it. No s
 ### Sessions with several repositories
 Repository hooks do not run when a session holds several repositories, so `scripts/cloud-session.sh` does not run either. Run `vertex-session` (or `vertex-session <repo-dir>` for one repository) at the start: it starts one PostgreSQL 17 container, `vertex-postgres`, on `127.0.0.1:5432` and prepares every Vertex repository it finds. A single-repository session started afterwards in the same VM reuses that server.
 
-F18 (accounting through Vertex Mizan, ADR 0035) is worked on this way: one session with `vertex-mizan` next to this repository.
-
 ### What stays local
 - **Production deploys** (`ssh vertex`): the server's SSH key never goes into a cloud environment, where every process in the session could read it.
 - **The owner's acceptance test in the browser:** the app in a cloud VM is not reachable from the owner's browser. After the merge, run the cleanup line in the local checkout (it pulls `main`), then `pnpm db:migrate` and `pnpm dev`, and report findings to a cloud session (the same one if it is still open), which fixes them in a new PR.
