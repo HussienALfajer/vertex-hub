@@ -36,5 +36,5 @@ The owner chose the third (2026-10-20).
 - The Hub's F18 starts once Mizan's posting API, chart of accounts and cash boxes are stable. Until then the Hub's V1 finance (ADR 0024) stays as it is.
 - Two tracks double the owner's decisions. Hub and Mizan sessions alternate, and two large specs are not opened in the same week.
 - Events the Hub sends follow ADR 0006 (minor units, a currency code and a stored rate). Mizan's money rules must be compatible.
-- How the Hub's existing financial history reaches Mizan is open (Q17).
+- The Hub's existing financial history reaches Mizan through an opening snapshot as of 2026-09-30 and a replay of every event from 2026-10-01 (resolved Q17, 2026-11-12; Mizan's ADR 0019).
 - For V2 this replaces the V1 deferral "use an off-the-shelf accounting tool in parallel".
