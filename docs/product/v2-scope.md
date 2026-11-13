@@ -38,7 +38,8 @@ Two tracks run in parallel: the Hub (this repository) and Vertex Mizan (its own 
 | 4 | F06B Tasks 2.0: subtasks, questions, attachments and smart creation | F06, F07, F10, F16 |
 | 5 | F08B Content 2.0: per-platform captions, media and tasks at creation, calendar | F08, F06B, F10, F16 |
 | 5b | F23 Departments management: create, archive with transfer, identity, members, overview | F01, F16 |
-| 6 | F18 Accounting through Vertex Mizan: integration, purchases for clients, profitability | Mizan's posting API, chart of accounts and cash boxes stable (ADR 0035) |
+| 6 | F18A Mizan integration: outbox, the `/v1` events, period check, held events, daily reconciliation, opening snapshot and history replay | Mizan's `/v1` contract, implemented and deployed (2026-11) |
+| 6b | F18 remainder: purchases for clients, profitability in the Hub, the cash box on payments | Additions to Mizan's `/v1` (a purchase event, a read API for profitability, cash boxes) |
 | 7 | F19 HR: payroll, commissions and profit shares | F17, F18; Q15 and Q16 |
 | 8 | F20 Client portal (with client conversations) | F16 |
 | 9 | F21 Chat | F16, F20 for client conversations |
@@ -222,7 +223,14 @@ The owner wants a complete, comprehensive and professional accounting system. It
   - one concept with the ad budget wallet of F12.
 - **Profitability** by client, project, department and service, from Mizan's dimensions, shown in the Hub.
 - **Accounting features kept from the analysis,** in Mizan or the Hub as ADR 0035 splits them: a chart of accounts in Arabic, automatic double-entry journals, cash boxes and banks, person wallets, transfers and currency exchange, general and recurring expenses, employee custody and advances, suppliers and payables, monthly period close, the financial statements, partner profit distribution, exchange gains and losses, a cash forecast, and later receipt reading by AI.
-- **Open:** how the Hub's history reaches Mizan (Q17).
+- **History:** resolved by Mizan's S10 and ADR 0019 (owner, 2026-11-12): a snapshot of the open documents as of 2026-09-30, then every event dated from the books start, 2026-10-01, replayed in the Hub's order (Q17).
+- **Plan** (owner, 2026-11-13):
+  - **F18A, one spec** (`docs/specs/F18A-mizan-integration.md`, written with `/spec`): everything Mizan's open question Q5 lists for the Hub, against the contract in Mizan's ADR 0006 and 0008 and specs S05, S06, S08, S09 and S10, with the JSON Schema and examples from `pnpm --filter @vertex-mizan/contracts export:hub-schema`. That is the outbox and its worker, every `/v1` event, the fields the events need, the period check, held and refused events, the daily reconciliation report, the opening snapshot and the replay. It is split into several PRs.
+  - **Payments carry the method only** (cash, bank transfer, e-wallet), as `/v1` defines them; Mizan maps each method and currency to its account. The Hub picks a cash box once Mizan adds cash boxes to `/v1`.
+  - **A service on every revenue line and a department on every project expense are required.** The Hub suggests them from the source (the quote line, the retainer, the project's departments) and Finance confirms. An invoice is not issued and an expense is not saved without them. Finance completes the documents dated from 2026-10-01 before the replay.
+  - **Reopening a completed or cancelled project stays allowed** and notifies the accountant, who corrects the ledger by a manual entry, until Mizan adds `project.reopened` (Mizan's Q16); the Hub then sends it.
+  - **Later, after Mizan's additions:** purchases for clients, profitability shown in the Hub, the cash box on payments.
+- **Gaps found in the Hub** (2026-11-13), for the F18A spec: automatic invoice drafts never set a line's service; a line's department is only the service's current department, which can change; a line's source is derivable (milestone, retainer charge or extra-work link, with the charge's kind and the invoice's origin) but a deposit has no flag; retainer charges store `cycle_start` and no cycle end; voids, milestone dones and project completion or cancellation are timestamps (the project's are cleared on reopen), not dates; project expenses have no department; the rate has no history (the audit log only); and due-date, service, expense and spend edits, milestone reopens and charges settled outside each need their event.
 
 ### F19 — HR: payroll, commissions and profit shares
 - **Compensation as components per employee:**
