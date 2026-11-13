@@ -79,7 +79,14 @@ Order and directions: `docs/product/v2-scope.md` §3–4. Each feature starts wi
 - [x] Production deploy of F23 (2026-10-28, `9e1ec0d`: migrations 0095–0098 applied by this deploy, the seeded departments got their colors, icons and order; no `deploy/` changes, so no `provision.sh` run)
 - [x] F06C Task reminders by hand (requested by the owner 2026-11-01; spec `docs/specs/F06C-task-reminders.md`): a bell next to the assignee on the tasks list and a "Remind" button on the task page send the assignee an important `task_reminder` notification (in-app and push) with an optional note; the task's creator and whoever manages it may send it, with no limit; migration 0099
 - [x] Production deploy of F06C (2026-11-01, `d5deba2`: migration 0099 applied by this deploy; no `deploy/` changes, so no `provision.sh` run)
-- [ ] F18 Accounting inside the Hub (ADR 0035, owner, 2026-11-13; `v2-scope.md` F18): the full analysis and the owner's questions in a `/spec` session, then several features and PRs
+- [~] F18 Accounting inside the Hub (ADR 0035, owner, 2026-11-13; `v2-scope.md` F18): overview `docs/specs/F18-accounting-overview.md` with the cross-cutting decisions (ADR 0045: books from 2026-10-01, accrual, USD functional currency, an `accountant` role with maker-checker, monthly periods), seven packages in this order. Each later package gets its own `/spec` session for its own questions when its turn comes.
+  - [~] F18A Ledger core: chart of accounts, journals in USD and SYP with dimensions, manual entries with review, periods and year close, opening balances (spec `docs/specs/F18A-ledger-core.md`; four PRs)
+  - [ ] F18B Automatic posting from invoices, payments, the ad wallet, expenses and retainers, and the backfill from 2026-10-01 (own `/spec`)
+  - [ ] F18C Cash and banks: boxes, banks, wallets, custody, transfers and exchange, reconciliation (own `/spec`)
+  - [ ] F18D Purchases, suppliers and expenses, purchases for clients (own `/spec`)
+  - [ ] F18E Advanced receivables: allocations, prepayments, credit notes and refunds, aging (own `/spec`)
+  - [ ] F18F Reports: statements, ledgers, profitability, exchange revaluation, cash forecast, dashboard, exports (own `/spec`)
+  - [ ] F18G Partners, tax and fixed assets (own `/spec`)
 - [ ] F19 HR: payroll, commissions and profit shares (Q15, Q16)
 - [ ] F20 Client portal (with client conversations)
 - [ ] F21 Chat
